@@ -1,4 +1,4 @@
-# Architecture
+# Chapter 1 - Architecture: core-first, flat modules, contracts at the boundary
 
 This chapter describes how LACC is structured and the reasoning behind those
 choices. It grows as the implementation does.

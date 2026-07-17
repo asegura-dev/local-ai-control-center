@@ -1,4 +1,4 @@
-# Development
+# Chapter 3 - Development: setup, the quality gate, and doc discipline
 
 This chapter explains how to set up the project locally, run its quality gate,
 and keep documentation honest as the code grows.
