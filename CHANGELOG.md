@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-17
+
+### Added
+- Workspaces (`workspace`): a validated, frozen contract around a root directory
+  with an enforced boundary. `is_within` and `resolve_within` resolve `..` and
+  symlinks before checking, so paths cannot escape the workspace. Root creation is
+  explicit via `ensure`, never a silent side effect of construction.
+- `workspace_from_config`: builds an operational workspace from a configuration's
+  `workspace_root`, the seam connecting config to workspace.
+
+
 ## [0.1.0] - 2026-07-17
 
 ### Added

@@ -5,7 +5,7 @@ workflows. This package currently exposes its version and a placeholder
 entry point; functional modules are added incrementally in later phases.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["__version__"]
 
