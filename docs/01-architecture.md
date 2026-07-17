@@ -43,10 +43,10 @@ Early versions use a small set of flat modules rather than many subpackages.
 Subpackages are introduced only when a module grows large enough to justify the
 split. This avoids empty folders and premature abstraction.
 
-The package currently exposes its version and a placeholder entry point.
-Functional modules such as configuration, workspaces, providers, audit, and
-skills are added one at a time in later phases, each with its own tests and
-documentation.
+The package currently exposes its version, a validated configuration contract
+(`config`), and run identity (`run`). Further functional modules such as
+workspaces, providers, audit, and skills are added one at a time in later phases,
+each with its own tests and documentation.
 
 ## Future direction
 

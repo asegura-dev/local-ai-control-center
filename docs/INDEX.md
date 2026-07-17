@@ -17,6 +17,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 | ADR | File | The decision |
 |---|---|---|
 | 001 | [foundational-structure](adr/ADR-001-foundational-structure.md) | Core-first dependency direction, the `src/` package layout, flat modules until a split is justified, and the base stack (uv, Pydantic contracts at the boundary, the quality gate of ruff/mypy/pytest). The decision every later one assumes. |
+| 002 | [core-configuration-and-run-identity](adr/ADR-002-core-configuration-and-run-identity.md) | The first functional slice: a validated `Config` contract (network off by default, audit level, workspace root) loadable from YAML, and a human-readable time-ordered `run_id`. Adds pydantic and pyyaml. |
 
 ## Top-level files
 
