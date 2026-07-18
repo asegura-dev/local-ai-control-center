@@ -44,9 +44,10 @@ Subpackages are introduced only when a module grows large enough to justify the
 split. This avoids empty folders and premature abstraction.
 
 The package currently exposes its version, a validated configuration contract
-(`config`), run identity (`run`), and a workspace with boundary enforcement
-(`workspace`). Further functional modules such as providers, audit, and skills are
-added one at a time in later phases, each with its own tests and documentation.
+(`config`), run identity (`run`), a workspace with boundary enforcement
+(`workspace`), and a restrictive-by-default permission system (`permissions`).
+Further functional modules such as providers, audit, and skills are added one at a
+time in later phases, each with its own tests and documentation.
 
 ## Future direction
 

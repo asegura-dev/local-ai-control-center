@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-17
+
+### Added
+- Permissions (`permissions`): a frozen contract with one capability per field
+  (`read_files`, `write_files`, `network`, `run_commands`), all disabled by default
+  so an empty `Permissions()` grants nothing.
+- Configuration as a ceiling: `effective_permissions` intersects granted
+  capabilities with what the configuration allows, so a capability the
+  configuration forbids cannot be granted by a skill.
+- `check` returns a `PermissionCheck` naming exactly which capabilities are
+  missing, for execution previews; `require` raises `PermissionDenied` on the
+  execution path.
+
+
 ## [0.2.0] - 2026-07-17
 
 ### Added
