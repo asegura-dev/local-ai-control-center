@@ -1,46 +1,65 @@
 # Chapter 2 - Roadmap: where LACC is and where it is heading
 
-This chapter describes where LACC is today and the direction it is heading.
-Nearer versions are described with more confidence; later ones are direction and
-are expected to change as the project grows.
+This chapter describes what LACC has today and the path ahead. Nearer phases are
+described with more confidence; later ones are direction and are expected to change
+as real code reveals what each one actually needs. This is not a schedule and
+carries no dates.
 
-## Current state
+## Done
 
-The project is at an early scaffold stage. The package is installable, exposes
-its version, and passes a quality gate of linting, type checking, and a small
-test suite. It does not yet contain functional modules.
+- **v0.0.1 - Scaffold.** An installable package, the quality gate (lint, format,
+  strict type checking, tests), the documentation system, and the MIT license.
+- **v0.1.0 - Configuration and run identity.** A validated, frozen `Config`
+  contract loadable from YAML with network access off by default, and a
+  human-readable, time-ordered `run_id` for each execution.
+- **v0.2.0 - Workspaces and boundary enforcement.** A validated `Workspace` whose
+  boundary cannot be escaped: candidate paths are resolved before checking, so `..`
+  segments and symlinks are caught rather than trusted.
 
-## Near-term direction (v0.1.x)
+## Next: completing the control core
 
-The v0.1.x series is intended to build the core foundation, one small module at
-a time, each with its own tests and documentation:
+These phases build the remaining pieces a control layer needs before anything can
+run end to end:
 
-- Configuration and run identifiers.
-- Workspace contracts, with deterministic boundary checks.
-- A provider abstraction and a deterministic mock provider that runs offline.
-- An audit log foundation that records executions.
-- A command-line workflow that ties these together end to end.
-- A first demonstration skill, read-only and low risk, that exercises the whole
-  design: permission checks, an execution preview, confirmation, and an audited
-  result.
+- **Permissions.** A restrictive-by-default permission contract: every capability
+  starts disabled, and a skill declares only what it needs. This is the mechanism
+  the whole project is built around.
+- **Providers.** An abstraction over the thing that produces model output, plus a
+  deterministic mock provider that runs offline. The mock makes the rest of the
+  system testable without any engine installed.
+- **Audit.** An append-only record of what was executed, stamped with the `run_id`,
+  so a run can be traced after the fact.
 
-The order above reflects current intent, not a fixed schedule. Steps may be
-split, merged, or reordered as real code reveals what each one actually needs.
+## Then: the first end-to-end run
 
-## Later direction
+With the control core in place, these phases connect it into something that
+actually runs:
 
-Beyond v0.1.x, the following are directions under consideration, not commitments:
+- **Execution preview.** Showing what a skill would do before it does it - the
+  human-in-the-loop moment the design exists for.
+- **A demonstration skill.** A small read-only skill that exercises the whole path:
+  permission check, preview, confirmation, execution, audit record.
+- **A command-line workflow.** The `lacc` command that ties configuration,
+  workspace, permissions, provider, preview, and audit into one flow.
 
-- A lightweight system profiler.
-- A dashboard interface consuming the same core.
-- An expanded execution preview and initial support for chaining skills.
-- Integration with real local inference backends.
+At the end of this group LACC does something complete from start to finish, against
+a mock provider. This is the point where the foundations become a working tool.
 
-These are described so the overall intent is visible. They are expected to
-change, and some may not happen at all.
+## Toward v1.0
+
+Beyond the first end-to-end run, the direction is to make it real and usable:
+integrating an actual local inference engine in place of the mock, hardening the
+boundaries against real-world use, and documenting the project well enough for
+someone else to adopt it. A v1.0 means the control loop is stable and trustworthy,
+not that every feature exists.
+
+Further ideas - a system profiler, a dashboard interface consuming the same core,
+chaining skills together - are under consideration, not commitments. Some may not
+happen at all.
 
 ## What this roadmap is not
 
-This is not a release schedule and carries no dates. It is a statement of
-direction meant to keep development focused and honest. Where a feature is not
-yet implemented, it is described as intent, not as a guarantee.
+Not a release schedule, and not a promise. It is a statement of direction meant to
+keep development focused and honest. Where a feature is not yet implemented, it is
+described as intent. Phases may be split, merged, or reordered as real code reveals
+what each one needs.
