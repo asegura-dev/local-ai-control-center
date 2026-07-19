@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-19
+
+### Added
+- Audit log (`audit`): append-only JSON Lines records written inside the workspace,
+  with the path resolved through the workspace boundary. Each event carries a UTC
+  timestamp, the `run_id`, a closed-set event kind, a message, and optional detail.
+- `audit_level` gains behavior: `standard` (the default) records metadata only,
+  omitting prompt and completion content; `full` records content as an explicit
+  opt-in.
+- `audit_failure_policy` in the configuration: `abort` (the default) refuses to
+  proceed when a record cannot be written; `continue` proceeds unrecorded. Each
+  option documents its consequence.
+
+
 ## [0.4.0] - 2026-07-17
 
 ### Added

@@ -57,6 +57,17 @@ Further ideas - a system profiler, a dashboard interface consuming the same core
 chaining skills together - are under consideration, not commitments. Some may not
 happen at all.
 
+One direction worth naming, because it changes assumptions rather than adding to
+them: running LACC across several machines the user owns, on their own private
+network, so a laptop can dispatch heavy work to a desktop with a dedicated GPU
+while light tasks stay local. This stays local-first in the sense that matters -
+own hardware, own network, own data, nothing sent to a third-party service - but
+the moment LACC listens on a port, the threat model changes. The current design
+assumes one user on one machine; permissions guard against misbehaving skills, not
+against someone who reaches the interface. That would need its own decision record
+covering authentication, authorization, and whether the audit trail should sit
+outside the reachable workspace. It is a direction for after v1.0, not a plan.
+
 ## What this roadmap is not
 
 Not a release schedule, and not a promise. It is a statement of direction meant to

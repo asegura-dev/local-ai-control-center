@@ -45,10 +45,11 @@ split. This avoids empty folders and premature abstraction.
 
 The package currently exposes its version, a validated configuration contract
 (`config`), run identity (`run`), a workspace with boundary enforcement
-(`workspace`), a restrictive-by-default permission system (`permissions`), and a
-provider port with a deterministic offline mock (`provider`). Further functional
-modules such as audit and skills are added one at a time in later phases, each with
-its own tests and documentation.
+(`workspace`), a restrictive-by-default permission system (`permissions`), a
+provider port with a deterministic offline mock (`provider`), and an append-only
+audit log (`audit`). Further functional modules such as skills and the execution
+preview are added one at a time in later phases, each with its own tests and
+documentation.
 
 ## Future direction
 

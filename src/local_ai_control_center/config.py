@@ -17,6 +17,9 @@ from pydantic import BaseModel, ConfigDict, Field
 AuditLevel = Literal["standard", "full"]
 """How much detail the audit trail records. A closed set, not a free string."""
 
+AuditFailurePolicy = Literal["abort", "continue"]
+"""What to do when an audit record cannot be written."""
+
 
 class Config(BaseModel):
     """Validated configuration for one LACC run.
@@ -35,8 +38,20 @@ class Config(BaseModel):
         default="standard",
         description="Level of detail recorded by the audit trail.",
     )
+
     workspace_root: Path = Field(
         description="Base directory LACC treats as its working area.",
+    )
+    audit_failure_policy: AuditFailurePolicy = Field(
+        default="abort",
+        description=(
+            "What happens when an audit record cannot be written. "
+            "'abort' raises, so an execution that cannot be recorded does not "
+            "proceed - safer for traceability, but a full disk or permission "
+            "error stops LACC. 'continue' proceeds unrecorded - more robust, "
+            "at the cost of a gap in the audit trail exactly when something is "
+            "going wrong."
+        ),
     )
 
 

@@ -1,7 +1,7 @@
 # ADR-005 - Provider abstraction and a deterministic mock
 
 - **Status:** Accepted - implemented (v0.4.0)
-- **Date:** 2026-07-17
+- **Date:** 2026-07-18
 - **Context:** LACC needs model output, but the core must not depend on any
   particular engine. Calling an engine directly would tie the project to it and
   make everything downstream untestable without that engine installed. This ADR
