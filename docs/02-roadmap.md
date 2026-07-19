@@ -37,6 +37,10 @@ actually runs:
 
 - **Execution preview.** Showing what a skill would do before it does it - the
   human-in-the-loop moment the design exists for.
+- **An execution cycle.** The seam that runs an action through the whole system:
+  preview, permission check, provider call, audit record. Without it every caller
+  would have to orchestrate the modules itself. This is also where the first
+  integration tests live, exercising the modules together rather than in isolation.
 - **A demonstration skill.** A small read-only skill that exercises the whole path:
   permission check, preview, confirmation, execution, audit record.
 - **A command-line workflow.** The `lacc` command that ties configuration,

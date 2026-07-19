@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-07-19
+
+### Added
+- Execution preview (`preview`): describes what an action would do before it runs
+  and whether it would be allowed, with no side effects - nothing is written, no
+  provider is called.
+- `IntendedAction`: a generic description (name, summary, required capabilities,
+  target paths) that anything can produce, so the preview does not depend on skills.
+- Previews report every refusal reason at once - missing capabilities and paths
+  escaping the workspace boundary - and render a readable block for confirmation.
+
+
 ## [0.5.0] - 2026-07-19
 
 ### Added
