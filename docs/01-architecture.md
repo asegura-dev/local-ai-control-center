@@ -45,9 +45,10 @@ split. This avoids empty folders and premature abstraction.
 
 The package currently exposes its version, a validated configuration contract
 (`config`), run identity (`run`), a workspace with boundary enforcement
-(`workspace`), and a restrictive-by-default permission system (`permissions`).
-Further functional modules such as providers, audit, and skills are added one at a
-time in later phases, each with its own tests and documentation.
+(`workspace`), a restrictive-by-default permission system (`permissions`), and a
+provider port with a deterministic offline mock (`provider`). Further functional
+modules such as audit and skills are added one at a time in later phases, each with
+its own tests and documentation.
 
 ## Future direction
 

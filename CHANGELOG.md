@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-17
+
+### Added
+- Provider port (`provider`): an abstract `Provider` with a single operation
+  (prompt in, `Completion` out) so the core never depends on a concrete engine.
+  Completions carry the name of the provider that produced them, so results can be
+  attributed in an audit record.
+- `MockProvider`: a deterministic implementation that touches no network, model, or
+  filesystem. Answers from caller-supplied scripted responses, or falls back to a
+  predictable response derived from the prompt. Makes every later phase testable
+  offline.
+
+
 ## [0.3.0] - 2026-07-17
 
 ### Added
