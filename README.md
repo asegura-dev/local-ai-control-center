@@ -1,5 +1,7 @@
 # Local AI Control Center (LACC)
 
+[![Quality gate](https://github.com/asegura-dev/local-ai-control-center/actions/workflows/quality-gate.yml/badge.svg)](https://github.com/asegura-dev/local-ai-control-center/actions/workflows/quality-gate.yml)
+
 A local-first framework for private, reproducible, auditable AI-assisted
 workflows.
 
