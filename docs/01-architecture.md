@@ -48,9 +48,10 @@ The package currently exposes its version, a validated configuration contract
 (`workspace`), a restrictive-by-default permission system (`permissions`), a
 provider port with a deterministic offline mock (`provider`), an append-only audit
 log (`audit`), a side-effect-free execution preview (`preview`), the execution
-cycle that runs an action through all of them (`cycle`), and skills that produce
-those actions (`skill`). The command-line workflow that ties everything into a
-usable tool is added next, with its own tests and documentation.
+cycle that runs an action through all of them (`cycle`), skills that produce those
+actions (`skill`), and a command-line interface that ties everything into a usable
+tool (`cli`). Interface code (Typer, Rich) lives only in the CLI; the core stays
+free of it. Later phases add a system profiler and a real provider.
 
 ## Future direction
 

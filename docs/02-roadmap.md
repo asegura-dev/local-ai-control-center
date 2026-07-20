@@ -11,50 +11,56 @@ carries no dates.
   strict type checking, tests), the documentation system, and the MIT license.
 - **v0.1.0 - Configuration and run identity.** A validated, frozen `Config`
   contract loadable from YAML with network access off by default, and a
-  human-readable, time-ordered `run_id` for each execution.
+  human-readable, time-ordered `run_id`.
 - **v0.2.0 - Workspaces and boundary enforcement.** A validated `Workspace` whose
-  boundary cannot be escaped: candidate paths are resolved before checking, so `..`
-  segments and symlinks are caught rather than trusted.
-- **v0.3.0 - Permissions.** A restrictive-by-default permission contract: every
-  capability starts disabled, configuration acts as a ceiling, and a check reports
-  exactly which capabilities are missing without raising.
-- **v0.4.0 - Providers.** A provider port with a single operation, plus a
-  deterministic mock provider that runs offline, making every later phase testable
-  without any engine installed.
-- **v0.5.0 - Audit.** An append-only `.jsonl` record stamped with the `run_id`,
-  with a standard level that omits sensitive detail and a full level that keeps it.
-- **v0.6.0 - Execution preview.** A side-effect-free description of an intended
-  action - whether it would be allowed and why not - shown before anything runs.
-- **v0.7.0 - Execution cycle.** The seam that drives an action through the whole
-  system in order: preview, confirm, execute, record. Confirmation is supplied by
-  the caller, not performed in the core. Home of the first integration tests.
-- **v0.8.0 - Skills.** An abstract `Skill` contract that declares capabilities and
-  produces an action through a pure `plan`, plus a read-only file-summarization
-  skill that runs the whole path end to end through the cycle.
+  boundary cannot be escaped: candidate paths are resolved before checking.
+- **v0.3.0 - Permissions.** A restrictive-by-default permission contract with the
+  configuration acting as a ceiling no permission can exceed.
+- **v0.4.0 - Provider port.** An abstract provider with a deterministic offline
+  mock, so the rest of the system is testable without any engine.
+- **v0.5.0 - Audit log.** Append-only JSON Lines inside the workspace, with privacy
+  as the default and a configurable write-failure policy.
+- **v0.6.0 - Execution preview.** A side-effect-free description of what an action
+  would do and whether it would be allowed.
+- **v0.7.0 - Execution cycle.** The one place that runs an action through the whole
+  system, with confirmation supplied as a function, plus the first integration
+  tests. Continuous integration and an example configuration were added here too.
+- **v0.8.0 - Skills.** An abstract `Skill` contract that produces an action through
+  a pure `plan`, plus a read-only file-summarization skill.
+- **v0.9.0 - Command-line interface.** The `lacc` command (Typer + Rich): `run` and
+  `preview`, with human confirmation defaulting to no. **LACC now runs end to end
+  from a terminal** against the mock provider - the foundations became a working
+  tool.
 
-## Next: the first end-to-end run
+## Next
 
-The control core is complete. These phases connect it into something that actually
-runs, against the mock provider:
+The end-to-end path works against a mock. What remains turns it into something that
+runs real models, safely.
 
-- **A command-line workflow.** The `lacc` command that ties configuration,
-  workspace, permissions, provider, preview, and audit into one flow, so a skill
-  can be run from a terminal rather than from a test.
-
-At the end of this group LACC does something complete from start to finish. This is
-the point where the foundations become a working tool.
+- **Permission sourcing and a profiler.** Two related pieces. First, resolve where
+  a skill's granted permissions come from - the CLI currently hardcodes them, a
+  deliberate stopgap noted in ADR-010 that must not last. Second, a profiler that
+  **detects and reports**: whether an inference engine is present, which models are
+  installed, and what the machine can actually run. Detection only - it reads and
+  reports, with no side effects. Pulling a missing model is an action, and like
+  every action in LACC it belongs behind explicit, confirmed control, not something
+  the profiler does on its own.
+- **A real provider.** A second implementation of the provider port backed by a
+  local engine (such as Ollama), reached through the same contract as the mock.
+  This is where generation parameters and model selection are finally decided,
+  informed by what the profiler found. It is also the most unpredictable phase:
+  real models, real hardware, real latency, exercised through the CLI that already
+  exists.
 
 ## Toward v1.0
 
-Beyond the first end-to-end run, the direction is to make it real and usable:
-integrating an actual local inference engine in place of the mock, hardening the
-boundaries against real-world use, and documenting the project well enough for
-someone else to adopt it. A v1.0 means the control loop is stable and trustworthy,
-not that every feature exists.
+Beyond a working real provider, the direction is to make it dependable: hardening
+against real-world failure, and documentation good enough for someone else to adopt
+it. A v1.0 means the control loop is stable and trustworthy, not that every feature
+exists.
 
-Further ideas - a system profiler, a dashboard interface consuming the same core,
-chaining skills together - are under consideration, not commitments. Some may not
-happen at all.
+Further ideas - a system dashboard consuming the same core, chaining skills
+together - are under consideration, not commitments. Some may not happen at all.
 
 One direction worth naming, because it changes assumptions rather than adding to
 them: running LACC across several machines the user owns, on their own private

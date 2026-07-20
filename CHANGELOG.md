@@ -5,7 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0] - 2026-07-19
+## [0.9.0] - 2026-07-21
+
+### Added
+- Command-line interface (`cli`): the `lacc` command, built with Typer and
+  rendered with Rich, both confined to the CLI so the core stays free of interface
+  code.
+- `lacc run <skill> <request>` plans a skill, shows the preview, asks for
+  confirmation (defaulting to no), and on an explicit yes executes and records it.
+- `lacc preview <skill> <request>` shows what would happen without asking,
+  executing, or recording.
+- The `lacc` console script now points at the real CLI entry point, replacing the
+  scaffold placeholder.
+
+### Dependencies
+- Added typer and rich, confined to the command-line interface.
+
+
+## [0.8.0] - 2026-07-20
 
 ### Added
 - Skills (`skill`): an abstract `Skill` contract mirroring the provider port. A
@@ -19,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its own.
 
 
-## [0.7.0] - 2026-07-19
+## [0.7.0] - 2026-07-20
 
 ### Added
 - Execution cycle (`cycle`): `run_action` drives an action through the whole
