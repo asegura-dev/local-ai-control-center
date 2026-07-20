@@ -22,6 +22,8 @@ htmlcov/
 *.local.yaml
 .env
 .env.*
+/lacc-workspace/
+*.jsonl
 
 # OS / editor noise
 .DS_Store

@@ -1,0 +1,29 @@
+# Example LACC configuration.
+#
+# Copy this file, adjust it, and pass it to LACC. Every field below is optional
+# except `workspace_root`; an absent field takes the default shown here.
+
+# Base directory LACC treats as its working area. Required.
+# Paths outside this directory are refused.
+workspace_root: ./lacc-workspace
+
+# Whether LACC may use the network. Off by default (local-first).
+# Setting this to true does not grant network access to anything by itself: a
+# skill must also request the `network` capability. Configuration is a ceiling,
+# not a grant.
+network_access: false
+
+# How much detail the audit trail records.
+#   standard - metadata only: which capabilities were requested, whether they
+#              were granted, which provider was called. Prompt and completion
+#              text are NOT written to disk.
+#   full     - the above plus prompt and completion content. Opt in deliberately:
+#              prompts can contain whatever you were working on.
+audit_level: standard
+
+# What happens when an audit record cannot be written (full disk, permissions).
+#   abort    - refuse to proceed. An execution that cannot be recorded does not
+#              run. Safer for traceability, but LACC stops when logging breaks.
+#   continue - proceed unrecorded. More robust, at the cost of a gap in the
+#              audit trail exactly when something is going wrong.
+audit_failure_policy: abort
