@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-07-19
+
+### Added
+- Execution cycle (`cycle`): `run_action` drives an action through the whole
+  system in order - preview, refuse or ask, execute, record - so callers describe
+  what they want done without knowing how a run proceeds.
+- Human confirmation is supplied as a function, not performed by the core, so the
+  cycle works from a terminal, a test, or any future interface without containing
+  interface code.
+- Refused and declined runs are recorded, not just completed ones: the audit trail
+  can answer whether something was ever attempted. New audit events `run_refused`
+  and `confirmation_declined`.
+- The first integration tests, exercising configuration, workspace, permissions,
+  provider, preview, and audit together rather than in isolation.
+- Continuous integration: the quality gate runs on every push via GitHub Actions.
+- An example configuration file (`config.example.yaml`) with each option's
+  consequence documented.
+
+
 ## [0.6.0] - 2026-07-19
 
 ### Added

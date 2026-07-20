@@ -20,6 +20,8 @@ from local_ai_control_center.workspace import Workspace
 EventKind = Literal[
     "run_started",
     "run_finished",
+    "run_refused",
+    "confirmation_declined",
     "permission_granted",
     "permission_denied",
     "provider_called",

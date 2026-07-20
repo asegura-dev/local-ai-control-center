@@ -47,9 +47,10 @@ The package currently exposes its version, a validated configuration contract
 (`config`), run identity (`run`), a workspace with boundary enforcement
 (`workspace`), a restrictive-by-default permission system (`permissions`), a
 provider port with a deterministic offline mock (`provider`), an append-only audit
-log (`audit`), and a side-effect-free execution preview (`preview`). Further
-functional modules such as skills and the command-line workflow are added one at a
-time in later phases, each with its own tests and documentation.
+log (`audit`), a side-effect-free execution preview (`preview`), and the execution
+cycle that runs an action through all of them (`cycle`). Further functional modules
+such as skills and the command-line workflow are added one at a time in later
+phases, each with its own tests and documentation.
 
 ## Future direction
 
