@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-07-19
+
+### Added
+- Skills (`skill`): an abstract `Skill` contract mirroring the provider port. A
+  skill declares its name and required capabilities and implements `plan`, which
+  turns a request into an action and a prompt without side effects.
+- `SummarizeFileSkill`: the first demonstration skill, read-only. It declares a
+  `read_files` requirement and a target path inside the workspace, exercising the
+  permission check and the boundary end to end.
+- `run_skill`: wires a skill to the execution cycle, so a skill is always run
+  through preview, permission check, confirmation, execution, and audit - never on
+  its own.
+
+
 ## [0.7.0] - 2026-07-19
 
 ### Added

@@ -24,6 +24,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 | 006 | [audit-log](adr/ADR-006-audit-log.md) | Append-only JSON Lines inside the workspace, contained by its boundary. `audit_level` decides detail with privacy as the default (metadata always, content only under `full`), and `audit_failure_policy` decides whether a failed write stops execution, with each option's consequence stated. |
 | 007 | [execution-preview](adr/ADR-007-execution-preview.md) | A side-effect-free preview that reports whether an action would be allowed, built on a generic `IntendedAction` so it never depends on skills. Reports every refusal reason at once: missing capabilities and paths escaping the workspace. |
 | 008 | [execution-cycle](adr/ADR-008-execution-cycle.md) | The one place that knows the order: `run_action` previews, refuses or asks, executes, and records. Confirmation is supplied as a function so the core holds no interface code. Refused and declined runs are audited, not just completed ones. Home of the first integration tests. |
+| 009 | [skills](adr/ADR-009-skills.md) | An abstract `Skill` contract mirroring the provider port: a skill declares its name and capabilities and implements a pure `plan` that describes an action without doing anything. The cycle owns side effects. First skill: read-only file summarization. No registry yet - it arrives with the command line. |
 
 ## Top-level files
 

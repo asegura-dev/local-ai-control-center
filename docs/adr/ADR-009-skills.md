@@ -28,15 +28,15 @@ carries no dates.
 - **v0.7.0 - Execution cycle.** The seam that drives an action through the whole
   system in order: preview, confirm, execute, record. Confirmation is supplied by
   the caller, not performed in the core. Home of the first integration tests.
-- **v0.8.0 - Skills.** An abstract `Skill` contract that declares capabilities and
-  produces an action through a pure `plan`, plus a read-only file-summarization
-  skill that runs the whole path end to end through the cycle.
 
 ## Next: the first end-to-end run
 
 The control core is complete. These phases connect it into something that actually
 runs, against the mock provider:
 
+- **A demonstration skill.** A small read-only skill that exercises the whole path:
+  permission check, preview, confirmation, execution, audit record. The first time
+  every module runs together to produce a real, audited result.
 - **A command-line workflow.** The `lacc` command that ties configuration,
   workspace, permissions, provider, preview, and audit into one flow, so a skill
   can be run from a terminal rather than from a test.
