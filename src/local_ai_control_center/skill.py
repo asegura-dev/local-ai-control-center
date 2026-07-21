@@ -16,7 +16,12 @@ from pydantic import BaseModel, ConfigDict
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config
 from local_ai_control_center.cycle import ConfirmationFn, RunResult, run_action
-from local_ai_control_center.permissions import Capability, Permissions
+from local_ai_control_center.permissions import (
+    CAPABILITIES,
+    Capability,
+    Permissions,
+    effective_permissions,
+)
 from local_ai_control_center.preview import IntendedAction
 from local_ai_control_center.provider import Provider
 from local_ai_control_center.workspace import Workspace
@@ -109,3 +114,16 @@ def run_skill(
         run_id,
         confirm,
     )
+
+
+def grant_for(skill: Skill, config: Config) -> Permissions:
+    """Grant a skill the capabilities it declares, limited by the configuration.
+
+    The skill declares what it needs (`required`); the configuration ceiling
+    removes any capability it forbids (ADR-011). The result grants exactly the
+    intersection: nothing the skill did not ask for, nothing the configuration
+    vetoes. Replaces hardcoded permissions at the call site.
+    """
+    declared = Permissions(**{cap: cap in skill.required for cap in CAPABILITIES})
+    available = effective_permissions(declared, config)
+    return Permissions(**{cap: cap in available for cap in CAPABILITIES})

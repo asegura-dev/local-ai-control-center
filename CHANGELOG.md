@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-07-20
+
+### Changed
+- Permissions granted to a skill now come from what the skill declares, limited by
+  the configuration ceiling (`grant_for`), replacing the hardcoded `read_files`
+  the CLI used as a stopgap. A skill receives exactly the capabilities it declares,
+  minus any the configuration forbids - nothing more, nothing vetoed.
+
+
 ## [0.9.0] - 2026-07-21
 
 ### Added

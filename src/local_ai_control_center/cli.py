@@ -18,11 +18,10 @@ from rich.panel import Panel
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config, load_config
 from local_ai_control_center.cycle import RunResult
-from local_ai_control_center.permissions import Permissions
 from local_ai_control_center.preview import ExecutionPreview, preview_action
 from local_ai_control_center.provider import MockProvider
 from local_ai_control_center.run import new_run_id
-from local_ai_control_center.skill import Skill, SummarizeFileSkill, run_skill
+from local_ai_control_center.skill import Skill, SummarizeFileSkill, grant_for, run_skill
 from local_ai_control_center.workspace import Workspace, workspace_from_config
 
 DEFAULT_CONFIG_PATH = Path("config.yaml")
@@ -87,7 +86,7 @@ def run(
     result = run_skill(
         resolved,
         request,
-        Permissions(read_files=True),
+        grant_for(resolved, config),
         config,
         workspace,
         MockProvider(),
@@ -111,7 +110,7 @@ def preview(
     resolved = _resolve_skill(skill)
     config, workspace = _load(config_path)
     plan = resolved.plan(request)
-    result = preview_action(plan.action, Permissions(read_files=True), config, workspace)
+    result = preview_action(plan.action, grant_for(resolved, config), config, workspace)
     _show_preview(result)
 
 

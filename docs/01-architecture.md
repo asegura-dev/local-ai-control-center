@@ -11,9 +11,10 @@ goals that shape decisions, not properties the current code already proves.
 - **High cohesion.** Each module aims to have one clear responsibility.
 - **Low coupling.** Modules aim to depend on each other as little as possible,
   communicating through explicit contracts rather than shared internals.
-- **Explicit over implicit.** Behavior that matters is meant to be declared, not
-  assumed: permissions start disabled and are requested per skill, and sensitive
-  actions are meant to be shown before they run.
+- **Explicit over implicit.** Behavior that matters is declared, not assumed:
+  permissions start disabled, a skill declares the capabilities it needs, the
+  configuration limits what may be granted, and sensitive actions are shown before
+  they run.
 - **Incremental design.** Structure is added when a real need appears, not in
   advance. Flat modules stay flat until a module grows enough to justify a split.
 

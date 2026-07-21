@@ -9,13 +9,14 @@ import pytest
 
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config
-from local_ai_control_center.permissions import Permissions
-from local_ai_control_center.preview import ExecutionPreview
+from local_ai_control_center.permissions import Capability, Permissions
+from local_ai_control_center.preview import ExecutionPreview, IntendedAction
 from local_ai_control_center.provider import MockProvider
 from local_ai_control_center.skill import (
     Skill,
     SkillPlan,
     SummarizeFileSkill,
+    grant_for,
     run_skill,
 )
 from local_ai_control_center.workspace import Workspace
@@ -137,3 +138,44 @@ def test_run_skill_records_the_run(tmp_path: Path) -> None:
     kinds = [event["kind"] for event in events]
     assert kinds == ["run_started", "permission_granted", "provider_called", "run_finished"]
     assert {event["run_id"] for event in events} == {"run-1"}
+
+
+def _config(*, network_access: bool = False) -> Config:
+    return Config(workspace_root=Path("/tmp/lacc"), network_access=network_access)
+
+
+def test_grant_for_gives_the_skill_what_it_declares() -> None:
+    """A skill is granted exactly the capabilities it declares."""
+    granted = grant_for(SummarizeFileSkill(), _config())
+    assert granted.granted() == frozenset({"read_files"})
+
+
+def test_grant_for_does_not_grant_undeclared_capabilities() -> None:
+    """Capabilities the skill did not declare stay disabled."""
+    granted = grant_for(SummarizeFileSkill(), _config())
+    assert granted.write_files is False
+    assert granted.network is False
+    assert granted.run_commands is False
+
+
+def test_grant_for_respects_the_network_ceiling() -> None:
+    """A declared network capability is removed when the configuration forbids it."""
+
+    class NetworkSkill(Skill):
+        @property
+        def name(self) -> str:
+            return "needs_network"
+
+        @property
+        def required(self) -> frozenset[Capability]:
+            return frozenset({"network"})
+
+        def plan(self, request: str) -> SkillPlan:
+            action = IntendedAction(name=self.name, summary="x", required=self.required)
+            return SkillPlan(action=action, prompt="x")
+
+    denied = grant_for(NetworkSkill(), _config(network_access=False))
+    assert denied.network is False
+
+    allowed = grant_for(NetworkSkill(), _config(network_access=True))
+    assert allowed.network is True

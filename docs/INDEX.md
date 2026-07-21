@@ -26,6 +26,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 | 008 | [execution-cycle](adr/ADR-008-execution-cycle.md) | The one place that knows the order: `run_action` previews, refuses or asks, executes, and records. Confirmation is supplied as a function so the core holds no interface code. Refused and declined runs are audited, not just completed ones. Home of the first integration tests. |
 | 009 | [skills](adr/ADR-009-skills.md) | An abstract `Skill` contract mirroring the provider port: a skill declares its name and capabilities and implements a pure `plan` that describes an action without doing anything. The cycle owns side effects. First skill: read-only file summarization. No registry yet - it arrives with the command line. |
 | 010 | [command-line-interface](adr/ADR-010-command-line-interface.md) | The `lacc` command (Typer + Rich, confined to the CLI): `run` previews, confirms (defaulting to no), executes, and records; `preview` shows without doing. Skills resolved by a minimal mapping, no registry yet. Notes a deferred decision: where granted permissions come from. |
+| 011 | [permission-sourcing](adr/ADR-011-permission-sourcing.md) | Removes the CLI's hardcoded permission: `grant_for` grants a skill the capabilities it declares, minus any the configuration vetoes. Configuration is a ceiling that removes, not an allowlist that grants; the stricter allowlist model is deferred to when untrusted skills exist. |
 
 ## Top-level files
 
