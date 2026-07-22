@@ -52,7 +52,10 @@ log (`audit`), a side-effect-free execution preview (`preview`), the execution
 cycle that runs an action through all of them (`cycle`), skills that produce those
 actions (`skill`), and a command-line interface that ties everything into a usable
 tool (`cli`). Interface code (Typer, Rich) lives only in the CLI; the core stays
-free of it. Later phases add a system profiler and a real provider.
+free of it. A profiler (`profiler`) detects and reports what the machine offers -
+the local engine, installed models, hardware, and rough capacity guidance - without
+acting; it is Ollama-specific for now, while the provider port stays engine-agnostic.
+A real provider is the remaining phase before the loop runs against a live model.
 
 ## Future direction
 

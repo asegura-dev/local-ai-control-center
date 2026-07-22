@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-07-20
+
+### Added
+- Profiler (`profiler`) and the `lacc profile` command: detects and reports what the
+  machine offers - whether Ollama is present, which models are installed (with size
+  and quantization), and hardware facts (architecture, processor, OS, CPU count,
+  total memory, free disk, uptime). Reads and reports only; it never pulls a model
+  or runs inference.
+- A rough model-fit table computed by formula (weight is parameters times bit-width
+  over eight) across common sizes and quantizations, marked fits / tight / too large,
+  presented as an approximation to verify rather than a recommendation.
+- Honest notes instead of guesses: that capacity assumes free memory, that exceeding
+  it causes slow swapping, how to check free memory in real time, and that GPU/NPU
+  accelerators may exist but be unusable (Ollama runs on CPU on Snapdragon).
+
+### Dependencies
+- Added psutil, used only to read total memory and boot time portably.
+
+
 ## [0.10.0] - 2026-07-20
 
 ### Changed

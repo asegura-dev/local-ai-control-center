@@ -31,26 +31,26 @@ carries no dates.
   `preview`, with human confirmation defaulting to no. **LACC now runs end to end
   from a terminal** against the mock provider - the foundations became a working
   tool.
+- **v0.10.0 - Permission sourcing.** A skill is granted the capabilities it
+  declares, limited by the configuration ceiling (`grant_for`), removing the CLI's
+  hardcoded permission.
+- **v0.11.0 - Profiler.** A read-only `lacc profile` that detects Ollama, lists
+  installed models, reports hardware, and computes a model-fit table by formula -
+  honest about what it cannot know, and never recommending a model.
 
 ## Next
 
 The end-to-end path works against a mock. What remains turns it into something that
 runs real models, safely.
 
-- **Permission sourcing and a profiler.** Two related pieces. First, resolve where
-  a skill's granted permissions come from - the CLI currently hardcodes them, a
-  deliberate stopgap noted in ADR-010 that must not last. Second, a profiler that
-  **detects and reports**: whether an inference engine is present, which models are
-  installed, and what the machine can actually run. Detection only - it reads and
-  reports, with no side effects. Pulling a missing model is an action, and like
-  every action in LACC it belongs behind explicit, confirmed control, not something
-  the profiler does on its own.
+## Next
+
 - **A real provider.** A second implementation of the provider port backed by a
-  local engine (such as Ollama), reached through the same contract as the mock.
-  This is where generation parameters and model selection are finally decided,
-  informed by what the profiler found. It is also the most unpredictable phase:
-  real models, real hardware, real latency, exercised through the CLI that already
-  exists.
+  local engine (Ollama), reached through the same contract as the mock. This is
+  where generation parameters and model selection are finally decided, informed by
+  what the profiler reports. It is the most unpredictable phase: real models, real
+  hardware, real latency, exercised through the CLI that already exists. This is the
+  step that makes the loop run against a live model instead of a deterministic mock.
 
 ## Toward v1.0
 
