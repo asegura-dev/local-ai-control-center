@@ -7,6 +7,11 @@
 # Paths outside this directory are refused.
 workspace_root: ./lacc-workspace
 
+# The Ollama model a real provider uses (see installed models with `lacc profile`).
+# Empty by default: naming a model is required to run against Ollama, so an empty
+# value is a clear error rather than a guessed default.
+model: qwen2.5:3b
+
 # Whether LACC may use the network. Off by default (local-first).
 # Setting this to true does not grant network access to anything by itself: a
 # skill must also request the `network` capability. Configuration is a ceiling,

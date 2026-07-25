@@ -46,8 +46,8 @@ split. This avoids empty folders and premature abstraction.
 
 The package currently exposes its version, a validated configuration contract
 (`config`), run identity (`run`), a workspace with boundary enforcement
-(`workspace`), a restrictive-by-default permission system (`permissions`), a
-provider port with a deterministic offline mock (`provider`), an append-only audit
+(`workspace`), a restrictive-by-default permission system (`permissions`), aa provider port with a deterministic offline mock and a real Ollama-backed
+implementation (`provider`), an append-only audit
 log (`audit`), a side-effect-free execution preview (`preview`), the execution
 cycle that runs an action through all of them (`cycle`), skills that produce those
 actions (`skill`), and a command-line interface that ties everything into a usable
@@ -55,7 +55,9 @@ tool (`cli`). Interface code (Typer, Rich) lives only in the CLI; the core stays
 free of it. A profiler (`profiler`) detects and reports what the machine offers -
 the local engine, installed models, hardware, and rough capacity guidance - without
 acting; it is Ollama-specific for now, while the provider port stays engine-agnostic.
-A real provider is the remaining phase before the loop runs against a live model.
+With the real provider in place, the loop now runs end to end against a live local
+model: a skill's prompt reaches Ollama and its completion returns through the cycle,
+audited like any other run. The CLI chooses between the mock and Ollama per run.
 
 ## Future direction
 

@@ -2,7 +2,7 @@
 
 Uses Typer's CliRunner to invoke commands as a user would, with a temporary
 configuration and workspace so nothing real is touched. Confirmation is driven
-through stdin.
+through stdin. Run tests use the mock provider so they never depend on Ollama.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def test_run_declined_by_default(tmp_path: Path) -> None:
     config = _config_file(tmp_path)
     result = runner.invoke(
         app,
-        ["run", "summarize_file", "notes.txt", "-c", str(config)],
+        ["run", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
         input="\n",
     )
     assert result.exit_code == 0
@@ -58,7 +58,7 @@ def test_run_executes_on_yes(tmp_path: Path) -> None:
     config = _config_file(tmp_path)
     result = runner.invoke(
         app,
-        ["run", "summarize_file", "notes.txt", "-c", str(config)],
+        ["run", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
         input="y\n",
     )
     assert result.exit_code == 0
@@ -70,13 +70,25 @@ def test_run_records_to_the_audit_log(tmp_path: Path) -> None:
     config = _config_file(tmp_path)
     runner.invoke(
         app,
-        ["run", "summarize_file", "notes.txt", "-c", str(config)],
+        ["run", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
         input="y\n",
     )
     log = tmp_path / "ws" / "audit.jsonl"
     assert log.exists()
     kinds = [json.loads(line)["kind"] for line in log.read_text(encoding="utf-8").splitlines()]
     assert kinds == ["run_started", "permission_granted", "provider_called", "run_finished"]
+
+
+def test_run_without_model_fails_clearly(tmp_path: Path) -> None:
+    """The default provider (Ollama) needs a configured model; without one, it exits clearly."""
+    config = _config_file(tmp_path)
+    result = runner.invoke(
+        app,
+        ["run", "summarize_file", "notes.txt", "-c", str(config)],
+        input="y\n",
+    )
+    assert result.exit_code == 1
+    assert "No model configured" in result.stdout
 
 
 def test_unknown_skill_fails_clearly(tmp_path: Path) -> None:

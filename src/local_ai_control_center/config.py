@@ -53,6 +53,16 @@ class Config(BaseModel):
             "going wrong."
         ),
     )
+    model: str = Field(
+        default="",
+        description=(
+            "The Ollama model a real provider should use (for example, "
+            "'qwen2.5:3b'). Empty by default: naming a model is required to run "
+            "against a real engine, so an empty value is a clear configuration "
+            "error rather than a guessed default. See installed models with "
+            "'lacc profile'."
+        ),
+    )
 
 
 def load_config(path: str | Path) -> Config:

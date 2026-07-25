@@ -30,3 +30,6 @@ htmlcov/
 Thumbs.db
 .idea/
 .vscode/
+
+# Scratch file used for manual provider testing
+notas.txt

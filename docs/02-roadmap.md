@@ -37,20 +37,27 @@ carries no dates.
 - **v0.11.0 - Profiler.** A read-only `lacc profile` that detects Ollama, lists
   installed models, reports hardware, and computes a model-fit table by formula -
   honest about what it cannot know, and never recommending a model.
+- **v0.12.0 - Real provider.** An `OllamaProvider` implementing the provider port
+  against a local Ollama instance, with model selection from configuration and a
+  CLI choice between mock and Ollama. LACC now runs end to end against a live local
+  model.
 
 ## Next
 
-The end-to-end path works against a mock. What remains turns it into something that
-runs real models, safely.
+The core is complete: LACC runs end to end against a live local model, with control,
+preview, confirmation, and audit around every run. What remains is not new machinery
+but making the machine dependable and adoptable.
 
-## Next
-
-- **A real provider.** A second implementation of the provider port backed by a
-  local engine (Ollama), reached through the same contract as the mock. This is
-  where generation parameters and model selection are finally decided, informed by
-  what the profiler reports. It is the most unpredictable phase: real models, real
-  hardware, real latency, exercised through the CLI that already exists. This is the
-  step that makes the loop run against a live model instead of a deterministic mock.
+- **Hardening through real use.** Now that LACC runs for real, use exposes what
+  design could not. The known next steps sit here: reading a file's contents into the
+  prompt so a skill summarizes real content rather than naming a file; shaping the
+  skill's prompt deliberately (instructions, output language) as prompt engineering;
+  and the loose ends noted across earlier ADRs - a formal skill registry, generation
+  parameters, an allowlist model for untrusted skills. These are taken up with real
+  experience in hand, not guessed in advance.
+- **Documentation for adoption.** Guides and runbooks (`docs/guides/`) written now
+  that there is a working tool to document: a CLI reference, and a runbook for a first
+  real run. Written from the tool as it actually behaves, not from a promise.
 
 ## Toward v1.0
 

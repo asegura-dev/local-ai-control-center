@@ -1,7 +1,7 @@
 # ADR-012 - Profiler: detect and report, never assume, never act
 
 - **Status:** Accepted - implemented (v0.11.0)
-- **Date:** 2026-07-20
+- **Date:** 2026-07-22
 - **Context:** Before a real provider can choose a model, something has to report
   what the machine offers: whether an inference engine is present, which models are
   installed, and what the hardware is. This ADR defines a profiler that reads and

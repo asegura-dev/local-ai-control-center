@@ -8,6 +8,7 @@ a skill, previews it, asks for confirmation (defaulting to no), and executes;
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -21,7 +22,12 @@ from local_ai_control_center.config import Config, load_config
 from local_ai_control_center.cycle import RunResult
 from local_ai_control_center.preview import ExecutionPreview, preview_action
 from local_ai_control_center.profiler import SystemProfile, profile_system
-from local_ai_control_center.provider import MockProvider
+from local_ai_control_center.provider import (
+    MockProvider,
+    OllamaProvider,
+    Provider,
+    ProviderError,
+)
 from local_ai_control_center.run import new_run_id
 from local_ai_control_center.skill import Skill, SummarizeFileSkill, grant_for, run_skill
 from local_ai_control_center.workspace import Workspace, workspace_from_config
@@ -37,6 +43,13 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+
+
+class ProviderChoice(StrEnum):
+    """The providers the CLI can run a skill against."""
+
+    ollama = "ollama"
+    mock = "mock"
 
 
 def _resolve_skill(name: str) -> Skill:
@@ -80,23 +93,72 @@ def run(
         Path,
         typer.Option("--config", "-c", help="Path to the configuration file."),
     ] = DEFAULT_CONFIG_PATH,
+    provider_choice: Annotated[
+        ProviderChoice,
+        typer.Option("--provider", help="Which provider to run against."),
+    ] = ProviderChoice.ollama,
 ) -> None:
     """Plan a skill, preview it, confirm, then execute and record it."""
     resolved = _resolve_skill(skill)
     config, workspace = _load(config_path)
     audit = AuditLog(workspace, config)
-    result = run_skill(
+
+    try:
+        provider = _build_provider(provider_choice, config)
+    except ProviderError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    plan = resolved.plan(request)
+    preview = preview_action(plan.action, grant_for(resolved, config), config, workspace)
+    if not _confirm(preview):
+        console.print("[yellow]Declined.[/yellow] Nothing was run.")
+        return
+
+    generating = provider_choice is ProviderChoice.ollama
+    try:
+        if generating:
+            with console.status("Contacting Ollama...") as status:
+                status.update(
+                    "Generating... (the first run loads the model into memory and may take longer)"
+                )
+                result = _do_run(resolved, request, config, workspace, provider, audit)
+        else:
+            result = _do_run(resolved, request, config, workspace, provider, audit)
+    except ProviderError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    _report(result)
+
+
+def _build_provider(choice: ProviderChoice, config: Config) -> Provider:
+    """Construct the chosen provider. Ollama needs a configured model; the mock does not."""
+    if choice is ProviderChoice.mock:
+        return MockProvider()
+    return OllamaProvider(config.model)
+
+
+def _do_run(
+    resolved: Skill,
+    request: str,
+    config: Config,
+    workspace: Workspace,
+    provider: Provider,
+    audit: AuditLog,
+) -> RunResult:
+    """Run the skill through the cycle with confirmation already handled."""
+    return run_skill(
         resolved,
         request,
         grant_for(resolved, config),
         config,
         workspace,
-        MockProvider(),
+        provider,
         audit,
         new_run_id(),
-        _confirm,
+        lambda _preview: True,
     )
-    _report(result)
 
 
 @app.command()

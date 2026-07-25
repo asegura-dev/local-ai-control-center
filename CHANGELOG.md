@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-07-25
+
+### Added
+- `OllamaProvider`: a real provider that sends a prompt to a local Ollama instance
+  (`/api/generate`, streaming off) and returns the completion, implementing the same
+  provider port as the mock. Talking to local Ollama over loopback is not network
+  access in the sense the configuration guards. Failures (engine unreachable, model
+  not installed, timeout) are translated into clear, actionable messages.
+- A `--provider` option on `lacc run` to choose between `ollama` (default) and
+  `mock`, so runs can hit a live model or stay offline and deterministic.
+- A `model` field in the configuration, naming the Ollama model to use. Empty by
+  default: a missing model is a clear error, not a guessed default.
+- A progress indicator while generating, noting that the first run loads the model
+  into memory and may take longer.
+
+### Notes
+- Generation parameters (temperature, `think`, and so on) remain out of the provider
+  contract, deferred until real use shows which are needed.
+- Reading file contents into the prompt is still pending: the summarize skill names
+  the file but does not yet read it, so a real model reports it lacks the content.
+  That is a known next step, not a defect.
+
+
 ## [0.11.0] - 2026-07-20
 
 ### Added
