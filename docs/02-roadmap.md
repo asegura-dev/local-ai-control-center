@@ -41,6 +41,11 @@ carries no dates.
   against a local Ollama instance, with model selection from configuration and a
   CLI choice between mock and Ollama. LACC now runs end to end against a live local
   model.
+- **v0.13.0 - Reading file contents.** The cycle reads the files an action declares,
+  after confirmation and before the provider, so `summarize_file` summarizes real
+  content instead of naming a file. A skill's plan supplies a prompt template and
+  stays pure; the cycle fills it. **LACC now does useful work on the user's own
+  documents** - the first step toward the north in VISION.md.
 
 ## Next
 
@@ -49,12 +54,13 @@ preview, confirmation, and audit around every run. What remains is not new machi
 but making the machine dependable and adoptable.
 
 - **Hardening through real use.** Now that LACC runs for real, use exposes what
-  design could not. The known next steps sit here: reading a file's contents into the
-  prompt so a skill summarizes real content rather than naming a file; shaping the
-  skill's prompt deliberately (instructions, output language) as prompt engineering;
-  and the loose ends noted across earlier ADRs - a formal skill registry, generation
-  parameters, an allowlist model for untrusted skills. These are taken up with real
-  experience in hand, not guessed in advance.
+  design could not. The known next steps sit here: shaping the skill's prompt
+  deliberately (instructions, output language) as prompt engineering, and making those
+  templates configurable rather than fixed in code; working with more than one file,
+  then chunking when they exceed the model's context; and the loose ends noted across
+  earlier ADRs - a formal skill registry, generation parameters, an allowlist model
+  for untrusted skills. These are taken up with real experience in hand, not guessed
+  in advance.
 - **Documentation for adoption.** Guides and runbooks (`docs/guides/`) written now
   that there is a working tool to document: a CLI reference, and a runbook for a first
   real run. Written from the tool as it actually behaves, not from a promise.

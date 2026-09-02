@@ -18,7 +18,10 @@ runner = CliRunner()
 
 
 def _config_file(tmp_path: Path) -> Path:
+    """Write a configuration whose workspace already holds the note runs summarize."""
     workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "notes.txt").write_text("A short note to summarize.\n", encoding="utf-8")
     config = tmp_path / "config.yaml"
     config.write_text(f"workspace_root: {workspace}\n", encoding="utf-8")
     return config
@@ -76,7 +79,13 @@ def test_run_records_to_the_audit_log(tmp_path: Path) -> None:
     log = tmp_path / "ws" / "audit.jsonl"
     assert log.exists()
     kinds = [json.loads(line)["kind"] for line in log.read_text(encoding="utf-8").splitlines()]
-    assert kinds == ["run_started", "permission_granted", "provider_called", "run_finished"]
+    assert kinds == [
+        "run_started",
+        "permission_granted",
+        "files_read",
+        "provider_called",
+        "run_finished",
+    ]
 
 
 def test_run_without_model_fails_clearly(tmp_path: Path) -> None:

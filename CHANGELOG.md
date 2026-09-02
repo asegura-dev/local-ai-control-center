@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-09-02
+
+### Added
+- The execution cycle now reads the files an action declares, so `summarize_file`
+  produces a real summary instead of naming a file it never opened. The read happens
+  after the human confirms and before the provider is called: a declined action never
+  touches a file, and the contents reach the prompt.
+- `SkillPlan` carries a prompt *template* (`prompt_template`) instead of a finished
+  prompt. The skill leaves a placeholder where file contents belong; the cycle fills
+  it with what it read. A plan stays pure - it holds the hole, never the content.
+- `ReadError`: a file that cannot be read (missing, locked, not UTF-8 text) fails with
+  a clear, actionable message rather than a raw filesystem error, the same posture
+  `ProviderError` takes. The CLI reports it and exits.
+- New audit events `files_read` (which files were read) and `read_failed` (that a read
+  failed, and why).
+
+### Security
+- Files are read only when the action declares `read_files`. The preview checks
+  declared capabilities and the workspace boundary; an action that names targets
+  without declaring the capability passes the preview but is still never read.
+- File contents follow the existing privacy rule: they reach the audit trail only
+  through the prompt, recorded under `audit_level: full` and omitted under `standard`.
+  The `files_read` event records paths, never contents.
+
+### Notes
+- Prompt wording still lives in code. Configurable, user-edited templates are a later
+  phase with their own questions; this release only splits template from filled prompt.
+- Multiple targets are read and joined, but no skill declares more than one yet.
+  Chunking and retrieval for files larger than the model's context come later.
+
+
 ## [0.12.0] - 2026-07-25
 
 ### Added

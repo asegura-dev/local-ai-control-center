@@ -46,7 +46,8 @@ split. This avoids empty folders and premature abstraction.
 
 The package currently exposes its version, a validated configuration contract
 (`config`), run identity (`run`), a workspace with boundary enforcement
-(`workspace`), a restrictive-by-default permission system (`permissions`), aa provider port with a deterministic offline mock and a real Ollama-backed
+(`workspace`), a restrictive-by-default permission system (`permissions`), a
+provider port with a deterministic offline mock and a real Ollama-backed
 implementation (`provider`), an append-only audit
 log (`audit`), a side-effect-free execution preview (`preview`), the execution
 cycle that runs an action through all of them (`cycle`), skills that produce those
@@ -58,6 +59,28 @@ acting; it is Ollama-specific for now, while the provider port stays engine-agno
 With the real provider in place, the loop now runs end to end against a live local
 model: a skill's prompt reaches Ollama and its completion returns through the cycle,
 audited like any other run. The CLI chooses between the mock and Ollama per run.
+
+## Where a side effect lives: reading files
+
+Reading a file is the first side effect a skill needs, and it shows how the layers
+divide work (ADR-014). A skill's `plan` is pure, so it cannot read. Instead the plan
+produces two things the cycle can act on: the files it wants, as the action's
+`targets`, and a *prompt template* with a placeholder where their contents belong.
+The plan therefore never holds file content - it holds the hole.
+
+The cycle does the reading, in its established order: preview, confirm, **read**,
+call the provider, record. Reading after confirmation means a declined action never
+touches a file. Reading before the provider means the contents can reach the prompt.
+The cycle fills the template and sends the result; the filled prompt is the cycle's
+product, not the plan's.
+
+Permission is not re-derived at the point of reading. The preview has already checked
+the action's declared capabilities against the permissions, and every target against
+the workspace boundary - so the cycle reads only what the action declared `read_files`
+for, and trusts what was verified rather than re-checking it. What it does not trust
+is the filesystem itself: a file that passed the boundary check can still be missing,
+locked, or not text at the moment of reading, so the read is attempted and its failure
+translated into a clear message, the same posture the provider takes.
 
 ## Future direction
 

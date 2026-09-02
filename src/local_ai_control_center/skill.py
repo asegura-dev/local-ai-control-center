@@ -2,8 +2,9 @@
 
 A `Skill` mirrors the provider port (ADR-009): an abstract contract with concrete
 implementations. A skill declares its name and required capabilities and implements
-`plan`, which turns a request into an action and a prompt without doing anything.
-Running a skill hands its plan to the execution cycle, which owns side effects.
+`plan`, which turns a request into an action and a prompt template without doing
+anything. Running a skill hands its plan to the execution cycle, which owns side
+effects - including reading the declared files and filling the template with them.
 """
 
 from __future__ import annotations
@@ -15,7 +16,12 @@ from pydantic import BaseModel, ConfigDict
 
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config
-from local_ai_control_center.cycle import ConfirmationFn, RunResult, run_action
+from local_ai_control_center.cycle import (
+    CONTENT_PLACEHOLDER,
+    ConfirmationFn,
+    RunResult,
+    run_action,
+)
 from local_ai_control_center.permissions import (
     CAPABILITIES,
     Capability,
@@ -28,15 +34,18 @@ from local_ai_control_center.workspace import Workspace
 
 
 class SkillPlan(BaseModel):
-    """What a skill intends to do: an action to preview, and a prompt to send.
+    """What a skill intends to do: an action to preview, and a prompt template.
 
-    Frozen and side-effect free. Produced by `plan`; consumed by the cycle.
+    Frozen and side-effect free. Produced by `plan`; consumed by the cycle. The
+    template may carry `CONTENT_PLACEHOLDER`, which the cycle replaces with the
+    contents it reads. A plan holds the hole, never the file content: the filled
+    prompt is the cycle's product (ADR-014).
     """
 
     model_config = ConfigDict(frozen=True)
 
     action: IntendedAction
-    prompt: str
+    prompt_template: str
 
 
 class Skill(ABC):
@@ -54,7 +63,11 @@ class Skill(ABC):
 
     @abstractmethod
     def plan(self, request: str) -> SkillPlan:
-        """Turn a request into a plan. Pure: reads nothing, calls nothing."""
+        """Turn a request into a plan. Pure: reads nothing, calls nothing.
+
+        A skill needing file contents leaves `CONTENT_PLACEHOLDER` in its template
+        and declares the files as the action's targets; the cycle does the reading.
+        """
 
 
 class SummarizeFileSkill(Skill):
@@ -82,8 +95,10 @@ class SummarizeFileSkill(Skill):
             required=self.required,
             targets=(Path(request),),
         )
-        prompt = f"Summarize the contents of the file at {request}."
-        return SkillPlan(action=action, prompt=prompt)
+        prompt_template = (
+            f"Summarize the contents of the file at {request}.\n\n{CONTENT_PLACEHOLDER}"
+        )
+        return SkillPlan(action=action, prompt_template=prompt_template)
 
 
 def run_skill(
@@ -105,7 +120,7 @@ def run_skill(
     plan = skill.plan(request)
     return run_action(
         plan.action,
-        plan.prompt,
+        plan.prompt_template,
         permissions,
         config,
         workspace,

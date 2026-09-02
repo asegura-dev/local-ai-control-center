@@ -42,10 +42,18 @@ as intent, not as a guarantee.
 
 ## Status
 
-Early development. The package currently exposes its version and a placeholder
-entry point. Functional modules - configuration, workspaces, providers, audit,
-and skills - are introduced one at a time in later phases, each with its own
-tests and documentation.
+Early development, but working end to end. `lacc run summarize_file <path>` plans
+the action, shows a preview, asks for confirmation (defaulting to no), reads the
+file inside the workspace boundary under the `read_files` permission, sends its
+contents to a local Ollama model, and records the run in an append-only audit log.
+`lacc preview` shows what would happen without doing it; `lacc profile` reports what
+the machine offers.
+
+The control core is in place: configuration, workspaces with boundary enforcement,
+permissions, a provider port with a deterministic mock and a real Ollama
+implementation, the audit log, execution previews, the execution cycle, skills, and
+the command-line interface. What remains is hardening through real use and
+documentation for adoption - see the [roadmap](docs/02-roadmap.md).
 
 ## License
 

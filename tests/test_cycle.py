@@ -9,9 +9,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config
-from local_ai_control_center.cycle import ExecutionPreview, RunResult, run_action
+from local_ai_control_center.cycle import (
+    CONTENT_PLACEHOLDER,
+    ExecutionPreview,
+    ReadError,
+    RunResult,
+    run_action,
+)
 from local_ai_control_center.permissions import Permissions
 from local_ai_control_center.preview import IntendedAction
 from local_ai_control_center.provider import MockProvider
@@ -31,6 +39,7 @@ def _run(
     action: IntendedAction,
     permissions: Permissions,
     confirm: object = _accept,
+    prompt_template: str = "the prompt",
     **config_kwargs: object,
 ) -> tuple[RunResult, AuditLog]:
     workspace = Workspace.ensure(tmp_path)
@@ -38,7 +47,7 @@ def _run(
     audit = AuditLog(workspace, config)
     result = run_action(
         action,
-        "the prompt",
+        prompt_template,
         permissions,
         config,
         workspace,
@@ -187,3 +196,135 @@ def test_every_event_carries_the_run_id(tmp_path: Path) -> None:
     action = IntendedAction(name="summarize", summary="Summarize", required=frozenset())
     _, audit = _run(tmp_path, action, Permissions())
     assert {event["run_id"] for event in _events(audit)} == {"run-1"}
+
+
+_TEMPLATE = f"Summarize this:\n\n{CONTENT_PLACEHOLDER}"
+
+
+def _reading_action(*, declares_read: bool = True) -> IntendedAction:
+    """An action naming a file to read, optionally without declaring the permission."""
+    return IntendedAction(
+        name="summarize",
+        summary="Summarize a note",
+        required=frozenset({"read_files"}) if declares_read else frozenset(),
+        targets=(Path("notes.txt"),),
+    )
+
+
+def _note(tmp_path: Path, body: str = "The note body.") -> Path:
+    path = tmp_path / "notes.txt"
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def _recorded_prompt(audit: AuditLog) -> object:
+    call = next(event for event in _events(audit) if event["kind"] == "provider_called")
+    detail = call["detail"]
+    assert isinstance(detail, dict)
+    return detail["prompt"]
+
+
+def test_declared_files_are_read_into_the_prompt(tmp_path: Path) -> None:
+    """The cycle fills the template with what it read, and sends that to the provider."""
+    _note(tmp_path)
+    _, audit = _run(
+        tmp_path,
+        _reading_action(),
+        Permissions(read_files=True),
+        prompt_template=_TEMPLATE,
+        audit_level="full",
+    )
+    assert _recorded_prompt(audit) == "Summarize this:\n\nThe note body."
+
+
+def test_reading_is_recorded_with_the_path_not_the_contents(tmp_path: Path) -> None:
+    """The read leaves a trail naming the file; the contents are not in that event."""
+    note = _note(tmp_path)
+    _, audit = _run(
+        tmp_path,
+        _reading_action(),
+        Permissions(read_files=True),
+        prompt_template=_TEMPLATE,
+    )
+    read = next(event for event in _events(audit) if event["kind"] == "files_read")
+    detail = read["detail"]
+    assert isinstance(detail, dict)
+    assert detail["files"] == [str(note.resolve())]
+
+
+def test_standard_audit_level_omits_the_file_contents(tmp_path: Path) -> None:
+    """A read must not leak what the file said into a standard-level trail."""
+    _note(tmp_path, "SECRET BODY")
+    _, audit = _run(
+        tmp_path,
+        _reading_action(),
+        Permissions(read_files=True),
+        prompt_template=_TEMPLATE,
+    )
+    assert "SECRET BODY" not in audit.path.read_text(encoding="utf-8")
+
+
+def test_targets_are_not_read_without_a_declared_read_files(tmp_path: Path) -> None:
+    """Reading follows the declaration the preview checked, not the granted permission.
+
+    An action that names targets but declares no `read_files` passes the preview,
+    since the preview only checks what was declared. It must still not be read.
+    """
+    _note(tmp_path, "SECRET BODY")
+    _, audit = _run(
+        tmp_path,
+        _reading_action(declares_read=False),
+        Permissions(read_files=True),
+        prompt_template=_TEMPLATE,
+        audit_level="full",
+    )
+    assert _recorded_prompt(audit) == _TEMPLATE
+    assert "files_read" not in _kinds(audit)
+
+
+def test_unreadable_file_fails_clearly_and_is_recorded(tmp_path: Path) -> None:
+    """A target that cannot be read raises a clear error and leaves a record."""
+    with pytest.raises(ReadError) as excinfo:
+        _run(
+            tmp_path,
+            _reading_action(),
+            Permissions(read_files=True),
+            prompt_template=_TEMPLATE,
+        )
+    assert "notes.txt" in str(excinfo.value)
+    trail = (tmp_path / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["kind"] for line in trail] == [
+        "run_started",
+        "permission_granted",
+        "read_failed",
+    ]
+
+
+def test_a_file_that_is_not_text_fails_clearly(tmp_path: Path) -> None:
+    """A binary target is refused with a message about text, not a decode traceback."""
+    (tmp_path / "notes.txt").write_bytes(b"\xff\xfe\x00\x01")
+    with pytest.raises(ReadError) as excinfo:
+        _run(
+            tmp_path,
+            _reading_action(),
+            Permissions(read_files=True),
+            prompt_template=_TEMPLATE,
+        )
+    assert "not UTF-8 text" in str(excinfo.value)
+
+
+def test_declining_reads_nothing(tmp_path: Path) -> None:
+    """The read happens after confirmation, never before.
+
+    The note is never created: had the cycle read before asking, this would fail
+    with a `ReadError` instead of declining quietly.
+    """
+    result, audit = _run(
+        tmp_path,
+        _reading_action(),
+        Permissions(read_files=True),
+        confirm=_decline,
+        prompt_template=_TEMPLATE,
+    )
+    assert result.outcome == "declined"
+    assert "files_read" not in _kinds(audit)

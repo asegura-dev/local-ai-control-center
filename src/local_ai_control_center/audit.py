@@ -24,6 +24,8 @@ EventKind = Literal[
     "confirmation_declined",
     "permission_granted",
     "permission_denied",
+    "files_read",
+    "read_failed",
     "provider_called",
 ]
 """The closed set of events recorded today. It grows as real events appear."""

@@ -9,6 +9,7 @@ import pytest
 
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config
+from local_ai_control_center.cycle import CONTENT_PLACEHOLDER
 from local_ai_control_center.permissions import Capability, Permissions
 from local_ai_control_center.preview import ExecutionPreview, IntendedAction
 from local_ai_control_center.provider import MockProvider
@@ -39,14 +40,20 @@ def test_summarize_declares_read_files() -> None:
     assert skill.required == frozenset({"read_files"})
 
 
-def test_plan_produces_an_action_and_prompt() -> None:
+def test_plan_produces_an_action_and_prompt_template() -> None:
     """plan returns a plan describing the file to summarize."""
     plan = SummarizeFileSkill().plan("notes.txt")
     assert isinstance(plan, SkillPlan)
     assert plan.action.name == "summarize_file"
     assert plan.action.required == frozenset({"read_files"})
     assert plan.action.targets == (Path("notes.txt"),)
-    assert "notes.txt" in plan.prompt
+    assert "notes.txt" in plan.prompt_template
+
+
+def test_plan_leaves_a_hole_for_the_file_contents() -> None:
+    """The template carries the placeholder, never the contents themselves."""
+    plan = SummarizeFileSkill().plan("notes.txt")
+    assert CONTENT_PLACEHOLDER in plan.prompt_template
 
 
 def test_plan_has_no_side_effects(tmp_path: Path) -> None:
@@ -62,6 +69,7 @@ def test_run_skill_executes_through_the_cycle(tmp_path: Path) -> None:
     config = Config(workspace_root=tmp_path)
     audit = AuditLog(workspace, config)
     target = tmp_path / "notes.txt"
+    target.write_text("A short note to summarize.\n", encoding="utf-8")
     result = run_skill(
         SummarizeFileSkill(),
         str(target),
@@ -123,6 +131,7 @@ def test_run_skill_records_the_run(tmp_path: Path) -> None:
     workspace = Workspace.ensure(tmp_path)
     config = Config(workspace_root=tmp_path)
     audit = AuditLog(workspace, config)
+    (tmp_path / "notes.txt").write_text("A short note to summarize.\n", encoding="utf-8")
     run_skill(
         SummarizeFileSkill(),
         str(tmp_path / "notes.txt"),
@@ -136,8 +145,39 @@ def test_run_skill_records_the_run(tmp_path: Path) -> None:
     )
     events = [json.loads(line) for line in audit.path.read_text(encoding="utf-8").splitlines()]
     kinds = [event["kind"] for event in events]
-    assert kinds == ["run_started", "permission_granted", "provider_called", "run_finished"]
+    assert kinds == [
+        "run_started",
+        "permission_granted",
+        "files_read",
+        "provider_called",
+        "run_finished",
+    ]
     assert {event["run_id"] for event in events} == {"run-1"}
+
+
+def test_run_skill_sends_the_file_contents_to_the_provider(tmp_path: Path) -> None:
+    """End to end: what the file says reaches the model, with no hole left behind."""
+    workspace = Workspace.ensure(tmp_path)
+    config = Config(workspace_root=tmp_path, audit_level="full")
+    audit = AuditLog(workspace, config)
+    target = tmp_path / "notes.txt"
+    target.write_text("The note body.", encoding="utf-8")
+    run_skill(
+        SummarizeFileSkill(),
+        str(target),
+        Permissions(read_files=True),
+        config,
+        workspace,
+        MockProvider(),
+        audit,
+        "run-1",
+        _accept,
+    )
+    events = [json.loads(line) for line in audit.path.read_text(encoding="utf-8").splitlines()]
+    call = next(event for event in events if event["kind"] == "provider_called")
+    prompt = call["detail"]["prompt"]
+    assert "The note body." in prompt
+    assert CONTENT_PLACEHOLDER not in prompt
 
 
 def _config(*, network_access: bool = False) -> Config:
@@ -172,7 +212,7 @@ def test_grant_for_respects_the_network_ceiling() -> None:
 
         def plan(self, request: str) -> SkillPlan:
             action = IntendedAction(name=self.name, summary="x", required=self.required)
-            return SkillPlan(action=action, prompt="x")
+            return SkillPlan(action=action, prompt_template="x")
 
     denied = grant_for(NetworkSkill(), _config(network_access=False))
     assert denied.network is False

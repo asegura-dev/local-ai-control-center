@@ -19,7 +19,7 @@ from rich.table import Table
 
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config, load_config
-from local_ai_control_center.cycle import RunResult
+from local_ai_control_center.cycle import ReadError, RunResult
 from local_ai_control_center.preview import ExecutionPreview, preview_action
 from local_ai_control_center.profiler import SystemProfile, profile_system
 from local_ai_control_center.provider import (
@@ -125,7 +125,7 @@ def run(
                 result = _do_run(resolved, request, config, workspace, provider, audit)
         else:
             result = _do_run(resolved, request, config, workspace, provider, audit)
-    except ProviderError as error:
+    except (ProviderError, ReadError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
 
