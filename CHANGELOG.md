@@ -5,6 +5,38 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-09-02
+
+### Added
+- The `summarize_file` prompt is shaped rather than merely stated: it frames the task,
+  names the language to answer in, asks for a concise and factual summary, and fences
+  the document between markers so the model can tell instruction from material.
+- `output_language` in the configuration, naming the language the model is asked to
+  answer in. Defaults to `English` - small local models follow instructions and write
+  more reliably in it - and is configurable because the right language depends on who
+  reads the answer. A blank value is rejected at validation rather than falling back
+  to whatever the model would have chosen.
+- `Skill.plan` receives the configuration, so a skill can describe intent that depends
+  on it. This amends the contract set in ADR-009 and does so deliberately: the plan
+  stays pure, since reading a frozen, already validated `Config` is not a side effect.
+
+### Security
+- The prompt states that the fenced document is material to summarize, not a request
+  addressed to the model. Text read from a file is treated as untrusted input.
+- The markers are fixed strings holding no user-supplied text, so a crafted file name
+  cannot forge a fence. A document that contains the closing marker verbatim does
+  still end the fence early: that limitation is named in ADR-015 rather than left to
+  be discovered. What bounds the damage is that nothing acts on the answer - it is
+  text returned to a person who previewed and confirmed the run.
+
+### Notes
+- Prompt wording still lives in code. External, user-editable templates remain a later
+  phase, now with real wording to generalize from rather than a guess.
+- Generation parameters (temperature and the like) remain outside the provider
+  contract, as ADR-013 left them: they shape an answer through the engine rather than
+  through the prompt.
+
+
 ## [0.13.0] - 2026-09-02
 
 ### Added

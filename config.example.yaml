@@ -12,6 +12,13 @@ workspace_root: ./lacc-workspace
 # value is a clear error rather than a guessed default.
 model: qwen2.5:3b
 
+# The language the model is asked to answer in. English by default: small local
+# models follow instructions and write more reliably in it than in languages they
+# saw less of during training. Set it to whatever the reader needs - the value is
+# put into the prompt as written. It may not be empty: a blank language would mean
+# letting the model choose, which is a guess, not a default.
+output_language: English
+
 # Whether LACC may use the network. Off by default (local-first).
 # Setting this to true does not grant network access to anything by itself: a
 # skill must also request the `network` capability. Configuration is a ceiling,

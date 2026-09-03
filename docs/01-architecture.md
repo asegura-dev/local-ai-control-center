@@ -82,6 +82,29 @@ is the filesystem itself: a file that passed the boundary check can still be mis
 locked, or not text at the moment of reading, so the read is attempted and its failure
 translated into a clear message, the same posture the provider takes.
 
+## What LACC says to the model
+
+The prompt is part of the system, not an afterthought at its edge (ADR-015). It is
+built in two places, and the split follows the same rule as everything else: the skill
+describes, the cycle acts. The skill writes the wording - the framing, the instruction,
+the language to answer in, the markers that fence the document - and leaves a hole. The
+cycle fills that hole with what it read. Neither half holds the other's job.
+
+The language the answer must be written in comes from the configuration rather than
+from the model's own choice, which is why `plan` takes a `Config`. That widened the
+skill contract set in ADR-009, deliberately and in the open: what a skill intends can
+legitimately depend on configuration, and reading a frozen, already validated value is
+not a side effect, so the plan stays pure and stays safe to preview.
+
+The document is fenced between fixed markers and the instruction says, in words, that
+what sits inside them is material to summarize rather than a request. This is where
+LACC treats its own inputs as untrusted: a file inside the workspace belongs to the
+user, but that does not make its text an instruction LACC should follow. The fence is
+a mitigation and the documentation says so - a document containing the closing marker
+ends it early. What keeps the residual risk small is structural rather than textual:
+nothing in LACC acts on a model's answer. It is returned to a person who previewed and
+confirmed the run, and no skill chains from it.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

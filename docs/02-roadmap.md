@@ -46,6 +46,11 @@ carries no dates.
   content instead of naming a file. A skill's plan supplies a prompt template and
   stays pure; the cycle fills it. **LACC now does useful work on the user's own
   documents** - the first step toward the north in VISION.md.
+- **v0.14.0 - Shaping the prompt.** What LACC says to the model becomes deliberate: a
+  framed task, a configured output language (`output_language`, English by default),
+  and the document fenced between markers and declared to be material rather than
+  instruction. `Skill.plan` receives the configuration, amending ADR-009 without
+  giving up the plan's purity.
 
 ## Next
 
@@ -53,14 +58,13 @@ The core is complete: LACC runs end to end against a live local model, with cont
 preview, confirmation, and audit around every run. What remains is not new machinery
 but making the machine dependable and adoptable.
 
-- **Hardening through real use.** Now that LACC runs for real, use exposes what
-  design could not. The known next steps sit here: shaping the skill's prompt
-  deliberately (instructions, output language) as prompt engineering, and making those
-  templates configurable rather than fixed in code; working with more than one file,
-  then chunking when they exceed the model's context; and the loose ends noted across
-  earlier ADRs - a formal skill registry, generation parameters, an allowlist model
-  for untrusted skills. These are taken up with real experience in hand, not guessed
-  in advance.
+- **Hardening through real use.** Now that LACC runs for real, use exposes what design
+  could not. The known next steps sit here: moving prompt wording out of the code into
+  something the user can edit, now that shaping it in code has shown which parts
+  genuinely vary; working with more than one file, then chunking when they exceed the
+  model's context; and the loose ends noted across earlier ADRs - a formal skill
+  registry, generation parameters, an allowlist model for untrusted skills. These are
+  taken up with real experience in hand, not guessed in advance.
 - **Documentation for adoption.** Guides and runbooks (`docs/guides/`) written now
   that there is a working tool to document: a CLI reference, and a runbook for a first
   real run. Written from the tool as it actually behaves, not from a promise.

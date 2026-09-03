@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AuditLevel = Literal["standard", "full"]
 """How much detail the audit trail records. A closed set, not a free string."""
@@ -63,6 +63,29 @@ class Config(BaseModel):
             "'lacc profile'."
         ),
     )
+    output_language: str = Field(
+        default="English",
+        description=(
+            "The language the model is asked to answer in. Defaults to English: "
+            "small local models follow instructions and write more reliably in it "
+            "than in languages they saw less of during training. Never empty - a "
+            "blank language is a clear error, not a silent fallback to whatever "
+            "the model happens to choose."
+        ),
+    )
+
+    @field_validator("output_language")
+    @classmethod
+    def _require_a_language(cls, value: str) -> str:
+        """Reject a blank language, and normalize the surrounding whitespace.
+
+        Checked once here at the boundary, so everything downstream can put the
+        value straight into a prompt without re-validating it.
+        """
+        language = value.strip()
+        if not language:
+            raise ValueError("output_language must name a language, for example: English")
+        return language
 
 
 def load_config(path: str | Path) -> Config:

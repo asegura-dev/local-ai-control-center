@@ -109,7 +109,7 @@ def run(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
 
-    plan = resolved.plan(request)
+    plan = resolved.plan(request, config)
     preview = preview_action(plan.action, grant_for(resolved, config), config, workspace)
     if not _confirm(preview):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
@@ -173,7 +173,7 @@ def preview(
     """Show what a skill would do, without asking, executing, or recording."""
     resolved = _resolve_skill(skill)
     config, workspace = _load(config_path)
-    plan = resolved.plan(request)
+    plan = resolved.plan(request, config)
     result = preview_action(plan.action, grant_for(resolved, config), config, workspace)
     _show_preview(result)
 

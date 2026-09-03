@@ -69,3 +69,21 @@ def test_load_config_rejects_non_mapping(tmp_path: Path) -> None:
     config_file.write_text("- just\n- a\n- list\n", encoding="utf-8")
     with pytest.raises(ValueError):
         load_config(config_file)
+
+
+def test_output_language_defaults_to_english() -> None:
+    """The answer's language is named, not left to the model. English by default."""
+    assert Config(workspace_root=Path("/tmp/lacc")).output_language == "English"
+
+
+def test_blank_output_language_is_rejected() -> None:
+    """An empty language is a clear error, not a fallback to whatever the model picks."""
+    for blank in ("", "   ", "\t\n"):
+        with pytest.raises(ValidationError):
+            Config(workspace_root=Path("/tmp/lacc"), output_language=blank)
+
+
+def test_output_language_is_normalized() -> None:
+    """Whitespace is stripped once at the boundary, so a prompt never carries it."""
+    config = Config(workspace_root=Path("/tmp/lacc"), output_language="  Spanish  ")
+    assert config.output_language == "Spanish"
