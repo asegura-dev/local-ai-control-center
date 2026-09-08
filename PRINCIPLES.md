@@ -36,6 +36,14 @@ aspirations.
   (ADR) precedes code, code is covered by tests, the quality gate stays green. No
   large unreviewed leaps.
 
+- **A change is not done until its documentation is true.** Every advance is recorded
+  where it belongs, in the phase that produced it: the decision in an ADR, the change
+  in the CHANGELOG, the mechanism in the chapter it belongs to, the entry in the index
+  and the roadmap. Documentation that lags is not merely incomplete - it is a false
+  statement about what the code does, and a reader has no way to tell which parts still
+  hold. It costs more to repair than the code cost to write. A phase whose documents do
+  not match reality is not finished, however green its gate.
+
 ## Security
 
 - **Restrictive by default.** Every capability (`read_files`, `write_files`,

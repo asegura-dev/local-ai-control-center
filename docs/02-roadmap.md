@@ -52,43 +52,90 @@ carries no dates.
   instruction. `Skill.plan` receives the configuration, amending ADR-009 without
   giving up the plan's purity.
 
-## Next
+## The route to v1.0
 
-The core is complete: LACC runs end to end against a live local model, with control,
-preview, confirmation, and audit around every run. What remains is not new machinery
-but making the machine dependable and adoptable.
+v0.14.0 leaves LACC able to read one text file inside a workspace and answer about it
+from a terminal, with permission, preview, confirmation and audit around the run. The
+north in VISION.md - dialogue with your own documents, persisted locally, documented -
+needs machinery that does not exist yet. Calling what remains "hardening" would be
+false: most of it is new capability, and this chapter says so rather than flattering
+the current state.
 
-- **Hardening through real use.** Now that LACC runs for real, use exposes what design
-  could not. The known next steps sit here: moving prompt wording out of the code into
-  something the user can edit, now that shaping it in code has shown which parts
-  genuinely vary; working with more than one file, then chunking when they exceed the
-  model's context; and the loose ends noted across earlier ADRs - a formal skill
-  registry, generation parameters, an allowlist model for untrusted skills. These are
-  taken up with real experience in hand, not guessed in advance.
-- **Documentation for adoption.** Guides and runbooks (`docs/guides/`) written now
-  that there is a working tool to document: a CLI reference, and a runbook for a first
-  real run. Written from the tool as it actually behaves, not from a promise.
+The first real user is the author, writing a thesis: private research documents on their
+own machine that must not leave it. That use orders the phases below. Each one is the
+next thing that stops being impossible, not the next thing that would be nice.
+
+- **Ingestion - documents become text LACC can read.** Sources arrive as PDF and
+  `.docx`; LACC reads only UTF-8 text and refuses binaries with a clear error. Rather
+  than parsing binaries silently at read time, conversion becomes an explicit step that
+  writes Markdown into the workspace: the extracted text is a file the user can open,
+  check and correct, it sits inside the boundary, and its creation is audited. The core
+  keeps reading only text. PDF and `.docx` are two real implementations, so the
+  converter port is justified on arrival rather than guessed. A scanned PDF with no
+  text layer is reported as such; OCR is out of scope. This is also the first exercise
+  of `write_files`, in its safest form: new files only, never overwriting.
+- **A second read-only skill - critique.** Reading a draft chapter and reporting gaps
+  in the argument costs almost no machinery and is useful immediately. With three
+  skills in hand, the skill registry deferred since ADR-010 finally has enough cases to
+  take its shape, and prompt wording has enough variety to be worth generalizing later.
+- **More than one file, and an honest ceiling.** Comparing what several sources say
+  requires reading several. It also reaches the first hard limit: a set of documents
+  that does not fit the model's context. LACC must detect that and say so, never
+  truncate silently and answer as though it had read everything.
+- **Chunking.** A single document larger than the context window, split deliberately,
+  with the seams visible rather than hidden.
+- **Writing, with a diff shown first.** Editing an existing file is the first
+  destructive effect. The preview shows the diff, the human confirms, the change is
+  recorded. This is what turns reading into drafting and rewriting.
+- **Conversation across turns.** The provider port takes a single prompt today
+  (ADR-005). Dialogue makes it carry a history instead, which is the deepest change to
+  the core on this list.
+- **Persistence of conversations.** Close LACC, come back, and the exchange is where it
+  was left - the last promise the north makes.
+- **Retrieval.** When the collection as a whole exceeds any context, the relevant parts
+  have to be found rather than sent. Needs a local embedding model and somewhere to
+  keep vectors: two new dependencies that stay on the machine, and the last capability
+  before v1.
+- **Documentation for adoption.** Guides and runbooks (`docs/guides/`): a CLI reference
+  and a runbook for a first real run, written from the tool as it behaves.
+
+Phases will merge and split. The order will not survive contact with real use intact,
+and the chapter will be corrected when it does not, rather than left to describe a plan
+that stopped being true.
+
+## Decided, and deliberately after v1.0
+
+Two directions are settled enough to record and deliberately out of v1.0. They are
+written here so that decisions taken before them do not quietly rule them out.
+
+**A model running on another machine of the user's own, reached over a private network
+(Tailscale).** Small models fit this laptop; thesis-level work does not fit small
+models. Sending the prompt to a stronger machine the user owns keeps every promise that
+matters - own hardware, own network, own data, nothing sent to a third party - and
+VISION.md already says local-first means exactly that. But PRINCIPLES.md today puts a
+non-loopback host out of scope, so the two documents contradict each other, and the
+contradiction is resolved by decision record rather than by convenient reading. The
+moment LACC talks to a port that is not loopback, the threat model changes: permissions
+guard against misbehaving skills, not against whoever reaches the interface. That ADR -
+covering authentication, authorization, and whether the audit trail belongs outside the
+reachable workspace - is written before it is needed, not while wiring it up.
+
+**An interface beyond the CLI.** A terminal UI or a local web application, consuming
+the same core. It arrives once the core keeps its promise, so that the interface is
+built on something finished rather than becoming the place where behaviour is decided.
+
+Converting the finished Markdown to LaTeX is not on this list. Pandoc does that well
+already, and LACC has no reason to reimplement it.
 
 ## Toward v1.0
 
-Beyond a working real provider, the direction is to make it dependable: hardening
-against real-world failure, and documentation good enough for someone else to adopt
-it. A v1.0 means the control loop is stable and trustworthy, not that every feature
-exists.
+A v1.0 means the north is met and the control loop is trustworthy: dialogue with your
+own documents, persisted locally, with permission, preview, confirmation and audit
+around every run, and documentation good enough for someone else to adopt it. It does
+not mean every feature exists.
 
-Further ideas - a system dashboard consuming the same core, chaining skills
-together - are under consideration, not commitments. Some may not happen at all.
-
-One direction worth naming, because it changes assumptions rather than adding to
-them: running LACC across several machines the user owns, on their own private
-network, so a laptop can dispatch heavy work to a desktop with a dedicated GPU
-while light tasks stay local. This stays local-first in the sense that matters -
-own hardware, own network, own data, nothing sent to a third-party service - but
-the moment LACC listens on a port, the threat model changes. The current design
-assumes one user on one machine; permissions guard against misbehaving skills, not
-against someone who reaches the interface. That would need its own decision record
-covering authentication, authorization, and whether the audit trail should sit
-outside the reachable workspace. It is a direction for after v1.0, not a plan.
+Further ideas - a system dashboard consuming the same core, chaining skills together -
+are under consideration, not commitments. Some may not happen at all.
 
 ## What this roadmap is not
 
