@@ -149,6 +149,24 @@ backwards: an action may do what it *declared*, not what its permissions happen 
 allow. A conversion whose permissions grant `write_files` but whose action never asked
 for it is refused - the grant is a ceiling, not an instruction.
 
+## What a path has to be, not only where it is
+
+The workspace boundary was built to answer one question - is this path inside? - and it
+answers it well. A security review found that it was being asked to carry a second
+promise it had never been given: that a path names a file you can find again (ADR-017).
+
+Three shapes broke that promise without leaving the boundary, all of them specific to
+Windows. A device name (`NUL`, `CON`, `COM1`) resolves to a device whatever directory
+precedes it, so a document written there is discarded while the run reports success. An
+alternate data stream (`notes.md:hidden`) writes to a place no directory listing shows.
+A name ending in a dot or a space is silently trimmed before resolving, so the file
+written is not the file named.
+
+None of them is an escape, and that is the point worth keeping: a containment check is
+not the whole of what a boundary owes. These are refused by shape, in the workspace, next
+to the containment check, so that the one module answering "may LACC touch this path"
+answers the whole question rather than half of it.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

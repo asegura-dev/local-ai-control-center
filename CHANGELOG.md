@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-09-08
+
+### Added
+- `max_input_bytes` in the configuration, 32 MiB by default: the largest file LACC will
+  read or convert. Checked before the file is opened, so an oversized document is refused
+  with its name, its size and the limit, rather than discovered as a `MemoryError` from
+  somewhere deep in the process. The ceiling is about this machine and not about the
+  model - whether the text then fits the model's context is a different question, with a
+  different answer, in a later phase.
+
+### Changed
+- **A refused run now exits 1.** It exited 0, so a script checking the exit code was told
+  the work had succeeded when nothing ran. A declined run still exits 0: nothing failed
+  there - the human was asked and said no, which is the system working, and conflating
+  the two would make the exit code useless for telling them apart.
+
+### Security
+- The workspace refuses three path shapes that stayed inside the boundary while breaking
+  the other promise it makes: that a path names a file you can find again.
+  - **Windows device names** (`NUL`, `CON`, `COM1`, and the rest). Windows resolves them
+    to devices whatever directory precedes them and whatever extension follows, so a
+    converted document written to `NUL` is discarded while the run reports success.
+  - **Alternate data streams** (`notes.md:hidden`), which no directory listing shows. What
+    LACC does is meant to be visible; a write that cannot be seen contradicts that.
+  - **Names ending in a dot or a space**, which Windows strips before resolving, so the
+    file written is not the file that was named.
+
+  None of the three escapes the workspace. They are refused because containment was never
+  the only thing the boundary was for.
+
+
 ## [0.15.0] - 2026-09-08
 
 ### Added

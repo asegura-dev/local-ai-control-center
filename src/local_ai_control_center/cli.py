@@ -238,7 +238,7 @@ def _report_ingestion(result: RunResult, destination: Path) -> None:
     if result.outcome == "completed":
         console.print(Panel(f"Extracted text written to {destination}", title="Ingested"))
     elif result.outcome == "refused":
-        console.print("[red]Refused:[/red] the action would not be allowed.")
+        _exit_refused()
     else:
         console.print("[yellow]Declined.[/yellow] Nothing was written.")
 
@@ -312,9 +312,20 @@ def _report(result: RunResult) -> None:
     if result.outcome == "completed" and result.completion is not None:
         console.print(Panel(result.completion.text, title="Result", expand=False))
     elif result.outcome == "refused":
-        console.print("[red]Refused:[/red] the action would not be allowed.")
+        _exit_refused()
     elif result.outcome == "declined":
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
+
+
+def _exit_refused() -> None:
+    """Report a refusal and exit 1.
+
+    A refused run exits non-zero so that a script checking the exit code is not told the
+    work succeeded when nothing ran (ADR-017). A declined run keeps exiting 0: nothing
+    failed there - the human was asked and said no, which is the system working.
+    """
+    console.print("[red]Refused:[/red] the action would not be allowed.")
+    raise typer.Exit(code=1)
 
 
 def main() -> None:

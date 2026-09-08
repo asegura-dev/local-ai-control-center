@@ -87,3 +87,15 @@ def test_output_language_is_normalized() -> None:
     """Whitespace is stripped once at the boundary, so a prompt never carries it."""
     config = Config(workspace_root=Path("/tmp/lacc"), output_language="  Spanish  ")
     assert config.output_language == "Spanish"
+
+
+def test_max_input_bytes_has_a_generous_default() -> None:
+    """A ceiling exists without anyone configuring one."""
+    assert Config(workspace_root=Path("/tmp/lacc")).max_input_bytes == 32 * 1024 * 1024
+
+
+def test_max_input_bytes_must_be_a_real_ceiling() -> None:
+    """Zero or negative would refuse every file: a way to switch LACC off by accident."""
+    for value in (0, -1):
+        with pytest.raises(ValidationError):
+            Config(workspace_root=Path("/tmp/lacc"), max_input_bytes=value)

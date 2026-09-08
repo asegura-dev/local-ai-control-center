@@ -86,3 +86,37 @@ def test_workspace_from_config_creates_and_binds(tmp_path: Path) -> None:
     workspace = workspace_from_config(config)
     assert workspace.root == target.resolve()
     assert target.is_dir()
+
+
+def test_reserved_device_names_are_refused(tmp_path: Path) -> None:
+    """`NUL` swallows a write and reports success, whatever directory precedes it."""
+    workspace = Workspace.ensure(tmp_path)
+    for name in ("NUL", "con", "COM1", "sources/NUL", "NUL.txt"):
+        assert workspace.is_within(name) is False
+        with pytest.raises(ValueError):
+            workspace.resolve_within(name)
+
+
+def test_alternate_data_streams_are_refused(tmp_path: Path) -> None:
+    """A stream no directory listing shows contradicts LACC being inspectable."""
+    workspace = Workspace.ensure(tmp_path)
+    assert workspace.is_within("notes.md:hidden") is False
+    with pytest.raises(ValueError):
+        workspace.resolve_within("notes.md:hidden")
+
+
+def test_names_ending_in_a_dot_or_space_are_refused(tmp_path: Path) -> None:
+    """Windows strips them before resolving, so the file written is not the file named."""
+    workspace = Workspace.ensure(tmp_path)
+    for name in ("notes.md.", "notes.md ", "folder./notes.md"):
+        assert workspace.is_within(name) is False
+        with pytest.raises(ValueError):
+            workspace.resolve_within(name)
+
+
+def test_ordinary_names_are_still_accepted(tmp_path: Path) -> None:
+    """The new refusals are about shape, and must not catch anything ordinary."""
+    workspace = Workspace.ensure(tmp_path)
+    for name in ("notes.md", "sources/paper.pdf", "a.b.c/nul_notes.txt", "console.md"):
+        assert workspace.is_within(name) is True
+        assert workspace.resolve_within(name)

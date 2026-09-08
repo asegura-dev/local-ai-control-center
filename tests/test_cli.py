@@ -188,3 +188,25 @@ def test_ingest_will_not_overwrite(tmp_path: Path, make_pdf: Callable[..., Path]
     assert result.exit_code == 1
     assert "already exists" in result.stdout
     assert (workspace / "paper.md").read_text(encoding="utf-8") == "corrected by hand"
+
+
+def test_refused_run_exits_non_zero(tmp_path: Path, make_pdf: Callable[..., Path]) -> None:
+    """A script that checks the exit code must not be told the work succeeded."""
+    config, workspace = _ingest_config(tmp_path)
+    shutil.copy(make_pdf("Some text"), workspace / "paper.pdf")
+
+    result = runner.invoke(
+        app, ["ingest", "paper.pdf", "../escaped.md", "-c", str(config)], input="y\n"
+    )
+    assert result.exit_code == 1
+    assert "Refused" in result.stdout
+    assert not (tmp_path / "escaped.md").exists()
+
+
+def test_declined_run_still_exits_zero(tmp_path: Path, make_pdf: Callable[..., Path]) -> None:
+    """Declining is the system working, not a failure, and the exit code says so."""
+    config, workspace = _ingest_config(tmp_path)
+    shutil.copy(make_pdf("Some text"), workspace / "paper.pdf")
+
+    result = runner.invoke(app, ["ingest", "paper.pdf", "-c", str(config)], input="\n")
+    assert result.exit_code == 0

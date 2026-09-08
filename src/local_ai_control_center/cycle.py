@@ -55,6 +55,30 @@ outside everything the human was shown before agreeing to it (ADR-016).
 """
 
 
+_TOO_LARGE = (
+    "{name} is {size:,} bytes, over the {limit:,}-byte ceiling set by max_input_bytes. "
+    "LACC reads a document into memory whole, so this ceiling is about the machine, not "
+    "about the model. Raise max_input_bytes if the file really is meant to be read."
+)
+
+
+def _oversize(path: Path, limit: int) -> str | None:
+    """Return a message if ``path`` is over ``limit``, or ``None`` if it is not.
+
+    A message rather than an exception, because the two entry points translate the same
+    fact into different errors. A path that cannot be measured returns ``None``: the read
+    or the conversion that follows reports why far better than a guess here would
+    (ADR-017).
+    """
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return None
+    if size <= limit:
+        return None
+    return _TOO_LARGE.format(name=path.name, size=size, limit=limit)
+
+
 class ReadError(Exception):
     """Raised when a file the action declared cannot be read.
 
@@ -139,8 +163,11 @@ def _authorize(
     return preview, None
 
 
-def _read_file(path: Path) -> str:
+def _read_file(path: Path, max_bytes: int) -> str:
     """Return the text of ``path``, translating any failure into a clear message."""
+    oversize = _oversize(path, max_bytes)
+    if oversize is not None:
+        raise ReadError(oversize)
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError as error:
@@ -150,7 +177,7 @@ def _read_file(path: Path) -> str:
 
 
 def _fill_template(
-    template: str, action: IntendedAction, workspace: Workspace
+    template: str, action: IntendedAction, workspace: Workspace, max_bytes: int
 ) -> tuple[str, tuple[Path, ...]]:
     """Return the prompt with the action's file contents in place, and what was read.
 
@@ -162,7 +189,7 @@ def _fill_template(
     if "read_files" not in action.required or not action.targets:
         return template, ()
     paths = tuple(workspace.resolve_within(target) for target in action.targets)
-    contents = "\n\n".join(_read_file(path) for path in paths)
+    contents = "\n\n".join(_read_file(path, max_bytes) for path in paths)
     return template.replace(CONTENT_PLACEHOLDER, contents), paths
 
 
@@ -212,7 +239,9 @@ def run_action(
         return stopped
 
     try:
-        prompt, files_read = _fill_template(prompt_template, action, workspace)
+        prompt, files_read = _fill_template(
+            prompt_template, action, workspace, config.max_input_bytes
+        )
     except ReadError as error:
         audit.record(
             run_id,
@@ -293,6 +322,16 @@ def run_conversion(
 
     resolved_source = workspace.resolve_within(source)
     resolved_destination = workspace.resolve_within(destination)
+
+    oversize = _oversize(resolved_source, config.max_input_bytes)
+    if oversize is not None:
+        audit.record(
+            run_id,
+            "ingestion_failed",
+            f"Could not ingest {resolved_source.name}",
+            {"action": action.name, "source": str(resolved_source), "error": oversize},
+        )
+        raise ConversionError(oversize)
 
     try:
         text = converter.extract_text(resolved_source)

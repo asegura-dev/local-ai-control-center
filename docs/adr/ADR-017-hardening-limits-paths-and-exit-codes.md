@@ -1,6 +1,6 @@
 # ADR-017 - Hardening: input limits, path shapes, and honest exit codes
 
-- **Status:** Accepted - not yet implemented (planned for the phase after v0.15.0)
+- **Status:** Accepted - implemented (v0.16.0)
 - **Date:** 2026-09-08
 - **Context:** Before adding more surface, the existing surface was reviewed against the
   promises PRINCIPLES makes. Four things were wrong. Two were defects rather than

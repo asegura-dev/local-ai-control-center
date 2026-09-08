@@ -58,6 +58,10 @@ carries no dates.
   address was honoured without being checked, and a conversion could read or write what
   its action had not declared - and recorded the rest in ADR-017.
 
+- **v0.16.0 - Hardening (ADR-017).** What a security review of the existing surface
+  decided: a configured ceiling on input size, checked before a file is opened; Windows
+  device names, alternate data streams and names ending in a dot or a space refused at
+  the boundary; and a refused run exiting non-zero, while a declined one still does not.
 
 ## The route to v1.0
 

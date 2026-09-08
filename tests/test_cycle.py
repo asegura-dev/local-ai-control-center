@@ -504,3 +504,31 @@ def test_conversion_declaring_nothing_names_both_effects(
         _ingest(tmp_path, Path("document.pdf"), Path("document.md"), required=frozenset())
     message = str(excinfo.value)
     assert "read_files" in message and "write_files" in message
+
+
+def test_a_file_over_the_ceiling_is_not_read(tmp_path: Path) -> None:
+    """The ceiling is checked before the file is opened, not after it is in memory."""
+    _note(tmp_path, "x" * 500)
+    with pytest.raises(ReadError) as excinfo:
+        _run(
+            tmp_path,
+            _reading_action(),
+            Permissions(read_files=True),
+            prompt_template=_TEMPLATE,
+            max_input_bytes=100,
+        )
+    message = str(excinfo.value)
+    assert "notes.txt" in message and "max_input_bytes" in message
+
+
+def test_a_document_over_the_ceiling_is_not_converted(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """The same ceiling covers ingestion, and the refusal is recorded."""
+    make_pdf("Some text")
+    with pytest.raises(ConversionError) as excinfo:
+        _ingest(tmp_path, Path("document.pdf"), Path("document.md"), max_input_bytes=100)
+    assert "max_input_bytes" in str(excinfo.value)
+    assert not (tmp_path / "document.md").exists()
+    audit = AuditLog(Workspace.ensure(tmp_path), Config(workspace_root=tmp_path))
+    assert _kinds(audit)[-1] == "ingestion_failed"

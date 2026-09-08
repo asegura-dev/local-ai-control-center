@@ -20,6 +20,10 @@ AuditLevel = Literal["standard", "full"]
 AuditFailurePolicy = Literal["abort", "continue"]
 """What to do when an audit record cannot be written."""
 
+MAX_INPUT_BYTES_DEFAULT = 32 * 1024 * 1024
+"""32 MiB: large enough that an ordinary research document never meets it, small enough
+that meeting it says something rather than merely being a nuisance."""
+
 
 class Config(BaseModel):
     """Validated configuration for one LACC run.
@@ -63,6 +67,16 @@ class Config(BaseModel):
             "'lacc profile'."
         ),
     )
+    max_input_bytes: int = Field(
+        default=MAX_INPUT_BYTES_DEFAULT,
+        description=(
+            "The largest file LACC will read or convert, in bytes. A document is read "
+            "into memory whole, so this is a ceiling about the machine rather than "
+            "about the model: whether the text then fits the model's context is a "
+            "different question with a different answer. Over the ceiling the run is "
+            "refused, naming the file, its size and the limit."
+        ),
+    )
     output_language: str = Field(
         default="English",
         description=(
@@ -73,6 +87,18 @@ class Config(BaseModel):
             "the model happens to choose."
         ),
     )
+
+    @field_validator("max_input_bytes")
+    @classmethod
+    def _require_a_positive_ceiling(cls, value: int) -> int:
+        """Reject a ceiling that is not a real ceiling.
+
+        Zero or a negative value would refuse every file, which is not a limit but a
+        way of turning LACC off by configuration accident.
+        """
+        if value <= 0:
+            raise ValueError("max_input_bytes must be a positive number of bytes")
+        return value
 
     @field_validator("output_language")
     @classmethod
