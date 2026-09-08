@@ -9,9 +9,11 @@ engine installed.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
@@ -94,13 +96,45 @@ class ProviderError(Exception):
     """
 
 
-def _ollama_host() -> str:
-    """The engine address, honoring OLLAMA_HOST, defaulting to loopback."""
+_NOT_LOOPBACK = (
+    "OLLAMA_HOST points at {host}, which is not this machine. LACC talks to an engine "
+    "over loopback only: that is inter-process communication, while a non-loopback host "
+    "is real network access, and sending your documents to another machine is not "
+    "something LACC does because an environment variable said so. Running a model on "
+    "another machine you own is a direction the roadmap records, and it needs its own "
+    "decision record - authentication, authorization, where the audit trail lives - "
+    "before it exists. Until then, unset OLLAMA_HOST or point it at 127.0.0.1."
+)
+
+
+def _is_loopback(hostname: str) -> bool:
+    """Whether ``hostname`` names this machine, by literal address or by `localhost`."""
+    if hostname.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+def ollama_host() -> str:
+    """The engine address, honoring OLLAMA_HOST, defaulting to loopback.
+
+    Refuses a host that is not loopback rather than using it. PRINCIPLES treats
+    loopback as inter-process communication and anything else as network access, which
+    LACC does not do; without this check the promise is a comment, and an environment
+    variable set by an installer, a script or a mistake would be enough to turn a local
+    tool into one that sends private documents elsewhere, looking exactly like a normal
+    run while it did.
+    """
     host = os.environ.get("OLLAMA_HOST", "").strip()
     if not host:
         return DEFAULT_OLLAMA_HOST
     if not host.startswith("http"):
         host = f"http://{host}"
+    hostname = urllib.parse.urlparse(host).hostname
+    if hostname is None or not _is_loopback(hostname):
+        raise ProviderError(_NOT_LOOPBACK.format(host=host))
     return host
 
 
@@ -115,6 +149,7 @@ class OllamaProvider(Provider):
 
     def __init__(self, model: str) -> None:
         """Create the provider for a given model name (from configuration)."""
+        self._host = ollama_host()
         if not model:
             raise ProviderError(
                 "No model configured. Name one in your config (see 'lacc profile' "
@@ -132,7 +167,7 @@ class OllamaProvider(Provider):
 
         Translates connection, model, and timeout failures into clear messages.
         """
-        url = f"{_ollama_host()}/api/generate"
+        url = f"{self._host}/api/generate"
         body = json.dumps({"model": self._model, "prompt": prompt, "stream": False}).encode("utf-8")
         request = urllib.request.Request(
             url, data=body, headers={"Content-Type": "application/json"}
@@ -145,7 +180,7 @@ class OllamaProvider(Provider):
             raise self._translate_http_error(error) from error
         except (urllib.error.URLError, TimeoutError) as error:
             raise ProviderError(
-                f"Cannot reach Ollama at {_ollama_host()}. Is it running? "
+                f"Cannot reach Ollama at {self._host}. Is it running? "
                 "Start it with 'ollama serve', or check 'lacc profile'."
             ) from error
         except (ValueError, OSError) as error:

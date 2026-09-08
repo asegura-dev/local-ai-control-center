@@ -19,8 +19,10 @@ from rich.table import Table
 
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config, load_config
-from local_ai_control_center.cycle import ReadError, RunResult
-from local_ai_control_center.preview import ExecutionPreview, preview_action
+from local_ai_control_center.converter import ConversionError, converter_for
+from local_ai_control_center.cycle import ReadError, RunResult, run_conversion
+from local_ai_control_center.permissions import grant
+from local_ai_control_center.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.profiler import SystemProfile, profile_system
 from local_ai_control_center.provider import (
     MockProvider,
@@ -176,6 +178,69 @@ def preview(
     plan = resolved.plan(request, config)
     result = preview_action(plan.action, grant_for(resolved, config), config, workspace)
     _show_preview(result)
+
+
+@app.command()
+def ingest(
+    source: Annotated[
+        Path,
+        typer.Argument(help="Document to convert (PDF or .docx), inside the workspace."),
+    ],
+    destination: Annotated[
+        Path | None,
+        typer.Argument(help="Where to write the text. Defaults to the source with a .md suffix."),
+    ] = None,
+    config_path: Annotated[
+        Path,
+        typer.Option("--config", "-c", help="Path to the configuration file."),
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Extract a document's text into a file LACC can read, after preview and confirmation."""
+    config, workspace = _load(config_path)
+    audit = AuditLog(workspace, config)
+    target = destination if destination is not None else source.with_suffix(".md")
+
+    try:
+        converter = converter_for(source)
+    except ConversionError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    action = IntendedAction(
+        name="ingest",
+        summary=f"Extract the text of {source} into {target}",
+        required=frozenset({"read_files", "write_files"}),
+        targets=(source, target),
+    )
+
+    try:
+        result = run_conversion(
+            action,
+            source,
+            target,
+            converter,
+            grant(action.required, config),
+            config,
+            workspace,
+            audit,
+            new_run_id(),
+            _confirm,
+        )
+    except ConversionError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    _report_ingestion(result, target)
+
+
+def _report_ingestion(result: RunResult, destination: Path) -> None:
+    """Print the outcome of an ingestion run, naming the file it produced."""
+    if result.outcome == "completed":
+        console.print(Panel(f"Extracted text written to {destination}", title="Ingested"))
+    elif result.outcome == "refused":
+        console.print("[red]Refused:[/red] the action would not be allowed.")
+    else:
+        console.print("[yellow]Declined.[/yellow] Nothing was written.")
 
 
 @app.command()

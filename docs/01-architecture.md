@@ -51,7 +51,8 @@ provider port with a deterministic offline mock and a real Ollama-backed
 implementation (`provider`), an append-only audit
 log (`audit`), a side-effect-free execution preview (`preview`), the execution
 cycle that runs an action through all of them (`cycle`), skills that produce those
-actions (`skill`), and a command-line interface that ties everything into a usable
+actions (`skill`), a converter port that turns documents into text LACC can read
+(`converter`), and a command-line interface that ties everything into a usable
 tool (`cli`). Interface code (Typer, Rich) lives only in the CLI; the core stays
 free of it. A profiler (`profiler`) detects and reports what the machine offers -
 the local engine, installed models, hardware, and rough capacity guidance - without
@@ -104,6 +105,49 @@ a mitigation and the documentation says so - a document containing the closing m
 ends it early. What keeps the residual risk small is structural rather than textual:
 nothing in LACC acts on a model's answer. It is returned to a person who previewed and
 confirmed the run, and no skill chains from it.
+
+## A second kind of run, and the cost of admitting it
+
+Reading a document that is not text - a PDF, a `.docx` - is the first job that does not
+fit the shape everything else has. A skill produces a prompt and the cycle sends it to a
+model; converting a document produces a file and never asks a model anything. Making it
+a skill would have meant a plan with no prompt and a cycle that sometimes skips the
+provider: a hole cut in a contract to admit the one case that does not fit it (ADR-016).
+
+It did not need to be a skill. `IntendedAction` was built generic in ADR-007, and named
+a command-line action as one of its producers from the start. That seam had gone unused
+for eight releases; ingestion is what it was for. Skills keep meaning "work a model
+does", and `lacc ingest` builds its action directly.
+
+What the cycle grew is a second entry point, not a second sequence. Preview, refuse or
+ask, record - the order ADR-008 fixed - lives in one function that both entry points
+open with; what differs is only the middle, where one reads and calls a provider and the
+other converts and writes. Two public functions each re-implementing the order would be
+two places that know how a run proceeds, which is the thing that order exists to prevent.
+
+The general design is visible from here: an action carrying its own effects, and one
+cycle running any of them. It is deliberately not built. Two cases written by the same
+hand on the same afternoon are weak evidence for an abstraction that would touch
+everything, and the duplication that remains is small enough to name and wait on.
+
+Conversion itself sits behind a `Converter` port with two implementations from the
+start, so the abstraction is shaped by two real cases rather than guessed from one - and
+so the extraction library, the part most likely to be wrong, can be replaced behind an
+interface instead of unpicked from the system.
+
+## What the preview shows is what was checked
+
+Both effects of a conversion - reading the document, writing the result - have to be
+declared by the action before either happens. This is not belt and braces. The preview
+checks the capabilities an action declares and nothing else, and the human confirms what
+the preview showed; so an effect that was never declared is one nobody checked and one
+nobody agreed to. Guarding the write and not the read left exactly that gap, and a
+security review found it after the write had already been fixed.
+
+The rule that comes out of it is worth stating plainly, because it is easy to get
+backwards: an action may do what it *declared*, not what its permissions happen to
+allow. A conversion whose permissions grant `write_files` but whose action never asked
+for it is refused - the grant is a ceiling, not an instruction.
 
 ## Future direction
 

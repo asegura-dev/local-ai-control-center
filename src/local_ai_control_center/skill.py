@@ -23,12 +23,7 @@ from local_ai_control_center.cycle import (
     RunResult,
     run_action,
 )
-from local_ai_control_center.permissions import (
-    CAPABILITIES,
-    Capability,
-    Permissions,
-    effective_permissions,
-)
+from local_ai_control_center.permissions import Capability, Permissions, grant
 from local_ai_control_center.preview import IntendedAction
 from local_ai_control_center.provider import Provider
 from local_ai_control_center.workspace import Workspace
@@ -168,7 +163,9 @@ def grant_for(skill: Skill, config: Config) -> Permissions:
     removes any capability it forbids (ADR-011). The result grants exactly the
     intersection: nothing the skill did not ask for, nothing the configuration
     vetoes. Replaces hardcoded permissions at the call site.
+
+    A thin reading of `grant`: the rule about ceilings lives in one place, and this is
+    the skill-shaped way in, so an action that is not a skill (ADR-016) can declare its
+    capabilities directly without a second copy of the rule.
     """
-    declared = Permissions(**{cap: cap in skill.required for cap in CAPABILITIES})
-    available = effective_permissions(declared, config)
-    return Permissions(**{cap: cap in available for cap in CAPABILITIES})
+    return grant(skill.required, config)

@@ -11,6 +11,7 @@ from local_ai_control_center.provider import (
     OllamaProvider,
     Provider,
     ProviderError,
+    ollama_host,
 )
 
 
@@ -160,3 +161,38 @@ def test_ollama_translates_missing_model() -> None:
     message = str(excinfo.value)
     assert "not installed" in message
     assert "ollama pull nope:1b" in message
+
+
+def test_engine_address_defaults_to_loopback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With nothing configured, the engine is on this machine."""
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    assert ollama_host() == "http://127.0.0.1:11434"
+
+
+def test_engine_address_accepts_loopback_forms(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Loopback by literal address or by name is inter-process communication, not network."""
+    for value in ("127.0.0.1:11434", "http://127.0.0.1:11434", "localhost", "http://[::1]:11434"):
+        monkeypatch.setenv("OLLAMA_HOST", value)
+        assert ollama_host()
+
+
+def test_engine_address_refuses_a_host_that_is_not_this_machine(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An environment variable must not be able to send documents to another machine.
+
+    PRINCIPLES puts a non-loopback host out of scope. Without this the promise is a
+    comment: a variable set by an installer, a script or a mistake would be enough.
+    """
+    for value in ("http://192.168.1.50:11434", "https://models.example.com", "example.com"):
+        monkeypatch.setenv("OLLAMA_HOST", value)
+        with pytest.raises(ProviderError) as excinfo:
+            ollama_host()
+        assert "not this machine" in str(excinfo.value)
+
+
+def test_provider_refuses_to_be_built_for_a_remote_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The refusal happens at construction, before a prompt could be sent anywhere."""
+    monkeypatch.setenv("OLLAMA_HOST", "https://models.example.com")
+    with pytest.raises(ProviderError):
+        OllamaProvider("qwen2.5:3b")

@@ -98,3 +98,19 @@ def require(
     result = check(required, permissions, config)
     if not result.allowed:
         raise PermissionDenied(f"Missing required capabilities: {', '.join(result.missing)}")
+
+
+def grant(
+    required: frozenset[Capability] | set[Capability],
+    config: Config,
+) -> Permissions:
+    """Grant exactly ``required``, minus whatever the configuration forbids.
+
+    The one place that turns "what was asked for" into "what is allowed" (ADR-011):
+    permission flows from the declaration, limited by the ceiling, never the reverse.
+    A skill declares through `grant_for`; a command-line action declares its
+    capabilities directly and comes here.
+    """
+    declared = Permissions(**{cap: cap in required for cap in CAPABILITIES})
+    available = effective_permissions(declared, config)
+    return Permissions(**{cap: cap in available for cap in CAPABILITIES})

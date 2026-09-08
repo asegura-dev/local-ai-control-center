@@ -31,6 +31,17 @@ what it contains. For the reading order and status, see [README.md](README.md).
 | 013 | [real-provider](adr/ADR-013-real-provider.md) | A real provider (`OllamaProvider`) implementing the existing port against local Ollama: complete responses (no streaming) with a progress spinner, model from configuration, localhost exempt from `network_access`, and failures translated into actionable messages rather than verified in advance. The CLI chooses mock or Ollama per run. |
 | 014 | [reading-file-contents](adr/ADR-014-reading-file-contents.md) | Turns a granted-but-unused `read_files` into a real read: the cycle reads the action's declared targets after confirmation and before the provider, never the skill's pure `plan`. The plan supplies a prompt template with a placeholder; the cycle fills it with what it read. Read failures are translated like provider failures, and contents are audited only under `full`. |
 | 015 | [prompt-shaping](adr/ADR-015-prompt-shaping.md) | Shapes what LACC actually says to the model: a framed task, a configured output language (`output_language`, default English), and the document fenced between fixed markers and declared to be material rather than instruction. `Skill.plan` gains the configuration, amending ADR-009 while keeping the plan pure. Names the fence's limitation instead of overclaiming, and keeps wording in code until external templates earn their own phase. |
+| 016 | [document-ingestion](adr/ADR-016-document-ingestion.md) | How a PDF or `.docx` becomes text LACC can read: conversion is an explicit step writing a `.md` into the workspace, not a parse hidden inside a read, so the most fragile link in the chain is the one you can inspect. Ingestion is a command-line action rather than a skill, since it never asks a model; the cycle gains a second entry point with the shared order factored out. A `Converter` port with two implementations from the start, create-only writes, and an empty extraction reported rather than written. |
+| 017 | [hardening-limits-paths-and-exit-codes](adr/ADR-017-hardening-limits-paths-and-exit-codes.md) | What a security review of the existing surface found and decided: a configured ceiling on input size, Windows device names and alternate data streams refused at the boundary, and a refused run exiting non-zero while a declined one does not. Also records what was checked and found sound - no XXE in `.docx`, boundary escapes refused - and what could not be verified on the reviewing machine. |
+
+## Guides (`docs/guides/`)
+
+Practical, written from the tool as it behaves. Added one at a time, when a phase earns
+one, rather than all at once.
+
+| File | What's in it |
+|---|---|
+| [virtualenv-outside-a-sync-folder](guides/virtualenv-outside-a-sync-folder.md) | Why a `.venv` inside OneDrive or another sync folder breaks `uv`: compiled extensions hollowed out by Files On-Demand, which fail quietly and are the reason that decides it, plus locked files that fail loudly and turn out to have more than one cause. The directory-link fix, the two alternatives, and what each costs. |
 
 ## Top-level files
 

@@ -7,20 +7,23 @@ permissions, provider, preview, and audit together rather than in isolation.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config
+from local_ai_control_center.converter import ConversionError, converter_for
 from local_ai_control_center.cycle import (
     CONTENT_PLACEHOLDER,
     ExecutionPreview,
     ReadError,
     RunResult,
     run_action,
+    run_conversion,
 )
-from local_ai_control_center.permissions import Permissions
+from local_ai_control_center.permissions import PermissionDenied, Permissions
 from local_ai_control_center.preview import IntendedAction
 from local_ai_control_center.provider import MockProvider
 from local_ai_control_center.workspace import Workspace
@@ -328,3 +331,176 @@ def test_declining_reads_nothing(tmp_path: Path) -> None:
     )
     assert result.outcome == "declined"
     assert "files_read" not in _kinds(audit)
+
+
+_INGEST_CAPS = frozenset({"read_files", "write_files"})
+
+
+def _ingest(
+    tmp_path: Path,
+    source: Path,
+    destination: Path,
+    *,
+    required: frozenset[str] = _INGEST_CAPS,
+    confirm: object = _accept,
+    **config_kwargs: object,
+) -> tuple[RunResult, AuditLog]:
+    workspace = Workspace.ensure(tmp_path)
+    config = Config(workspace_root=tmp_path, **config_kwargs)  # type: ignore[arg-type]
+    audit = AuditLog(workspace, config)
+    action = IntendedAction(
+        name="ingest",
+        summary=f"Extract the text of {source} into {destination}",
+        required=required,  # type: ignore[arg-type]
+        targets=(source, destination),
+    )
+    result = run_conversion(
+        action,
+        source,
+        destination,
+        converter_for(source),
+        Permissions(read_files=True, write_files=True),
+        config,
+        workspace,
+        audit,
+        "run-1",
+        confirm,  # type: ignore[arg-type]
+    )
+    return result, audit
+
+
+def test_conversion_writes_the_extracted_text(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """The run produces a file, and completes without ever reaching a provider."""
+    make_pdf("Attention is all you need")
+    result, _ = _ingest(tmp_path, Path("document.pdf"), Path("document.md"))
+    assert result.outcome == "completed"
+    assert result.completion is None
+    assert "Attention is all you need" in (tmp_path / "document.md").read_text(encoding="utf-8")
+
+
+def test_conversion_records_what_it_did(tmp_path: Path, make_pdf: Callable[..., Path]) -> None:
+    """A converted document leaves the same shape of trail as any other run."""
+    make_pdf("Some text")
+    _, audit = _ingest(tmp_path, Path("document.pdf"), Path("document.md"))
+    assert _kinds(audit) == [
+        "run_started",
+        "permission_granted",
+        "document_converted",
+        "run_finished",
+    ]
+
+
+def test_conversion_records_paths_but_never_the_text(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """The extracted text is already a file the record names; the trail does not repeat it."""
+    make_pdf("SECRET RESEARCH FINDING")
+    _, audit = _ingest(tmp_path, Path("document.pdf"), Path("document.md"), audit_level="full")
+    trail = audit.path.read_text(encoding="utf-8")
+    assert "SECRET RESEARCH FINDING" not in trail
+    assert "document.pdf" in trail and "document.md" in trail
+
+
+def test_declining_a_conversion_writes_nothing(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """The effects come after confirmation here too."""
+    make_pdf("Some text")
+    result, _ = _ingest(tmp_path, Path("document.pdf"), Path("document.md"), confirm=_decline)
+    assert result.outcome == "declined"
+    assert not (tmp_path / "document.md").exists()
+
+
+def test_conversion_never_overwrites(tmp_path: Path, make_pdf: Callable[..., Path]) -> None:
+    """A destination the user may have corrected by hand is not replaced."""
+    make_pdf("Some text")
+    existing = tmp_path / "document.md"
+    existing.write_text("corrected by hand", encoding="utf-8")
+    with pytest.raises(ConversionError) as excinfo:
+        _ingest(tmp_path, Path("document.pdf"), Path("document.md"))
+    assert "already exists" in str(excinfo.value)
+    assert existing.read_text(encoding="utf-8") == "corrected by hand"
+
+
+def test_conversion_into_a_missing_folder_fails_clearly(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """A folder that is not there is named, rather than created behind the user's back."""
+    make_pdf("Some text")
+    with pytest.raises(ConversionError) as excinfo:
+        _ingest(tmp_path, Path("document.pdf"), Path("nowhere/document.md"))
+    assert "does not exist" in str(excinfo.value)
+
+
+def test_conversion_failure_is_recorded(tmp_path: Path, make_pdf: Callable[..., Path]) -> None:
+    """A failed ingestion leaves a record saying so."""
+    make_pdf(" ")
+    with pytest.raises(ConversionError):
+        _ingest(tmp_path, Path("document.pdf"), Path("document.md"))
+    audit = AuditLog(Workspace.ensure(tmp_path), Config(workspace_root=tmp_path))
+    assert _kinds(audit) == ["run_started", "permission_granted", "ingestion_failed"]
+
+
+def test_conversion_refuses_a_destination_outside_the_workspace(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """The boundary applies to what is written, not only to what is read."""
+    workspace_root = tmp_path / "ws"
+    workspace_root.mkdir()
+    make_pdf("Some text", name="ws/document.pdf")
+    result, _ = _ingest(workspace_root, Path("document.pdf"), Path("../escaped.md"))
+    assert result.outcome == "refused"
+    assert not (tmp_path / "escaped.md").exists()
+
+
+def test_conversion_will_not_write_without_the_action_declaring_it(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """Writing follows the declaration the preview checked, not the permission granted.
+
+    The permissions here grant `write_files`; the action does not ask for it. The preview
+    checks only what is declared, so an undeclared write would never have been checked.
+    """
+    make_pdf("Some text")
+    with pytest.raises(PermissionDenied) as excinfo:
+        _ingest(
+            tmp_path,
+            Path("document.pdf"),
+            Path("document.md"),
+            required=frozenset({"read_files"}),
+        )
+    assert "write_files" in str(excinfo.value)
+    assert not (tmp_path / "document.md").exists()
+
+
+def test_conversion_will_not_read_without_the_action_declaring_it(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """Reading is an effect too, and the same rule covers it.
+
+    An action declaring only `write_files` is checked only for `write_files`, so the
+    preview the human confirmed would not have mentioned the read at all.
+    """
+    make_pdf("Some text")
+    with pytest.raises(PermissionDenied) as excinfo:
+        _ingest(
+            tmp_path,
+            Path("document.pdf"),
+            Path("document.md"),
+            required=frozenset({"write_files"}),
+        )
+    assert "read_files" in str(excinfo.value)
+    assert not (tmp_path / "document.md").exists()
+
+
+def test_conversion_declaring_nothing_names_both_effects(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """An action that declares neither is told about both, not just the first."""
+    make_pdf("Some text")
+    with pytest.raises(PermissionDenied) as excinfo:
+        _ingest(tmp_path, Path("document.pdf"), Path("document.md"), required=frozenset())
+    message = str(excinfo.value)
+    assert "read_files" in message and "write_files" in message

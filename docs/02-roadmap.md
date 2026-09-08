@@ -51,6 +51,13 @@ carries no dates.
   and the document fenced between markers and declared to be material rather than
   instruction. `Skill.plan` receives the configuration, amending ADR-009 without
   giving up the plan's purity.
+- **v0.15.0 - Ingestion.** `lacc ingest` turns a PDF or `.docx` inside the workspace into
+  a `.md` file inside it, through a `Converter` port with two implementations. The cycle
+  gains a second entry point for runs that produce a file rather than an answer. A
+  security review of the existing surface closed two holes here - a non-loopback engine
+  address was honoured without being checked, and a conversion could read or write what
+  its action had not declared - and recorded the rest in ADR-017.
+
 
 ## The route to v1.0
 

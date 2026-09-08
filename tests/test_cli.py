@@ -8,6 +8,8 @@ through stdin. Run tests use the mock provider so they never depend on Ollama.
 from __future__ import annotations
 
 import json
+import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -117,3 +119,72 @@ def test_missing_config_fails_clearly(tmp_path: Path) -> None:
     )
     assert result.exit_code == 1
     assert "Could not load configuration" in result.stdout
+
+
+def _ingest_config(tmp_path: Path) -> tuple[Path, Path]:
+    """A configuration whose workspace holds a real PDF, and the workspace path."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir(exist_ok=True)
+    config = tmp_path / "ingest.yaml"
+    config.write_text(f"workspace_root: {workspace}\n", encoding="utf-8")
+    return config, workspace
+
+
+def test_ingest_converts_after_confirmation(tmp_path: Path, make_pdf: Callable[..., Path]) -> None:
+    """Answering yes writes the extracted text and says where it went."""
+    config, workspace = _ingest_config(tmp_path)
+    shutil.copy(make_pdf("Attention is all you need"), workspace / "paper.pdf")
+
+    result = runner.invoke(app, ["ingest", "paper.pdf", "-c", str(config)], input="y\n")
+    assert result.exit_code == 0
+    assert "paper.md" in result.stdout
+    assert "Attention is all you need" in (workspace / "paper.md").read_text(encoding="utf-8")
+
+
+def test_ingest_declined_writes_nothing(tmp_path: Path, make_pdf: Callable[..., Path]) -> None:
+    """Pressing Enter declines, and the effects never happen."""
+    config, workspace = _ingest_config(tmp_path)
+    shutil.copy(make_pdf("Some text"), workspace / "paper.pdf")
+
+    result = runner.invoke(app, ["ingest", "paper.pdf", "-c", str(config)], input="\n")
+    assert result.exit_code == 0
+    assert "Declined" in result.stdout
+    assert not (workspace / "paper.md").exists()
+
+
+def test_ingest_accepts_an_explicit_destination(
+    tmp_path: Path, make_pdf: Callable[..., Path]
+) -> None:
+    """The destination can be named instead of derived."""
+    config, workspace = _ingest_config(tmp_path)
+    shutil.copy(make_pdf("Some text"), workspace / "paper.pdf")
+
+    result = runner.invoke(
+        app, ["ingest", "paper.pdf", "sources.md", "-c", str(config)], input="y\n"
+    )
+    assert result.exit_code == 0
+    assert (workspace / "sources.md").exists()
+    assert not (workspace / "paper.md").exists()
+
+
+def test_ingest_rejects_an_unsupported_format_before_asking(tmp_path: Path) -> None:
+    """An unsupported format exits non-zero without previewing or asking anything."""
+    config, workspace = _ingest_config(tmp_path)
+    (workspace / "notes.rtf").write_text("x", encoding="utf-8")
+
+    result = runner.invoke(app, ["ingest", "notes.rtf", "-c", str(config)])
+    assert result.exit_code == 1
+    assert "does not know how to convert" in result.stdout
+    assert "Proceed?" not in result.stdout
+
+
+def test_ingest_will_not_overwrite(tmp_path: Path, make_pdf: Callable[..., Path]) -> None:
+    """An existing destination ends the run with a clear message and exit code."""
+    config, workspace = _ingest_config(tmp_path)
+    shutil.copy(make_pdf("Some text"), workspace / "paper.pdf")
+    (workspace / "paper.md").write_text("corrected by hand", encoding="utf-8")
+
+    result = runner.invoke(app, ["ingest", "paper.pdf", "-c", str(config)], input="y\n")
+    assert result.exit_code == 1
+    assert "already exists" in result.stdout
+    assert (workspace / "paper.md").read_text(encoding="utf-8") == "corrected by hand"

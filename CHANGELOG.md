@@ -5,6 +5,65 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-09-08
+
+### Added
+- `lacc ingest <source> [destination]`: converts a PDF or `.docx` inside the workspace
+  into a `.md` file inside the workspace, after preview and confirmation, recorded in the
+  audit trail. Sources for real work arrive as PDF and Word while LACC reads only UTF-8
+  text, so until now the material it exists to work on was unreadable.
+- A `Converter` port with two implementations from the start - PDF via `pypdf`, `.docx`
+  via `python-docx` - selected by file suffix. Conversion is an explicit step producing a
+  file the user can open and correct, rather than a parse hidden inside a read.
+- What is produced is extracted text, and is not called more than that: page boundaries
+  are kept as `<!-- page N -->` and Word heading styles become headings, because both are
+  recovered rather than invented, while tables are flattened to rows instead of dressed as
+  Markdown tables that merged cells would break.
+- A second entry point in the cycle, `run_conversion`, for a run that produces a file
+  instead of an answer and never reaches a provider. The sequence every run shares -
+  preview, refuse or ask, record - is factored into one place rather than written twice.
+- New audit events `document_converted` and `ingestion_failed`.
+- `permissions.grant`: the configuration-ceiling rule in one place, so an action that is
+  not a skill can declare its capabilities without a second copy of the rule. `grant_for`
+  becomes a thin reading of it.
+
+### Security
+- **A non-loopback engine address is refused.** `OLLAMA_HOST` was honoured without being
+  checked, so a value set by an installer, a script or a mistake was enough to send
+  documents to another machine while looking exactly like a normal run. PRINCIPLES puts a
+  non-loopback host out of scope; until now that was a comment rather than a check. The
+  profiler carried its own copy of the same code, so both paths were open - there is one
+  now, and it refuses with a message explaining that a remote engine is a recorded
+  direction which needs its own decision record before it exists.
+- **A conversion must declare both of its effects before either happens.** The preview
+  checks only the capabilities an action declares, so a conversion now requires
+  `read_files` and `write_files` together and refuses an action that declares less. An
+  undeclared effect is one nobody checked, and one the human was never shown before
+  confirming.
+- Ingestion never overwrites: the destination is opened for exclusive creation, so a `.md`
+  the user already corrected by hand cannot be replaced by a fresh extraction.
+- A `.docx` is untrusted XML. python-docx does not resolve external entities - verified
+  against a document built to try - and a test pins that against a future change of
+  parser.
+- The trail records which document was converted, by which converter, to where, and how
+  many characters resulted. Never the text: it is already a file the record names.
+
+### Notes
+- A scanned PDF with no text layer is reported as such, and nothing is written. Producing
+  an empty file would turn a legible failure into a silent one. OCR is out of scope.
+- PyMuPDF is deliberately not used: it is the most capable option and it is AGPL, which
+  an MIT-licensed project cannot take on.
+- Input still has no size ceiling, Windows device names and alternate data streams still
+  pass the workspace boundary, and a refused run still exits 0. All three are decided in
+  ADR-017 and implemented in the phase after this one.
+
+### Dependencies
+- Added `pypdf` (BSD-3) and `python-docx` (MIT); `lxml` (BSD-3) arrives with the latter.
+  Licences were read from the installed packages rather than recalled. `lxml` is a
+  compiled extension rather than pure Python, so `.docx` support depends on a wheel
+  existing for the interpreter in use.
+
+
 ## [0.14.0] - 2026-09-02
 
 ### Added

@@ -46,13 +46,16 @@ Early development, but working end to end. `lacc run summarize_file <path>` plan
 the action, shows a preview, asks for confirmation (defaulting to no), reads the
 file inside the workspace boundary under the `read_files` permission, sends its
 contents to a local Ollama model, and records the run in an append-only audit log.
-`lacc preview` shows what would happen without doing it; `lacc profile` reports what
-the machine offers.
+`lacc ingest <document>` turns a PDF or Word file inside the workspace into text LACC
+can read, writing it as Markdown you can open and correct - after the same preview and
+confirmation, and never overwriting a file that is already there. `lacc preview` shows
+what would happen without doing it; `lacc profile` reports what the machine offers.
 
 The control core is in place: configuration, workspaces with boundary enforcement,
 permissions, a provider port with a deterministic mock and a real Ollama
-implementation, the audit log, execution previews, the execution cycle, skills, and
-the command-line interface. What remains is hardening through real use and
+implementation, the audit log, execution previews, the execution cycle, skills,
+document conversion, and the command-line interface. The engine is reached over
+loopback only: a non-loopback address is refused rather than used. What remains is hardening through real use and
 documentation for adoption - see the [roadmap](docs/02-roadmap.md).
 
 ## License

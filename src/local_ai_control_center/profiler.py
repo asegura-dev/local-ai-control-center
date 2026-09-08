@@ -19,7 +19,8 @@ import urllib.request
 import psutil
 from pydantic import BaseModel, ConfigDict, Field
 
-DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
+from local_ai_control_center.provider import ProviderError, ollama_host
+
 _PROBE_TIMEOUT_SECONDS = 0.5
 _QUANTIZATION_BITS: tuple[int, ...] = (3, 4, 8)
 _MODEL_SIZES_B: tuple[int, ...] = (1, 3, 8, 14, 32)
@@ -70,23 +71,16 @@ class SystemProfile(BaseModel):
     notes: tuple[str, ...] = Field(default_factory=tuple)
 
 
-def _ollama_host() -> str:
-    """The engine address, honoring OLLAMA_HOST, defaulting to loopback."""
-    host = os.environ.get("OLLAMA_HOST", "").strip()
-    if not host:
-        return DEFAULT_OLLAMA_HOST
-    if not host.startswith("http"):
-        host = f"http://{host}"
-    return host
-
-
 def _probe_installed_models() -> tuple[bool, tuple[InstalledModel, ...]]:
     """Probe the local engine for installed models.
 
     Returns (engine_present, models). Any connection failure, timeout, or bad
-    response means the engine is treated as absent - never an exception.
+    response means the engine is treated as absent - never an exception. A refused
+    engine address is not swallowed the same way: `ollama_host` raises rather than
+    letting the probe reach a machine that is not this one, and the caller turns that
+    into a note instead of a silent "no engine".
     """
-    url = f"{_ollama_host()}/api/tags"
+    url = f"{ollama_host()}/api/tags"
     try:
         with urllib.request.urlopen(url, timeout=_PROBE_TIMEOUT_SECONDS) as response:
             if response.status != 200:
@@ -172,7 +166,12 @@ def _free_memory_hint() -> str:
 
 def profile_system() -> SystemProfile:
     """Detect and report what the machine offers. No side effects."""
-    engine_present, models = _probe_installed_models()
+    engine_note = ""
+    try:
+        engine_present, models = _probe_installed_models()
+    except ProviderError as error:
+        engine_present, models = False, ()
+        engine_note = str(error)
 
     total_memory_gb = round(psutil.virtual_memory().total / 1024**3, 1)
     free_disk_gb = round(shutil.disk_usage(os.path.expanduser("~")).free / 1024**3, 1)
@@ -190,7 +189,9 @@ def profile_system() -> SystemProfile:
             f"Up {uptime_hours} hours: a restart can free fragmented memory and "
             "improve model performance."
         )
-    if not engine_present:
+    if engine_note:
+        notes.append(engine_note)
+    elif not engine_present:
         notes.append(
             "No local engine detected. If you use Ollama, start it, then pull a "
             "model, for example: ollama pull llama3.2"

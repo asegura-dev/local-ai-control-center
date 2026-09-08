@@ -14,6 +14,7 @@ from local_ai_control_center.permissions import (
     Permissions,
     check,
     effective_permissions,
+    grant,
     require,
 )
 
@@ -108,3 +109,22 @@ def test_require_raises_when_denied() -> None:
 def test_capabilities_tuple_matches_model_fields() -> None:
     """The capability set and the model's fields stay in sync."""
     assert set(CAPABILITIES) == set(Permissions.model_fields)
+
+
+def test_grant_gives_exactly_what_was_asked_for() -> None:
+    """Permission flows from the declaration, never from what happens to be available."""
+    granted = grant(frozenset({"read_files", "write_files"}), _config())
+    assert granted.granted() == frozenset({"read_files", "write_files"})
+    assert granted.network is False
+    assert granted.run_commands is False
+
+
+def test_grant_respects_the_configuration_ceiling() -> None:
+    """A declared capability the configuration forbids is not granted."""
+    assert grant(frozenset({"network"}), _config(network_access=False)).network is False
+    assert grant(frozenset({"network"}), _config(network_access=True)).network is True
+
+
+def test_grant_of_nothing_grants_nothing() -> None:
+    """Restrictive by default, made concrete."""
+    assert grant(frozenset(), _config()).granted() == frozenset()
