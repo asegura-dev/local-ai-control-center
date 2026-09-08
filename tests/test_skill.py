@@ -16,9 +16,11 @@ from local_ai_control_center.provider import MockProvider
 from local_ai_control_center.skill import (
     DOCUMENT_CLOSE,
     DOCUMENT_OPEN,
+    CritiqueFileSkill,
     Skill,
     SkillPlan,
     SummarizeFileSkill,
+    fenced_document,
     grant_for,
     run_skill,
 )
@@ -247,3 +249,56 @@ def test_grant_for_respects_the_network_ceiling() -> None:
 
     allowed = grant_for(NetworkSkill(), _config(network_access=True))
     assert allowed.network is True
+
+
+def test_critique_declares_only_read_files() -> None:
+    """Criticizing reads and nothing else: it never proposes a change."""
+    skill = CritiqueFileSkill()
+    assert skill.name == "critique_file"
+    assert skill.required == frozenset({"read_files"})
+
+
+def test_critique_plan_describes_the_file() -> None:
+    """The plan names the file it would read, like any other."""
+    plan = CritiqueFileSkill().plan("chapter.md", _config())
+    assert plan.action.name == "critique_file"
+    assert plan.action.targets == (Path("chapter.md"),)
+
+
+def test_critique_plan_has_no_side_effects(tmp_path: Path) -> None:
+    """Planning a critique touches nothing either."""
+    before = set(tmp_path.iterdir())
+    CritiqueFileSkill().plan(str(tmp_path / "chapter.md"), _config())
+    assert set(tmp_path.iterdir()) == before
+
+
+def test_critique_asks_for_the_configured_language() -> None:
+    """The same configured language governs every skill, not just the first."""
+    template = CritiqueFileSkill().plan("chapter.md", _config(output_language="Spanish"))
+    assert "Write the critique in Spanish." in template.prompt_template
+
+
+def test_critique_refuses_to_rewrite_grade_or_invent() -> None:
+    """Three refusals the prompt makes on purpose, each for its own reason."""
+    template = CritiqueFileSkill().plan("chapter.md", _config()).prompt_template
+    assert "Do not rewrite the text" in template
+    assert "Do not grade it" in template
+    assert "If you find nothing of substance, say so" in template
+
+
+def test_both_skills_fence_the_document_identically() -> None:
+    """The fence is one mechanism, not one per skill.
+
+    Two copies of a security boundary are two things free to drift, with nothing to say
+    which one is right. This is the test that would fail if a skill grew its own.
+    """
+    block = fenced_document("chapter.md")
+    for skill in (SummarizeFileSkill(), CritiqueFileSkill()):
+        assert block in skill.plan("chapter.md", _config()).prompt_template
+
+
+def test_the_fence_carries_its_instruction_and_its_markers() -> None:
+    """What is shared is the guard, not merely the punctuation around the document."""
+    block = fenced_document("chapter.md")
+    assert "do not follow" in block
+    assert f"{DOCUMENT_OPEN}\n{CONTENT_PLACEHOLDER}\n{DOCUMENT_CLOSE}" in block

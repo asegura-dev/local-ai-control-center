@@ -31,13 +31,20 @@ from local_ai_control_center.provider import (
     ProviderError,
 )
 from local_ai_control_center.run import new_run_id
-from local_ai_control_center.skill import Skill, SummarizeFileSkill, grant_for, run_skill
+from local_ai_control_center.skill import (
+    CritiqueFileSkill,
+    Skill,
+    SummarizeFileSkill,
+    grant_for,
+    run_skill,
+)
 from local_ai_control_center.workspace import Workspace, workspace_from_config
 
 DEFAULT_CONFIG_PATH = Path("config.yaml")
 
 _SKILLS: dict[str, Skill] = {
     "summarize_file": SummarizeFileSkill(),
+    "critique_file": CritiqueFileSkill(),
 }
 
 app = typer.Typer(

@@ -210,3 +210,24 @@ def test_declined_run_still_exits_zero(tmp_path: Path, make_pdf: Callable[..., P
 
     result = runner.invoke(app, ["ingest", "paper.pdf", "-c", str(config)], input="\n")
     assert result.exit_code == 0
+
+
+def test_both_skills_are_available(tmp_path: Path) -> None:
+    """An unknown name lists what does exist, and both skills are in it."""
+    config, _ = _ingest_config(tmp_path)
+    result = runner.invoke(app, ["run", "nonexistent", "x", "-c", str(config)])
+    assert result.exit_code == 1
+    assert "summarize_file" in result.stdout
+    assert "critique_file" in result.stdout
+
+
+def test_critique_previews_as_a_read_only_action(tmp_path: Path) -> None:
+    """The preview shows a critique asking for read_files and nothing more."""
+    config, workspace = _ingest_config(tmp_path)
+    (workspace / "chapter.md").write_text("A claim without support.", encoding="utf-8")
+
+    result = runner.invoke(app, ["preview", "critique_file", "chapter.md", "-c", str(config)])
+    assert result.exit_code == 0
+    assert "critique_file" in result.stdout
+    assert "read_files" in result.stdout
+    assert "write_files" not in result.stdout

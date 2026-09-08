@@ -167,6 +167,28 @@ not the whole of what a boundary owes. These are refused by shape, in the worksp
 to the containment check, so that the one module answering "may LACC touch this path"
 answers the whole question rather than half of it.
 
+## What a second skill was for
+
+A second skill answers questions a first one cannot. Two of them came due together
+(ADR-018).
+
+The first is what to share. Both skills fence the document and tell the model the fenced
+text is material rather than instruction, and that fence is not formatting: it is what
+stands between a document that reads like an instruction and a model that treats it as
+one. Copied, it becomes two implementations of one security boundary, free to drift, with
+nothing to say which is right. So it is extracted - and only it. The framing and the task
+stay in each skill, because those are what genuinely differ, and they belong next to the
+thing they describe.
+
+The second is the skill registry deferred in ADR-010. The roadmap expected a third skill
+to give it shape; that expectation was wrong, and the correction is worth keeping because
+the mistake is easy to repeat. The CLI's mapping already answers everything a registry is
+for: what exists, what a name resolves to, what to say about a name that does not. What a
+formal registry adds is discovery - skills arriving from somewhere other than this source
+tree - and that is a question about trust, because a skill LACC did not write is one whose
+declared capabilities are a claim rather than a fact. Counting skills was never the
+trigger.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

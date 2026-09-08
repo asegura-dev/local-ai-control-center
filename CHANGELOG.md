@@ -5,6 +5,43 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-09-08
+
+### Added
+- `lacc run critique_file <path>`: a second read-only skill. It reads a draft and reports
+  specific, locatable problems - claims made without support, gaps in an argument,
+  passages that contradict each other, terms used before they are defined, conclusions
+  that do not follow. The other direction from summarizing: not what a document says, but
+  what it fails to establish.
+- The critique prompt refuses three things on purpose. It does not rewrite, because
+  producing replacement text is writing, a phase with its own safety requirement, and a
+  read-only run must not return text that looks authoritative. It does not grade or open
+  with what the draft does well, because a critique that hedges is one whose findings have
+  to be looked for. And it is told to report nothing rather than invent something: a model
+  asked for problems will supply problems, and an invented weakness costs more to check
+  than a real one saves.
+
+### Changed
+- The document fence - the markers plus the instruction that what sits between them is
+  material rather than a request - is now written in one place and used by both skills.
+  It is a security mechanism, and two copies of one are two things free to drift with
+  nothing to say which is right. What is shared stops there: each skill still writes its
+  own framing and task.
+
+### Notes
+- **No skill registry, and the reason is recorded so the question is not reopened by
+  counting skills.** The roadmap said a third skill would give the registry deferred in
+  ADR-010 enough cases to take shape; that reasoning was wrong and ADR-018 corrects it.
+  The CLI's mapping already answers what a registry is for. What a formal one adds is
+  discovery - skills arriving from outside this source tree - and that is a question about
+  trust, not about count: a skill LACC did not write is one whose declared capabilities
+  are a claim rather than a fact.
+- A critique from a small local model will be shallow. Judging whether an argument holds
+  is outside what a three-billion-parameter model does well. The prompt is shaped as well
+  as it can be; the rest is the engine, and this is the clearest argument yet for the
+  stronger machine the roadmap already records.
+
+
 ## [0.16.0] - 2026-09-08
 
 ### Added

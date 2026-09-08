@@ -62,6 +62,11 @@ carries no dates.
   decided: a configured ceiling on input size, checked before a file is opened; Windows
   device names, alternate data streams and names ending in a dot or a space refused at
   the boundary; and a refused run exiting non-zero, while a declined one still does not.
+- **v0.17.0 - A second skill: critique.** `critique_file` reads a draft and reports what
+  is weak in it, read-only. The document fence moves into one function both skills use,
+  since a security mechanism copied per skill is free to drift. The skill registry
+  deferred in ADR-010 is declined rather than built, and the reasoning behind expecting it
+  here is corrected.
 
 ## The route to v1.0
 
@@ -85,10 +90,12 @@ next thing that stops being impossible, not the next thing that would be nice.
   converter port is justified on arrival rather than guessed. A scanned PDF with no
   text layer is reported as such; OCR is out of scope. This is also the first exercise
   of `write_files`, in its safest form: new files only, never overwriting.
-- **A second read-only skill - critique.** Reading a draft chapter and reporting gaps
-  in the argument costs almost no machinery and is useful immediately. With three
-  skills in hand, the skill registry deferred since ADR-010 finally has enough cases to
-  take its shape, and prompt wording has enough variety to be worth generalizing later.
+- **A second read-only skill - critique.** Done in v0.17.0. Reading a draft chapter and
+  reporting gaps in the argument cost almost no machinery and was useful immediately. It
+  also settled two questions that needed a second skill to answer: the document fence is
+  now shared rather than copied, and the skill registry was declined, since what a formal
+  registry adds is discovery of skills from outside this repository - a question about
+  trust rather than about how many skills exist (ADR-018).
 - **More than one file, and an honest ceiling.** Comparing what several sources say
   requires reading several. It also reaches the first hard limit: a set of documents
   that does not fit the model's context. LACC must detect that and say so, never
