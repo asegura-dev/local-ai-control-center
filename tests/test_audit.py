@@ -8,7 +8,15 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from local_ai_control_center.audit import AUDIT_FILENAME, AuditLog, AuditWriteError
+from local_ai_control_center.audit import (
+    AUDIT_FILENAME,
+    GENESIS_DIGEST,
+    AuditLog,
+    AuditWriteError,
+    digest_of,
+    digest_of_file,
+    verify_chain,
+)
 from local_ai_control_center.config import Config
 from local_ai_control_center.workspace import Workspace
 
@@ -118,3 +126,91 @@ def test_event_is_frozen(tmp_path: Path) -> None:
     assert event is not None
     with pytest.raises(ValidationError):
         event.message = "tampered"  # type: ignore[misc]
+
+
+def test_a_record_links_to_the_one_before_it(tmp_path: Path) -> None:
+    """Each record folds in the previous digest, so the file is a chain and not a heap."""
+    log = AuditLog(Workspace.ensure(tmp_path), Config(workspace_root=tmp_path))
+    first = log.record("run-1", "run_started", "one")
+    second = log.record("run-1", "run_finished", "two")
+    assert first is not None and second is not None
+    assert first.previous == GENESIS_DIGEST
+    assert second.previous == first.digest
+    assert second.digest and second.digest != first.digest
+
+
+def test_an_intact_trail_verifies(tmp_path: Path) -> None:
+    """The ordinary case: nothing touched it, and the walk says so."""
+    log = AuditLog(Workspace.ensure(tmp_path), Config(workspace_root=tmp_path))
+    for index in range(4):
+        log.record("run-1", "run_started", f"record {index}")
+    result = verify_chain(log.path)
+    assert result.intact is True
+    assert result.records == 4
+    assert result.broken_at is None
+
+
+def test_an_edited_record_breaks_the_chain_where_it_was_edited(tmp_path: Path) -> None:
+    """Silent tampering stops being silent, and the report says which record."""
+    log = AuditLog(Workspace.ensure(tmp_path), Config(workspace_root=tmp_path))
+    for index in range(4):
+        log.record("run-1", "run_started", f"record {index}")
+
+    lines = log.path.read_text(encoding="utf-8").splitlines()
+    lines[1] = lines[1].replace("record 1", "something else")
+    log.path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    result = verify_chain(log.path)
+    assert result.intact is False
+    assert result.broken_at == 2
+
+
+def test_a_removed_record_breaks_the_chain(tmp_path: Path) -> None:
+    """Deleting a line is the tampering people actually do, and it is caught too."""
+    log = AuditLog(Workspace.ensure(tmp_path), Config(workspace_root=tmp_path))
+    for index in range(4):
+        log.record("run-1", "run_started", f"record {index}")
+
+    lines = log.path.read_text(encoding="utf-8").splitlines()
+    del lines[2]
+    log.path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    assert verify_chain(log.path).intact is False
+
+
+def test_the_chain_survives_the_log_being_reopened(tmp_path: Path) -> None:
+    """A chain that restarted on every launch would be a chain in name only."""
+    workspace, config = Workspace.ensure(tmp_path), Config(workspace_root=tmp_path)
+    AuditLog(workspace, config).record("run-1", "run_started", "before")
+    AuditLog(workspace, config).record("run-2", "run_started", "after")
+    assert verify_chain(tmp_path / "audit.jsonl").intact is True
+
+
+def test_records_written_before_the_chain_are_unverifiable_not_broken(tmp_path: Path) -> None:
+    """A trail cannot vouch for what predates the mechanism, and does not pretend to."""
+    path = tmp_path / "audit.jsonl"
+    path.write_text(
+        '{"timestamp":"2026-01-01T00:00:00Z","run_id":"old","kind":"run_started",'
+        '"message":"from before","detail":{}}\n',
+        encoding="utf-8",
+    )
+    result = verify_chain(path)
+    assert result.intact is True
+    assert result.unverifiable == 1
+
+
+def test_a_digest_identifies_without_exposing(tmp_path: Path) -> None:
+    """The point of a digest: the same content hashes the same, and cannot be read back."""
+    secret = tmp_path / "thesis.md"
+    secret.write_text("A private finding.", encoding="utf-8")
+    fingerprint = digest_of_file(secret)
+    assert fingerprint == digest_of("A private finding.")
+    assert "private" not in (fingerprint or "")
+
+    secret.write_text("A different finding.", encoding="utf-8")
+    assert digest_of_file(secret) != fingerprint
+
+
+def test_an_unreadable_file_has_no_digest(tmp_path: Path) -> None:
+    """Unreadable means unknown; a record saying the wrong thing is worse than silence."""
+    assert digest_of_file(tmp_path / "absent.md") is None

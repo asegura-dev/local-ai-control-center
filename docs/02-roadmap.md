@@ -88,6 +88,11 @@ carries no dates.
   inside a git working tree is refused, and one that looks synchronised is flagged as
   a guess. PRINCIPLES gains the rule the release rests on: approximation is a tool for
   performance, never for exposure.
+- **v0.22.0 - A trail you can check.** Documents, prompts and completions are recorded
+  by digest at every level, so the trail can say which document without keeping a copy
+  of it. The trail is hash-chained and `lacc verify` walks it, making silent tampering
+  detectable and locatable - and saying plainly that a deliberate rewrite is not what
+  it catches.
 
 ## The route to v1.0
 

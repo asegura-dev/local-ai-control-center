@@ -65,6 +65,12 @@ def _run(
     return result, audit
 
 
+def _sha256_of(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def _events(audit: AuditLog) -> list[dict[str, object]]:
     text = audit.path.read_text(encoding="utf-8")
     return [json.loads(line) for line in text.splitlines() if line]
@@ -256,7 +262,8 @@ def test_reading_is_recorded_with_the_path_not_the_contents(tmp_path: Path) -> N
     read = next(event for event in _events(audit) if event["kind"] == "files_read")
     detail = read["detail"]
     assert isinstance(detail, dict)
-    assert detail["files"] == [str(note.resolve())]
+    recorded = detail["files"]
+    assert recorded == [{"path": str(note.resolve()), "sha256": _sha256_of(note)}]
 
 
 def test_standard_audit_level_omits_the_file_contents(tmp_path: Path) -> None:

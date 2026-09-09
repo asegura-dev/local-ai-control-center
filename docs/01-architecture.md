@@ -316,6 +316,43 @@ enforced by the quality gate, which fails if any test opens a connection to some
 is not this machine. The guarantee did not get stronger in what it claims - it got stronger
 in what would happen if it stopped being true, which is the only part that was ever soft.
 
+## Hashes where content would expose
+
+The audit trail had two blind spots, and they turned out to be the same problem seen from
+either side (ADR-023).
+
+It could not say *which* document. A record names a path, and a path is a name that
+outlives its contents. `full` answered the question by keeping the text, which means
+answering it by making a second copy of the private material the whole design exists to
+contain - so the level that could prove what happened was also the level that spread it.
+
+And it could not say whether the record itself was intact. Append-only was a description of
+LACC's behaviour, not a property of the file: nothing resisted a line being edited or
+removed afterwards.
+
+A digest answers both. It cannot be read back into a thesis and it is exactly enough to say
+whether two things are the same one, so a document can be identified without being stored,
+and a record can be bound to the record before it. Traceability and exposure stop being in
+tension at the point where the instrument stops carrying content.
+
+The chain is the same idea applied along the file: each record folds in the digest of its
+predecessor, so an edit breaks every link after it and tampering becomes locatable to a
+position rather than merely suspected. The design was not invented here - it is lifted from
+a decision this author had already made in another project, on the same reasoning, and
+reusing a decision that has been lived with beats making a parallel one that has not.
+
+What matters most is what the chain is not claimed to do. It catches modification by
+anything that does not know the file is a chain. It does not catch a deliberate rewrite,
+because whatever can write the file can recompute the digests from the point it changed.
+Closing that gap needs a signing key and somewhere to keep it, which is an operational
+story this project has declined more than once. So the property is stated as "silent
+tampering becomes detectable" and stops there.
+
+That restraint is the point rather than a caveat on it. A trail believed to be stronger
+than it is gets relied on in situations it cannot carry, and the belief is created by how
+the property is described. An honest smaller claim is worth more than a generous one,
+because the smaller one holds.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

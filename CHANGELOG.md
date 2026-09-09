@@ -5,6 +5,43 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-09-09
+
+### Added
+- **Every file LACC reads or converts is recorded with the SHA-256 of its contents**, at
+  every audit level. A path is a name that outlives its contents: the chapter summarised on
+  Tuesday and the chapter at that path today may share nothing. A digest says which
+  document without keeping a copy of it, so `standard` stops trading away the ability to
+  check. Prompts and completions are recorded by digest for the same reason.
+- **The audit trail is hash-chained.** Each record folds in the digest of the record before
+  it, so an edit or a deletion breaks the chain from that point on and becomes locatable
+  rather than silent. The design is taken from this author's own NetGuard ADR-003 rather
+  than invented again.
+- **`lacc verify`** walks the chain and reports either that it holds or the first record
+  where it does not. Verified by tampering: altering a record reports a break at record 3
+  of 6; deleting one reports a break at record 4 of 5. Both exit non-zero.
+- Records written before this release verify as unverifiable rather than as broken. A trail
+  cannot vouch for what predates the mechanism, and saying so is the honest reading.
+
+### Notes
+- **What the chain claims is that silent tampering becomes detectable, and no more.** It
+  catches modification by anything that does not know the file is a chain - an editor, a
+  sync conflict, a careless script, a person removing an inconvenient line. It does not
+  catch a deliberate, informed rewrite: whatever can write the file can recompute every
+  digest from the point it changed. Closing that needs a signing key and somewhere to keep
+  it, which is an operational story this project has repeatedly declined. Overstating the
+  property would be worse than not having it, because a trail believed stronger than it is
+  gets relied on where it should not be.
+- Hashing is not configurable. An audit level that could switch off the integrity of the
+  audit would be a setting whose only use is making the record less trustworthy.
+
+### Changed
+- Documentation that had fallen behind is brought up to date rather than left to drift:
+  the book's contents page listed one decision record of twenty-three and marked chapters
+  as finished at v0.0.1 though they are revised every phase, and the development chapter
+  described a quality gate that is no longer the one that runs.
+
+
 ## [0.21.0] - 2026-09-09
 
 ### Security

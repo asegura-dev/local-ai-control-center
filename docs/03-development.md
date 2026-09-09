@@ -38,13 +38,41 @@ Before committing, the following checks are expected to pass:
 ```text
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
-uv run pytest -q
+uv run python -m mypy src
+uv run python -m pytest -q
 ```
 
 In order, these lint the code, verify formatting without changing files, type
 check the package in strict mode, and run the test suite. If formatting fails,
 `uv run ruff format .` applies the changes.
+
+Run each check on its own rather than piping it through something that trims the
+output. A pipeline reports the exit status of its last command, so `ruff check . | tail`
+succeeds even when ruff fails, and a chained gate carries on as though nothing were
+wrong.
+
+The test suite also enforces a promise the documentation used to make on its own: it
+installs a guard that fails any test opening a connection to an address that is not
+loopback (ADR-022). LACC does not use the network, and a dependency or a future feature
+that reaches outward fails the build rather than shipping. Talking to a local engine over
+loopback is inter-process communication and stays allowed.
+
+`uv run mypy` and `uv run pytest` may fail with `failed to canonicalize script path` when
+uv has just reinstalled the project; invoking them as `python -m` avoids it.
+
+## Where to keep a workspace
+
+Not inside the repository. Everything LACC reads, converts and records in a workspace is
+your own material, and inside a working tree it is one `git add -A` from being committed
+and pushed. LACC refuses to run in that case unless the configuration acknowledges it
+(ADR-022), because the risk lasts as long as the project while a warning is read once.
+
+Keeping it out of a synchronising folder - OneDrive, Dropbox and the like - is the same
+argument: such a folder copies its contents to another computer. LACC warns about that
+one rather than refusing, and says it is guessing from the folder's name.
+
+The virtual environment has its own version of this problem, for different reasons; see
+[the guide](guides/virtualenv-outside-a-sync-folder.md).
 
 ## Documentation discipline
 

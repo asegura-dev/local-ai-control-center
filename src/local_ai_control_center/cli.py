@@ -17,7 +17,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from local_ai_control_center.audit import AuditLog
+from local_ai_control_center.audit import AuditLog, verify_chain
 from local_ai_control_center.config import Config, load_config
 from local_ai_control_center.converter import ConversionError, converter_for
 from local_ai_control_center.cycle import (
@@ -316,6 +316,48 @@ def _report_ingestion(result: RunResult, destination: Path) -> None:
         _exit_refused()
     else:
         console.print("[yellow]Declined.[/yellow] Nothing was written.")
+
+
+@app.command()
+def verify(
+    config_path: Annotated[
+        Path,
+        typer.Option("--config", "-c", help="Path to the configuration file."),
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Check that the audit trail has not been altered since it was written."""
+    _, workspace = _load(config_path)
+    audit = AuditLog(workspace, load_config(config_path))
+    result = verify_chain(audit.path)
+
+    if result.unreadable_at is not None:
+        console.print(
+            f"[red]The trail cannot be read[/red] at record {result.unreadable_at} ({audit.path})."
+        )
+        raise typer.Exit(code=1)
+
+    if not result.intact:
+        console.print(
+            f"[red]The trail has been altered.[/red] The chain first breaks at record "
+            f"{result.broken_at} of {result.records} in {audit.path}. Every record from "
+            "there on is no longer vouched for by the ones before it."
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        f"[green]The trail holds.[/green] {result.records} records in {audit.path}, "
+        "each linked to the one before it."
+    )
+    if result.unverifiable:
+        console.print(
+            f"[yellow]{result.unverifiable} of them predate the chain[/yellow] and cannot "
+            "be vouched for either way."
+        )
+    console.print(
+        "[dim]This detects modification by anything that does not know the file is a "
+        "chain. It does not detect a deliberate rewrite: whatever can write the file can "
+        "recompute the digests.[/dim]"
+    )
 
 
 @app.command()

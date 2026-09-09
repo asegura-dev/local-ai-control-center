@@ -17,22 +17,27 @@ local inference engines such as Ollama, rather than to replace them: the engine
 provides the model, while LACC is intended to handle permissions, previews,
 confirmation, and audit around each action.
 
-The project is in early development. This document describes the project's
-design and direction. Where something is not yet implemented, it is described
-as intent, not as a guarantee.
+The project is in early development. Where something is not yet implemented, this
+document describes it as intent rather than as a guarantee - and where a property is
+enforced rather than merely intended, it says which mechanism enforces it.
 
 ## Design principles
 
-- **Local-first.** LACC is designed to run without paid APIs or internet
-  access. Local user data is intended to stay out of version control.
-- **Restrictive by default.** Permissions are intended to start disabled; each
-  skill opts into only what it needs.
-- **Auditable.** The project is designed so that meaningful executions can be
-  traced after the fact.
-- **Reproducible.** Executions are intended to record enough metadata to be
-  understood and repeated later.
-- **Human-in-the-loop.** Sensitive actions are meant to be reviewable before
-  they run, not executed silently.
+- **Local-first.** LACC runs without paid APIs or internet access, and the quality gate
+  fails if any part of it reaches a non-loopback address. A workspace inside a git
+  working tree is refused, so local material is not one `git add -A` from being
+  published.
+- **Restrictive by default.** Every capability starts disabled. An action may do what it
+  *declared*, not what its permissions happen to allow, and the configuration is a
+  ceiling that removes rather than a grant.
+- **Auditable.** Every meaningful execution leaves an append-only record, hash-chained so
+  that a silent edit becomes detectable and locatable. Documents are recorded by digest,
+  which says which document without keeping a copy of it.
+- **Reproducible.** A run records what it read, what it asked, how large the prompt was
+  and what the engine reported back - enough to understand it later without storing the
+  material itself.
+- **Human-in-the-loop.** Sensitive actions are previewed and confirmed before they run,
+  with confirmation defaulting to no. Nothing acts on a model's answer.
 
 ## What LACC is not
 

@@ -19,7 +19,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from local_ai_control_center.audit import AuditLog
+from local_ai_control_center.audit import AuditLog, digest_of, digest_of_file
 from local_ai_control_center.config import Config
 from local_ai_control_center.converter import ConversionError, Converter
 from local_ai_control_center.permissions import Capability, PermissionDenied, Permissions
@@ -301,7 +301,12 @@ def run_action(
             run_id,
             "files_read",
             f"Read targets for {action.name}",
-            {"action": action.name, "files": [str(path) for path in files_read]},
+            {
+                "action": action.name,
+                "files": [
+                    {"path": str(path), "sha256": digest_of_file(path)} for path in files_read
+                ],
+            },
         )
 
     estimate = estimate_tokens(prompt)
@@ -344,6 +349,8 @@ def run_action(
             "action": action.name,
             "provider": completion.provider,
             "estimated_tokens": estimate,
+            "prompt_sha256": digest_of(prompt),
+            "completion_sha256": digest_of(completion.text),
             "measured_prompt_tokens": completion.prompt_tokens,
             "measured_answer_tokens": completion.answer_tokens,
             "finish_reason": completion.finish_reason,
@@ -473,7 +480,9 @@ def run_conversion(
             "action": action.name,
             "converter": converter.name,
             "source": str(resolved_source),
+            "source_sha256": digest_of_file(resolved_source),
             "destination": str(resolved_destination),
+            "destination_sha256": digest_of_file(resolved_destination),
             "characters": len(text),
         },
     )
