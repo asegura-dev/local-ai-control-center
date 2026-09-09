@@ -215,6 +215,39 @@ Nothing is trimmed to fit, because trimming is the behaviour being prevented. An
 window is configured, the run proceeds and says so, because an unset option should not
 quietly become an assumption in either direction.
 
+## A check that can be checked
+
+The context ceiling rests on an estimate, and until v0.19.0 that estimate rested on an
+argument (ADR-020). Three characters per token was reasoned about carefully and never
+observed, which is a particular kind of weakness: if the ratio were wrong in the loose
+direction, LACC would let through prompts the engine then truncated, and the system would
+report success every time it happened.
+
+The engine had been answering the question all along. Its response carries the number of
+tokens it actually processed, and LACC was discarding it. Recording it turns the ceiling
+from something asserted into something with evidence, and the evidence so far says the
+estimate is sound: seven to eighteen per cent high, in the safe direction, on real text.
+
+Two things follow from that, and the second is the interesting one.
+
+The first is that the port grew - a completion now carries what the engine reported about
+producing it. The line is that these are facts about a call that already happened, never
+inputs to the next one. Generation parameters stay deferred. A port that can ask a question
+but not hear the answer is minimal in the wrong place.
+
+The second is that LACC does not learn from what it measures. Closing the loop is the
+obvious next move and it is refused: a constant that adjusts itself makes the ceiling
+depend on runs nobody can see, and it would loosen after a stretch of token-cheap text -
+which is exactly when the next document might not be. The number stays stated in one place,
+the evidence is recorded, and a person changes it deliberately or not at all. Measurement
+is for making a decision reviewable, not for removing the reviewer.
+
+The same posture governs what LACC does when the numbers arrive too late to help. An
+underestimated prompt and an answer cut short are both discovered after the answer exists.
+Nothing can be undone, so the answer is reported as suspect rather than withheld or quietly
+retried. Saying "this may be built on a document that was truncated" is the whole of what
+can honestly be done at that point, and it is more than the system could say before.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

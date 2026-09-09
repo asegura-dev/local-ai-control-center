@@ -230,3 +230,65 @@ def test_no_window_is_asked_for_when_none_is_configured() -> None:
     """Unset means unset: LACC does not invent a window to send."""
     body = _captured_request_body(OllamaProvider("qwen2.5:3b"))
     assert "options" not in body
+
+
+def _fake_response_with(payload: dict[str, object]) -> object:
+    """A stand-in for urlopen's return carrying an arbitrary engine payload."""
+
+    class _Resp:
+        def read(self) -> bytes:
+            return json.dumps(payload).encode("utf-8")
+
+        def __enter__(self) -> _Resp:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    return _Resp()
+
+
+def test_the_engines_own_counts_are_kept() -> None:
+    """The estimate can only be checked against what the engine actually counted."""
+    from unittest.mock import patch
+
+    payload = {
+        "response": "hola",
+        "prompt_eval_count": 750,
+        "eval_count": 42,
+        "done_reason": "stop",
+    }
+    with patch("urllib.request.urlopen", return_value=_fake_response_with(payload)):
+        completion = OllamaProvider("qwen2.5:3b").complete("hi")
+    assert completion.prompt_tokens == 750
+    assert completion.answer_tokens == 42
+    assert completion.finish_reason == "stop"
+
+
+def test_counts_the_engine_does_not_report_stay_unknown() -> None:
+    """Unknown is recorded as unknown, never filled in with something plausible."""
+    from unittest.mock import patch
+
+    with patch("urllib.request.urlopen", return_value=_fake_response_with({"response": "hola"})):
+        completion = OllamaProvider("qwen2.5:3b").complete("hi")
+    assert completion.prompt_tokens is None
+    assert completion.answer_tokens is None
+    assert completion.finish_reason is None
+
+
+def test_a_malformed_count_is_treated_as_unknown() -> None:
+    """An engine is external: what it sends is checked, not trusted to be the right shape."""
+    from unittest.mock import patch
+
+    payload = {"response": "hola", "prompt_eval_count": "many", "eval_count": -1}
+    with patch("urllib.request.urlopen", return_value=_fake_response_with(payload)):
+        completion = OllamaProvider("qwen2.5:3b").complete("hi")
+    assert completion.prompt_tokens is None
+    assert completion.answer_tokens is None
+
+
+def test_the_mock_reports_no_counts() -> None:
+    """A provider that cannot measure says so rather than inventing numbers."""
+    completion = MockProvider().complete("hi")
+    assert completion.prompt_tokens is None
+    assert completion.finish_reason is None

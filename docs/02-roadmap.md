@@ -73,6 +73,11 @@ carries no dates.
   why asking matters: the engine loads a 32768-token model with 4096 unless told
   otherwise. Taken before reading several files, since several documents in one prompt
   is what makes prompts long.
+- **v0.19.0 - Measuring the estimate.** The engine's own token count is recorded next
+  to LACC's estimate, so the context ceiling can be checked rather than argued for. An
+  underestimated prompt and an answer cut short are named as such. The ratio is not
+  tuned automatically: measurement is for making a decision reviewable, not for
+  removing the reviewer.
 
 ## The route to v1.0
 

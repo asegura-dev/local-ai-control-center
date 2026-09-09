@@ -28,7 +28,7 @@ from local_ai_control_center.cycle import (
 )
 from local_ai_control_center.permissions import PermissionDenied, Permissions
 from local_ai_control_center.preview import IntendedAction
-from local_ai_control_center.provider import MockProvider
+from local_ai_control_center.provider import Completion, MockProvider
 from local_ai_control_center.workspace import Workspace
 
 
@@ -611,3 +611,75 @@ def test_every_prompt_is_measured_even_without_a_ceiling(tmp_path: Path) -> None
     assert isinstance(detail, dict)
     assert detail["estimated_tokens"] > 0
     assert detail["requested_window"] is None
+
+
+class _MeasuringProvider(MockProvider):
+    """A mock that reports engine counts, so the measurement path can be exercised."""
+
+    def __init__(self, prompt_tokens: int | None = None, finish_reason: str | None = None) -> None:
+        super().__init__()
+        self._prompt_tokens = prompt_tokens
+        self._finish_reason = finish_reason
+
+    def complete(self, prompt: str) -> Completion:
+        base = super().complete(prompt)
+        return Completion(
+            text=base.text,
+            provider=base.provider,
+            prompt_tokens=self._prompt_tokens,
+            answer_tokens=7,
+            finish_reason=self._finish_reason,
+        )
+
+
+def _run_measured(tmp_path: Path, provider: MockProvider, **config_kwargs: object) -> AuditLog:
+    workspace = Workspace.ensure(tmp_path)
+    config = Config(workspace_root=tmp_path, **config_kwargs)  # type: ignore[arg-type]
+    audit = AuditLog(workspace, config)
+    _note(tmp_path, "una nota corta")
+    run_action(
+        _reading_action(),
+        _TEMPLATE,
+        Permissions(read_files=True),
+        config,
+        workspace,
+        provider,
+        audit,
+        "run-1",
+        _accept,
+    )
+    return audit
+
+
+def test_the_estimate_and_the_measurement_are_recorded_together(tmp_path: Path) -> None:
+    """The trail can say whether the estimate was any good, without re-deriving it."""
+    audit = _run_measured(tmp_path, _MeasuringProvider(prompt_tokens=120))
+    call = next(event for event in _events(audit) if event["kind"] == "provider_called")
+    detail = call["detail"]
+    assert isinstance(detail, dict)
+    assert detail["estimated_tokens"] > 0
+    assert detail["measured_prompt_tokens"] == 120
+
+
+def test_a_prompt_larger_than_estimated_is_named(tmp_path: Path) -> None:
+    """LACC let through what it should have refused, and says so rather than burying it."""
+    audit = _run_measured(tmp_path, _MeasuringProvider(prompt_tokens=99_999), context_tokens=4096)
+    assert "ceiling_underestimated" in _kinds(audit)
+
+
+def test_an_accurate_estimate_raises_no_alarm(tmp_path: Path) -> None:
+    """The signal only fires when the engine's count actually exceeded the budget."""
+    audit = _run_measured(tmp_path, _MeasuringProvider(prompt_tokens=100), context_tokens=32768)
+    assert "ceiling_underestimated" not in _kinds(audit)
+
+
+def test_an_answer_cut_short_is_recorded(tmp_path: Path) -> None:
+    """An answer that ran out of room ends mid-thought and looks like an answer."""
+    audit = _run_measured(tmp_path, _MeasuringProvider(finish_reason="length"))
+    assert "answer_truncated" in _kinds(audit)
+
+
+def test_an_answer_that_finished_is_not_flagged(tmp_path: Path) -> None:
+    """Stopping because the model was done is the ordinary case."""
+    audit = _run_measured(tmp_path, _MeasuringProvider(finish_reason="stop"))
+    assert "answer_truncated" not in _kinds(audit)

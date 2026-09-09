@@ -33,6 +33,16 @@ class Completion(BaseModel):
 
     text: str
     provider: str
+    prompt_tokens: int | None = None
+    """Tokens the engine counted in the prompt, when it says. The only way LACC's own
+    estimate can be checked against reality (ADR-020)."""
+
+    answer_tokens: int | None = None
+    """Tokens the engine produced, when it says."""
+
+    finish_reason: str | None = None
+    """Why generation stopped, when the engine says. An answer that stopped because it
+    ran out of room ends mid-thought and looks like an answer."""
 
 
 class Provider(ABC):
@@ -139,6 +149,16 @@ def ollama_host() -> str:
     return host
 
 
+def _as_count(value: object) -> int | None:
+    """Return ``value`` as a token count, or ``None`` when the engine did not report one.
+
+    An engine is an external system, so what it sends is checked rather than trusted to
+    be the shape expected. A missing or malformed count is unknown, and unknown is
+    recorded as unknown.
+    """
+    return value if isinstance(value, int) and value >= 0 else None
+
+
 class OllamaProvider(Provider):
     """A provider backed by a local Ollama instance (ADR-013).
 
@@ -198,8 +218,13 @@ class OllamaProvider(Provider):
         except (ValueError, OSError) as error:
             raise ProviderError(f"Unexpected response from Ollama: {error}") from error
 
-        text = payload.get("response", "")
-        return Completion(text=text, provider=self.name)
+        return Completion(
+            text=payload.get("response", ""),
+            provider=self.name,
+            prompt_tokens=_as_count(payload.get("prompt_eval_count")),
+            answer_tokens=_as_count(payload.get("eval_count")),
+            finish_reason=payload.get("done_reason") or None,
+        )
 
     def _translate_http_error(self, error: urllib.error.HTTPError) -> ProviderError:
         """Turn an HTTP error from Ollama into an actionable message."""

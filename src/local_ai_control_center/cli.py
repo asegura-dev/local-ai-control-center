@@ -24,6 +24,7 @@ from local_ai_control_center.cycle import (
     PromptTooLargeError,
     ReadError,
     RunResult,
+    answer_reserve,
     run_conversion,
 )
 from local_ai_control_center.permissions import grant
@@ -144,8 +145,40 @@ def run(
         raise typer.Exit(code=1) from error
 
     _report(result)
+    _warn_about_the_answer(result, config)
     if config.context_tokens is None:
         _warn_no_context_ceiling()
+
+
+def _warn_about_the_answer(result: RunResult, config: Config) -> None:
+    """Say when the engine's own numbers show the answer is not what it looks like.
+
+    Both signals arrive after the answer does, so neither could have prevented it
+    (ADR-020). Reporting them is the whole of what can honestly be done: an answer built
+    on a document the engine truncated, and an answer that stopped for want of room, both
+    read exactly like answers.
+    """
+    completion = result.completion
+    if completion is None:
+        return
+
+    if (
+        completion.prompt_tokens is not None
+        and config.context_tokens is not None
+        and completion.prompt_tokens > config.context_tokens - answer_reserve(config.context_tokens)
+    ):
+        console.print(
+            f"[red]This answer may be wrong.[/red] The engine counted "
+            f"{completion.prompt_tokens:,} tokens in the prompt, over the budget LACC "
+            "checked against, so part of the document was dropped before the model read "
+            "it. LACC underestimated the size; use a shorter document."
+        )
+
+    if completion.finish_reason == "length":
+        console.print(
+            "[yellow]The answer stopped for want of room[/yellow], not because the model "
+            "had finished. Raise `context_tokens` if the machine can hold more."
+        )
 
 
 def _warn_no_context_ceiling() -> None:

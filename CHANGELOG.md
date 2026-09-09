@@ -5,6 +5,40 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-09-09
+
+### Added
+- Every provider call records the token estimate and the engine's own count side by side,
+  so the trail can say whether the estimate was any good without anyone re-deriving it.
+  `Completion` carries the engine's prompt and answer token counts and its stop reason,
+  all optional; `MockProvider` leaves them unset.
+- A new audit event when the engine's count exceeds the budget while the estimate did not.
+  That is LACC letting through a prompt it should have refused, with the engine silently
+  dropping part of it - the exact failure the ceiling exists to prevent - and it is named
+  rather than left to be spotted by comparing two figures.
+- A new audit event when the engine says the answer stopped for want of room rather than
+  because the model had finished. An answer that ran out of room ends mid-thought and
+  looks like an answer.
+- `lacc run` reports both conditions, because each means the answer is not what it appears
+  to be.
+
+### Notes
+- **The three-characters-per-token estimate now has evidence behind it, and it holds.**
+  Measured against Ollama 0.30.7 with `qwen2.5:3b` on Spanish prose: the engine counted
+  750 tokens where LACC estimated 800 - seven per cent high, in the safe direction. Four
+  characters per token, the usual rule of thumb, would have estimated 600: a fifth low, in
+  the direction that lets an oversized prompt through. On a longer document the estimate
+  ran eighteen per cent high. The constant is unchanged.
+- **LACC does not tune the ratio from what it measures, deliberately.** A constant that
+  drifts on its own makes the ceiling depend on invisible past runs, and would loosen
+  itself after a stretch of token-cheap text - exactly when the next document might not be.
+  The evidence is recorded so a person can change the number deliberately, in one place.
+- These signals arrive after the prompt was sent, so neither can prevent anything. They are
+  recorded, and reported when they say something is wrong. Retrying or trimming on the
+  strength of them would build behaviour on a number whose only job is to describe what
+  already happened.
+
+
 ## [0.18.0] - 2026-09-09
 
 ### Added

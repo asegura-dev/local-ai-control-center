@@ -343,13 +343,58 @@ def run_action(
         {
             "action": action.name,
             "provider": completion.provider,
+            "estimated_tokens": estimate,
+            "measured_prompt_tokens": completion.prompt_tokens,
+            "measured_answer_tokens": completion.answer_tokens,
+            "finish_reason": completion.finish_reason,
             "prompt": prompt,
             "completion": completion.text,
         },
     )
+    _record_what_the_engine_reported(completion, estimate, action, config, audit, run_id)
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})
 
     return RunResult(preview=preview, outcome="completed", completion=completion)
+
+
+def _record_what_the_engine_reported(
+    completion: Completion,
+    estimate: int,
+    action: IntendedAction,
+    config: Config,
+    audit: AuditLog,
+    run_id: str,
+) -> None:
+    """Record the two ways the engine can tell us the answer is not what it looks like.
+
+    Both arrive after the prompt was sent, so neither can gate anything (ADR-020). They
+    are recorded, and the caller reports them, because an answer built on a truncated
+    document and an answer that stopped mid-thought both look exactly like answers.
+    """
+    if (
+        completion.prompt_tokens is not None
+        and config.context_tokens is not None
+        and completion.prompt_tokens > config.context_tokens - answer_reserve(config.context_tokens)
+    ):
+        audit.record(
+            run_id,
+            "ceiling_underestimated",
+            f"The prompt for {action.name} was larger than estimated",
+            {
+                "action": action.name,
+                "estimated_tokens": estimate,
+                "measured_prompt_tokens": completion.prompt_tokens,
+                "budget": config.context_tokens - answer_reserve(config.context_tokens),
+            },
+        )
+
+    if completion.finish_reason == "length":
+        audit.record(
+            run_id,
+            "answer_truncated",
+            f"The answer for {action.name} stopped for want of room",
+            {"action": action.name, "answer_tokens": completion.answer_tokens},
+        )
 
 
 def run_conversion(
