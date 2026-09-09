@@ -78,6 +78,11 @@ carries no dates.
   underestimated prompt and an answer cut short are named as such. The ratio is not
   tuned automatically: measurement is for making a decision reviewable, not for
   removing the reviewer.
+- **v0.20.0 - What a context window costs.** `lacc profile` reports what each window
+  size would cost for each installed model, computed from the model's own published
+  shape rather than fitted to the machine it was written on, against the memory free
+  now. A range with its assumptions stated, never a recommendation, and it still does
+  not set `context_tokens` for anyone.
 
 ## The route to v1.0
 

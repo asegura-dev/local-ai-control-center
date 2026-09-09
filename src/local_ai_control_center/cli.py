@@ -369,8 +369,47 @@ def _show_profile(profile: SystemProfile) -> None:
 
     console.print(table)
 
+    _show_window_costs(profile)
+
     for note in profile.notes:
         console.print(f"[yellow]note:[/yellow] {note}")
+
+
+def _show_window_costs(profile: SystemProfile) -> None:
+    """Render what each context window size would cost, with what it assumes.
+
+    A range rather than a recommendation (ADR-021). A single suggested number would be
+    easier to read and would hide the assumptions that produced it, which is how a value
+    chosen for one machine ends up in someone else's configuration.
+    """
+    if not profile.window_costs:
+        return
+
+    free = profile.available_memory_gb
+    table = Table(
+        title=f"What a context window costs (approximate, {free} GB free now)",
+        expand=False,
+    )
+    table.add_column("Model")
+    table.add_column("context_tokens", justify="right")
+    table.add_column("Cache", justify="right")
+    table.add_column("Total with weights", justify="right")
+
+    colours = {"too_large": "red", "tight": "yellow", "fits": "green"}
+    for cost in profile.window_costs:
+        colour = colours[cost.status]
+        table.add_row(
+            cost.model,
+            f"{cost.window_tokens:,}",
+            f"{cost.cache_gb} GB",
+            f"[{colour}]{cost.total_gb} GB[/{colour}]",
+        )
+    console.print(table)
+    console.print(
+        "[dim]Assumes a 16-bit cache, the whole model in RAM, and ordinary attention; "
+        "free memory is a snapshot and moves. LACC does not set `context_tokens` for "
+        "you - copy the size you want into your configuration.[/dim]"
+    )
 
 
 def _report(result: RunResult) -> None:

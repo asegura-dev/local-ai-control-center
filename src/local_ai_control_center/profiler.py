@@ -24,6 +24,21 @@ from local_ai_control_center.provider import ProviderError, ollama_host
 _PROBE_TIMEOUT_SECONDS = 0.5
 _QUANTIZATION_BITS: tuple[int, ...] = (3, 4, 8)
 _MODEL_SIZES_B: tuple[int, ...] = (1, 3, 8, 14, 32)
+_WINDOW_SIZES: tuple[int, ...] = (4096, 8192, 16384, 32768)
+"""Window sizes the cost report walks through. A range, not a recommendation."""
+
+_CACHE_BYTES_PER_ELEMENT = 2
+"""Bytes per cached value, assuming a sixteen-bit cache. Quantizing it costs less."""
+
+_RUNTIME_ALLOWANCE = 1.5
+"""How much more than the attention cache a window is assumed to cost.
+
+An allowance, not a calibration. Growth of about 1.4 times the computed cache was
+observed once, on one model, one engine version and one machine (ADR-021); rounding away
+from that observation rather than fitting to it is the point. It errs toward reporting
+less headroom than the machine has, which is the direction where being wrong is cheap.
+"""
+
 _MEMORY_RESERVED_GB = 4.0
 """Memory left for the OS and other work when judging what a model can use."""
 
@@ -36,6 +51,10 @@ class InstalledModel(BaseModel):
     name: str
     size_gb: float
     quantization: str
+    cache_bytes_per_token: int | None = None
+    """What one token of context window costs in the attention cache, or ``None`` when
+    the model does not publish enough of its shape to say (ADR-021)."""
+
     context_tokens: int | None = None
     """The largest window the model supports, or ``None`` when the engine did not say.
 
@@ -59,6 +78,22 @@ class ModelFit(BaseModel):
     status: str
 
 
+class WindowCost(BaseModel):
+    """What one context window size would cost for one model, by formula.
+
+    An approximation with stated assumptions (ADR-021), not a promise, and never a
+    recommendation: it says what a size costs, not which size to choose.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    model: str
+    window_tokens: int
+    cache_gb: float
+    total_gb: float
+    status: str
+
+
 class SystemProfile(BaseModel):
     """A frozen report of what the machine offers. Data, not a recommendation."""
 
@@ -74,6 +109,8 @@ class SystemProfile(BaseModel):
     free_disk_gb: float = 0.0
     uptime_hours: float = 0.0
     fits: tuple[ModelFit, ...] = ()
+    window_costs: tuple[WindowCost, ...] = ()
+    available_memory_gb: float = 0.0
     notes: tuple[str, ...] = Field(default_factory=tuple)
 
 
@@ -100,23 +137,25 @@ def _probe_installed_models() -> tuple[bool, tuple[InstalledModel, ...]]:
         details = entry.get("details", {})
         size_bytes = entry.get("size", 0)
         name = entry.get("name", "unknown")
+        window, per_token = _probe_model_shape(name)
         models.append(
             InstalledModel(
                 name=name,
                 size_gb=round(size_bytes / 1024**3, 1),
                 quantization=details.get("quantization_level", "unknown"),
-                context_tokens=_probe_context_window(name),
+                context_tokens=window,
+                cache_bytes_per_token=per_token,
             )
         )
     return True, tuple(models)
 
 
-def _probe_context_window(model: str) -> int | None:
-    """Ask the engine what window ``model`` supports, or ``None`` if it will not say.
+def _probe_model_shape(model: str) -> tuple[int | None, int | None]:
+    """Ask the engine what ``model`` supports and what a token of window costs it.
 
     Reads and does not act (ADR-012): asking what a model is does not load it. Any
-    failure means the number is unknown, and unknown is reported as unknown rather than
-    filled in with something plausible.
+    failure means the numbers are unknown, and unknown is reported as unknown rather
+    than filled in with something plausible.
     """
     request = urllib.request.Request(
         f"{ollama_host()}/api/show",
@@ -127,11 +166,69 @@ def _probe_context_window(model: str) -> int | None:
         with urllib.request.urlopen(request, timeout=_PROBE_TIMEOUT_SECONDS * 4) as response:
             info = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
-        return None
-    for key, value in info.get("model_info", {}).items():
+        return None, None
+    model_info = info.get("model_info", {})
+    window = None
+    for key, value in model_info.items():
         if key.endswith("context_length") and isinstance(value, int):
-            return value
-    return None
+            window = value
+            break
+    return window, _cache_bytes_per_token(model_info)
+
+
+def _cache_bytes_per_token(model_info: dict[str, object]) -> int | None:
+    """Bytes the attention cache holds per token, from the model's own metadata.
+
+    Two caches, one for keys and one for values, across every layer, for every attention
+    head that has one, at the width of a head. Keys are matched by suffix because the
+    metadata is prefixed per architecture, and hardcoding one family is the narrowness
+    this avoids. Missing metadata yields ``None``: unknown is a usable answer, a guessed
+    one is not (ADR-021).
+    """
+
+    def value(suffix: str) -> int | None:
+        for key, found in model_info.items():
+            if key.endswith(suffix) and isinstance(found, int) and found > 0:
+                return found
+        return None
+
+    layers = value(".block_count")
+    kv_heads = value(".attention.head_count_kv")
+    head_width = value(".attention.key_length")
+    if head_width is None:
+        embedding, heads = value(".embedding_length"), value(".attention.head_count")
+        head_width = embedding // heads if embedding and heads else None
+    if not (layers and kv_heads and head_width):
+        return None
+    return 2 * layers * kv_heads * head_width * _CACHE_BYTES_PER_ELEMENT
+
+
+def _estimate_window_costs(
+    model: InstalledModel, per_token: int, free_memory_gb: float
+) -> tuple[WindowCost, ...]:
+    """What each window size would cost for ``model``, against the memory free now."""
+    costs = []
+    for window in _WINDOW_SIZES:
+        if model.context_tokens is not None and window > model.context_tokens:
+            continue
+        cache_gb = per_token * window / 1024**3
+        total = round(model.size_gb + cache_gb * _RUNTIME_ALLOWANCE, 1)
+        if total > free_memory_gb:
+            status = "too_large"
+        elif total > free_memory_gb * 0.85:
+            status = "tight"
+        else:
+            status = "fits"
+        costs.append(
+            WindowCost(
+                model=model.name,
+                window_tokens=window,
+                cache_gb=round(cache_gb, 2),
+                total_gb=total,
+                status=status,
+            )
+        )
+    return tuple(costs)
 
 
 def _estimate_fits(total_memory_gb: float) -> tuple[ModelFit, ...]:
@@ -204,7 +301,15 @@ def profile_system() -> SystemProfile:
         engine_present, models = False, ()
         engine_note = str(error)
 
-    total_memory_gb = round(psutil.virtual_memory().total / 1024**3, 1)
+    memory = psutil.virtual_memory()
+    total_memory_gb = round(memory.total / 1024**3, 1)
+    available_memory_gb = round(memory.available / 1024**3, 1)
+    window_costs = tuple(
+        cost
+        for model in models
+        if model.cache_bytes_per_token
+        for cost in _estimate_window_costs(model, model.cache_bytes_per_token, available_memory_gb)
+    )
     free_disk_gb = round(shutil.disk_usage(os.path.expanduser("~")).free / 1024**3, 1)
     uptime_hours = round((time.time() - psutil.boot_time()) / 3600, 1)
 
@@ -247,5 +352,7 @@ def profile_system() -> SystemProfile:
         free_disk_gb=free_disk_gb,
         uptime_hours=uptime_hours,
         fits=_estimate_fits(total_memory_gb),
+        window_costs=window_costs,
+        available_memory_gb=available_memory_gb,
         notes=tuple(notes),
     )

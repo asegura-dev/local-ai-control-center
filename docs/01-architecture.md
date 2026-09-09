@@ -248,6 +248,41 @@ Nothing can be undone, so the answer is reported as suspect rather than withheld
 retried. Saying "this may be built on a document that was truncated" is the whole of what
 can honestly be done at that point, and it is more than the system could say before.
 
+## Formulas that travel, and numbers that do not
+
+Three ceilings now exist - memory, context, and what a window costs - and the third one
+raised a question the first two did not have to answer: how much of what was measured on
+one machine belongs in the code (ADR-021).
+
+The temptation is real. Measuring how much memory a window actually consumed produces a
+clean ratio, and a ratio can be multiplied. But a number fitted to one model on one engine
+version on one machine describes that machine, and code that carries it will be accurate
+where it was written and confidently wrong everywhere else. That failure is quiet: it
+reports plausible figures on every other machine, and nobody has cause to check them.
+
+So the line drawn here is between arithmetic that travels and numbers that do not.
+
+What travels is the shape of the model. The attention cache is two caches, across every
+layer, for every attention head that has one, at the width of a head - and every engine
+publishes those numbers per model. That formula is the model's own, and it is right for
+models nobody has tried yet. Its inputs are matched by suffix rather than by architecture
+name, because the metadata is prefixed per family and pinning one family in would be the
+same narrowness in smaller clothing.
+
+What does not travel is the overhead around the cache. It was observed once, at about half
+again. It is applied as a round allowance rather than the observed figure, described as an
+allowance where it lives, and it points toward reporting less headroom than the machine
+really has - the direction where being wrong costs a retry rather than a session. The
+observation itself lives in the decision record, where a reader can weigh how much evidence
+it is, instead of in the source, where it would read as a constant of nature.
+
+And what is not done at all is closing the loop. LACC does not set `context_tokens` from
+what it computes, for the same reason it does not tune the token ratio from what it
+measures: a value derived from whatever memory happened to be free when the tool last
+looked would change behaviour between runs for reasons nobody can see in the configuration.
+The tool reports; the person decides; the decision is written down where it can be argued
+with.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

@@ -5,6 +5,41 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-09-09
+
+### Added
+- `lacc profile` reports what a context window costs: for each installed model that
+  publishes its shape, the attention cache at a range of window sizes and what that totals
+  with the model's weights, against the memory free at that moment, marked the way the
+  existing fit table marks its rows.
+- The report states its assumptions where it is shown, not only in the decision record.
+
+### Notes
+- **The cost comes from each model's own metadata, not from a measurement of one machine.**
+  The attention cache is two caches across every layer for every attention head that has
+  one, at the width of a head, and the engine publishes all of those numbers. Keys are
+  matched by suffix rather than by architecture name, so nothing is tied to one model
+  family. A model that does not publish enough is reported as unknown: unknown is a usable
+  answer and a guessed one is not.
+- **The overhead beyond the cache is an allowance, not a calibration.** Actual growth was
+  about 1.4 times the computed cache on the one setup where it was measured - one model,
+  one engine version, one machine. Baking that in as a constant is how a tool becomes
+  accurate on the desk it was written at and wrong everywhere else. What is applied is a
+  round one and a half, described as an allowance, erring toward reporting less headroom
+  than the machine has. The measurement lives in ADR-021, where its weight can be judged,
+  rather than in the code, where it would look like a fact.
+- **The report is a range, not a recommendation.** A single suggested number would be
+  easier to read and would hide the assumptions that produced it, which is how a value
+  chosen for one machine ends up in someone else's configuration.
+- Nothing sets `context_tokens`. Deriving it automatically would make it depend on whatever
+  memory happened to be free when the tool last looked, changing behaviour between runs for
+  reasons invisible in the configuration - the same reason the token ratio is not tuned
+  automatically (ADR-020).
+- The figures assume a 16-bit cache, the whole model resident in memory, and ordinary
+  attention. Free memory is a snapshot: it moved from 5.3 GB to 3.1 GB within minutes of
+  ordinary use on the machine this was written on.
+
+
 ## [0.19.0] - 2026-09-09
 
 ### Added

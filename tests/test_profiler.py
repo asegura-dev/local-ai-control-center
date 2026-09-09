@@ -9,8 +9,11 @@ import pytest
 from pydantic import ValidationError
 
 from local_ai_control_center.profiler import (
+    InstalledModel,
     SystemProfile,
+    _cache_bytes_per_token,
     _estimate_fits,
+    _estimate_window_costs,
     profile_system,
 )
 
@@ -131,3 +134,74 @@ def test_acceleration_note_is_honest_about_unusable_accelerators() -> None:
     with patch("urllib.request.urlopen", side_effect=OSError("refused")):
         profile = profile_system()
     assert any("may not be usable" in note for note in profile.notes)
+
+
+_QWEN_SHAPE = {
+    "general.architecture": "qwen2",
+    "qwen2.block_count": 36,
+    "qwen2.attention.head_count": 16,
+    "qwen2.attention.head_count_kv": 2,
+    "qwen2.embedding_length": 2048,
+}
+
+
+def test_cache_cost_comes_from_the_models_own_numbers() -> None:
+    """Two caches, every layer, every kv head, at the width of a head, at 16 bits."""
+    # 2 * 36 layers * 2 kv heads * (2048 / 16) head width * 2 bytes = 36864.
+    assert _cache_bytes_per_token(_QWEN_SHAPE) == 36864
+
+
+def test_cache_cost_is_found_whatever_the_architecture_is_called() -> None:
+    """Keys are matched by suffix: hardcoding one model family is the narrowness to avoid."""
+    other = {key.replace("qwen2.", "llama."): value for key, value in _QWEN_SHAPE.items()}
+    assert _cache_bytes_per_token(other) == 36864
+
+
+def test_an_explicit_head_width_is_preferred_over_dividing() -> None:
+    """When a model publishes its head width, that is used rather than inferred."""
+    shape = dict(_QWEN_SHAPE) | {"qwen2.attention.key_length": 64}
+    assert _cache_bytes_per_token(shape) == 2 * 36 * 2 * 64 * 2
+
+
+def test_a_model_that_does_not_publish_its_shape_costs_unknown() -> None:
+    """Unknown is a usable answer; a guessed one is not."""
+    assert _cache_bytes_per_token({"general.architecture": "mystery"}) is None
+    assert _cache_bytes_per_token(dict(_QWEN_SHAPE) | {"qwen2.block_count": 0}) is None
+
+
+def _model(context_tokens: int | None = 32768) -> InstalledModel:
+    return InstalledModel(
+        name="qwen2.5:3b",
+        size_gb=1.8,
+        quantization="Q4_K_M",
+        context_tokens=context_tokens,
+        cache_bytes_per_token=36864,
+    )
+
+
+def test_window_cost_grows_with_the_window() -> None:
+    """Twice the window is twice the cache, which is the whole shape of the trade."""
+    costs = {c.window_tokens: c for c in _estimate_window_costs(_model(), 36864, 16.0)}
+    assert costs[8192].cache_gb == round(costs[4096].cache_gb * 2, 2)
+    assert costs[32768].total_gb > costs[4096].total_gb
+
+
+def test_window_cost_is_marked_against_the_memory_free_now() -> None:
+    """The same window fits on a machine with room and does not on one without."""
+    roomy = {c.window_tokens: c for c in _estimate_window_costs(_model(), 36864, 16.0)}
+    cramped = {c.window_tokens: c for c in _estimate_window_costs(_model(), 36864, 2.0)}
+    assert roomy[32768].status == "fits"
+    assert cramped[32768].status == "too_large"
+
+
+def test_windows_beyond_what_the_model_supports_are_not_offered() -> None:
+    """Reporting the cost of a window the model cannot take would be noise."""
+    windows = {c.window_tokens for c in _estimate_window_costs(_model(8192), 36864, 16.0)}
+    assert windows == {4096, 8192}
+
+
+def test_the_report_includes_the_weights_not_only_the_cache() -> None:
+    """What matters is what the machine has to hold, not what the cache alone costs."""
+    cost = next(c for c in _estimate_window_costs(_model(), 36864, 16.0) if c.window_tokens == 4096)
+    assert cost.total_gb > 1.8
+    assert cost.cache_gb < cost.total_gb
