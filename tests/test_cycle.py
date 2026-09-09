@@ -668,10 +668,33 @@ def test_the_estimate_and_the_measurement_are_recorded_together(tmp_path: Path) 
     assert detail["measured_prompt_tokens"] == 120
 
 
-def test_a_prompt_larger_than_estimated_is_named(tmp_path: Path) -> None:
-    """LACC let through what it should have refused, and says so rather than burying it."""
-    audit = _run_measured(tmp_path, _MeasuringProvider(prompt_tokens=99_999), context_tokens=4096)
+def test_a_prompt_that_filled_the_window_is_named_as_truncated(tmp_path: Path) -> None:
+    """A count that reaches the window means the engine answered from part of the document."""
+    audit = _run_measured(tmp_path, _MeasuringProvider(prompt_tokens=4095), context_tokens=4096)
+    assert "prompt_was_truncated" in _kinds(audit)
+    assert "ceiling_underestimated" not in _kinds(audit)
+
+
+def test_an_underestimate_is_not_reported_as_truncation(tmp_path: Path) -> None:
+    """Different things, told apart: the prompt fitted, the arithmetic was off.
+
+    A window of 32768 reserves 8192 for the answer, leaving 24576. A prompt the engine
+    counted at 25000 went over that budget while sitting nowhere near the window.
+    """
+    audit = _run_measured(tmp_path, _MeasuringProvider(prompt_tokens=25_000), context_tokens=32768)
     assert "ceiling_underestimated" in _kinds(audit)
+    assert "prompt_was_truncated" not in _kinds(audit)
+
+
+def test_a_count_far_below_the_estimate_raises_no_alarm(tmp_path: Path) -> None:
+    """The estimate runs high by design, so measuring less than it is the ordinary case.
+
+    Comparing the count against the estimate rather than against the window would flag
+    every healthy run on text that tokenizes well (ADR-024).
+    """
+    audit = _run_measured(tmp_path, _MeasuringProvider(prompt_tokens=10), context_tokens=32768)
+    assert "prompt_was_truncated" not in _kinds(audit)
+    assert "ceiling_underestimated" not in _kinds(audit)
 
 
 def test_an_accurate_estimate_raises_no_alarm(tmp_path: Path) -> None:

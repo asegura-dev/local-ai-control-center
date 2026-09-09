@@ -90,6 +90,15 @@ while a prompt truncated that should have been refused produces a plausible wron
 nobody has reason to check (ADR-019).
 """
 
+WINDOW_TOLERANCE = 8
+"""How close the engine's prompt count may come to the window before LACC calls it clipped.
+
+A tolerance around an equality, not a factor scaling a quantity: the engine measured stops
+exactly one token short of the window when it truncates, and a few tokens of slack covers
+engines that reserve differently. Being wrong here costs a warning about a prompt that
+filled the window exactly, which is worth saying anyway (ADR-024).
+"""
+
 _MINIMUM_ANSWER_RESERVE = 512
 """Fewest tokens held back for the completion, whatever the window."""
 
@@ -378,22 +387,33 @@ def _record_what_the_engine_reported(
     are recorded, and the caller reports them, because an answer built on a truncated
     document and an answer that stopped mid-thought both look exactly like answers.
     """
-    if (
-        completion.prompt_tokens is not None
-        and config.context_tokens is not None
-        and completion.prompt_tokens > config.context_tokens - answer_reserve(config.context_tokens)
-    ):
-        audit.record(
-            run_id,
-            "ceiling_underestimated",
-            f"The prompt for {action.name} was larger than estimated",
-            {
-                "action": action.name,
-                "estimated_tokens": estimate,
-                "measured_prompt_tokens": completion.prompt_tokens,
-                "budget": config.context_tokens - answer_reserve(config.context_tokens),
-            },
-        )
+    if completion.prompt_tokens is not None and config.context_tokens is not None:
+        window = config.context_tokens
+        budget = window - answer_reserve(window)
+        if completion.prompt_tokens >= window - WINDOW_TOLERANCE:
+            audit.record(
+                run_id,
+                "prompt_was_truncated",
+                f"The engine did not read all of the prompt for {action.name}",
+                {
+                    "action": action.name,
+                    "estimated_tokens": estimate,
+                    "measured_prompt_tokens": completion.prompt_tokens,
+                    "window": window,
+                },
+            )
+        elif completion.prompt_tokens > budget:
+            audit.record(
+                run_id,
+                "ceiling_underestimated",
+                f"The prompt for {action.name} was larger than estimated",
+                {
+                    "action": action.name,
+                    "estimated_tokens": estimate,
+                    "measured_prompt_tokens": completion.prompt_tokens,
+                    "budget": budget,
+                },
+            )
 
     if completion.finish_reason == "length":
         audit.record(

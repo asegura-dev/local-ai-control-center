@@ -353,6 +353,30 @@ than it is gets relied on in situations it cannot carry, and the belief is creat
 the property is described. An honest smaller claim is worth more than a generous one,
 because the smaller one holds.
 
+## Watching for the symptom
+
+ADR-019 left a verification undone and said so: LACC asks the engine for a context window
+and does not check what it got. The obvious way to close that is to ask - query the engine
+after a run and compare. Measuring first produced a better answer, and the shape of it is
+worth keeping (ADR-024).
+
+The engine already reports how many tokens it processed. A prompt that fits is processed
+whole; a prompt that does not is clipped to the window, and the count comes back sitting on
+it - 2047 against a window of 2048, measured. So the condition that matters is visible in a
+response LACC already receives, and no second question needs asking.
+
+That is the better check for a reason beyond convenience. A window quietly reduced only
+harms by truncating; watching for truncation catches that case and every other path to the
+same outcome, including a window honoured exactly and simply too small. Verifying the
+adjustment would have confirmed one cause; watching the symptom covers the effect.
+
+The near-miss in designing it is also worth recording. The first form of the test compared
+the engine's count against LACC's estimate - far fewer tokens than expected, therefore
+clipped - and it is wrong, because the estimate is deliberately high. A healthy run reports
+fewer tokens than estimated every time. Two of the system's own honest choices, put next to
+each other carelessly, produce a false alarm on every good run; the correct comparison is
+against the window, which is the thing that actually does the clipping.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

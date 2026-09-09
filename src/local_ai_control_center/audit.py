@@ -32,6 +32,7 @@ EventKind = Literal[
     "prompt_measured",
     "prompt_too_large",
     "provider_called",
+    "prompt_was_truncated",
     "ceiling_underestimated",
     "answer_truncated",
 ]

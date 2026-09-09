@@ -93,6 +93,10 @@ carries no dates.
   of it. The trail is hash-chained and `lacc verify` walks it, making silent tampering
   detectable and locatable - and saying plainly that a deliberate rewrite is not what
   it catches.
+- **v0.23.0 - Detecting truncation.** A prompt the engine did not read in full is
+  noticed and named, distinguished from an estimate that merely ran low. Closes the
+  verification ADR-019 deferred, by watching for the symptom rather than asking the
+  engine what it granted.
 
 ## The route to v1.0
 

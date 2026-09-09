@@ -21,6 +21,7 @@ from local_ai_control_center.audit import AuditLog, verify_chain
 from local_ai_control_center.config import Config, load_config
 from local_ai_control_center.converter import ConversionError, converter_for
 from local_ai_control_center.cycle import (
+    WINDOW_TOLERANCE,
     PromptTooLargeError,
     ReadError,
     RunResult,
@@ -176,17 +177,23 @@ def _warn_about_the_answer(result: RunResult, config: Config) -> None:
     if completion is None:
         return
 
-    if (
-        completion.prompt_tokens is not None
-        and config.context_tokens is not None
-        and completion.prompt_tokens > config.context_tokens - answer_reserve(config.context_tokens)
-    ):
-        console.print(
-            f"[red]This answer may be wrong.[/red] The engine counted "
-            f"{completion.prompt_tokens:,} tokens in the prompt, over the budget LACC "
-            "checked against, so part of the document was dropped before the model read "
-            "it. LACC underestimated the size; use a shorter document."
-        )
+    if completion.prompt_tokens is not None and config.context_tokens is not None:
+        window = config.context_tokens
+        if completion.prompt_tokens >= window - WINDOW_TOLERANCE:
+            console.print(
+                f"[red]This answer is built on part of the document.[/red] The engine "
+                f"counted {completion.prompt_tokens:,} tokens, filling the {window:,}-token "
+                "window, which means it dropped what did not fit and answered from the "
+                "rest. Use a shorter document, or raise `context_tokens` if the machine "
+                "can hold more."
+            )
+        elif completion.prompt_tokens > window - answer_reserve(window):
+            console.print(
+                f"[yellow]LACC underestimated this prompt.[/yellow] The engine counted "
+                f"{completion.prompt_tokens:,} tokens, over the budget checked against, "
+                "though the prompt still fitted the window. The answer stands; the "
+                "arithmetic was off on this text."
+            )
 
     if completion.finish_reason == "length":
         console.print(

@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-09-09
+
+### Added
+- **A truncated prompt is detected and named.** When the engine reports a prompt whose
+  token count reaches the configured window, it did not read all of the document and
+  answered from the rest. `lacc run` says the answer is built on part of the document, and
+  the trail records it.
+
+### Changed
+- Truncation and an underestimated prompt are now reported as the different things they
+  are. Until now both were called an underestimate, which described one of them. A
+  truncated prompt means the answer should not be trusted; an estimate that ran low means
+  LACC's arithmetic was off on this text while the prompt still fitted, and the answer
+  stands.
+
+### Notes
+- **This closes the gap ADR-019 left open, and closes it better than the check it
+  deferred.** That gap was "LACC does not verify the window the engine granted". Measuring
+  showed the symptom is visible without asking: a prompt sent to a 2048-token window came
+  back reported as 2047 tokens, one short of the window, while the same prompt in an
+  8192-token window reported its real size of 4230. Detecting the symptom also catches
+  every other route to the same outcome, including a window honoured but too small.
+- **The comparison is against the window, never against the estimate.** The naive test -
+  "the engine counted far fewer tokens than we estimated, so it must have clipped" - was
+  tried and is wrong: the estimate runs seven to eighteen per cent high by design, so a
+  healthy run reports fewer tokens than estimated as a matter of course. The run that
+  fitted would have been flagged by it.
+
+
 ## [0.22.0] - 2026-09-09
 
 ### Added
