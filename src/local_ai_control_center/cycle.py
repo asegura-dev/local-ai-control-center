@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict
 from local_ai_control_center.audit import AuditLog, digest_of, digest_of_file
 from local_ai_control_center.config import Config
 from local_ai_control_center.converter import ConversionError, Converter
+from local_ai_control_center.grounding import CheckedClaim, check_answer
 from local_ai_control_center.permissions import Capability, PermissionDenied, Permissions
 from local_ai_control_center.preview import (
     ExecutionPreview,
@@ -169,6 +170,11 @@ class RunResult(BaseModel):
     preview: ExecutionPreview
     outcome: Outcome
     completion: Completion | None = None
+    checked_claims: tuple[CheckedClaim, ...] = ()
+    """Quotations found in the answer, and whether each one appears in the source.
+
+    Empty unless the skill asked for its output to be checked (ADR-026).
+    """
 
     @property
     def executed(self) -> bool:
@@ -316,6 +322,7 @@ def run_action(
     confirm: ConfirmationFn,
     destination: Path | None = None,
     approve: ApprovalFn | None = None,
+    verify_quotes: bool = False,
 ) -> RunResult:
     """Run ``action`` through the whole system, in order, and ask a provider.
 
@@ -405,12 +412,30 @@ def run_action(
     _record_what_the_engine_reported(completion, estimate, action, config, audit, run_id)
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})
 
+    checked: tuple[CheckedClaim, ...] = ()
+    if verify_quotes:
+        checked = check_answer(completion.text, contents)
+        held = sum(1 for claim in checked if claim.holds)
+        audit.record(
+            run_id,
+            "quotations_checked",
+            f"Checked {len(checked)} quotations for {action.name}",
+            {
+                "action": action.name,
+                "quotations": len(checked),
+                "verified": held,
+                "unverified": len(checked) - held,
+            },
+        )
+
     if destination is not None:
         _offer_the_answer(
             completion.text, contents, destination, action, workspace, audit, run_id, approve
         )
 
-    return RunResult(preview=preview, outcome="completed", completion=completion)
+    return RunResult(
+        preview=preview, outcome="completed", completion=completion, checked_claims=checked
+    )
 
 
 def _offer_the_answer(

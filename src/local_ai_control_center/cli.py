@@ -41,6 +41,7 @@ from local_ai_control_center.provider import (
 from local_ai_control_center.run import new_run_id
 from local_ai_control_center.skill import (
     CritiqueFileSkill,
+    ExtractClaimsSkill,
     ReviseFileSkill,
     Skill,
     SkillPlan,
@@ -61,6 +62,7 @@ _SKILLS: dict[str, Skill] = {
     "summarize_file": SummarizeFileSkill(),
     "critique_file": CritiqueFileSkill(),
     "revise_file": ReviseFileSkill(),
+    "extract_claims": ExtractClaimsSkill(),
 }
 
 app = typer.Typer(
@@ -199,9 +201,50 @@ def run(
         raise typer.Exit(code=1) from error
 
     _report(result)
+    _show_checked_quotations(result)
     _warn_about_the_answer(result, config)
     if config.context_tokens is None:
         _warn_no_context_ceiling()
+
+
+def _show_checked_quotations(result: RunResult) -> None:
+    """Say which quotations were found in the source and which were not.
+
+    Nothing is hidden: an unverified claim stays in the answer above and is marked here,
+    because the point is to show what the model did rather than to tidy it away (ADR-026).
+    """
+    if not result.checked_claims:
+        return
+
+    marks = {
+        "verified": ("[green]found[/green]", ""),
+        "not_found": ("[red]NOT IN THE DOCUMENT[/red]", ""),
+        "wrong_page": ("[yellow]wrong page[/yellow]", ""),
+        "page_unknown": ("[yellow]page unchecked[/yellow]", ""),
+    }
+    table = Table(title="Quotations checked against the source", expand=False)
+    table.add_column("Claim")
+    table.add_column("Quotation")
+    table.add_column("Page")
+    table.add_column("Checked")
+    for checked in result.checked_claims:
+        page = str(checked.claim.page) if checked.claim.page else "-"
+        if checked.verdict == "wrong_page" and checked.found_on_page:
+            page = f"{page} (really {checked.found_on_page})"
+        table.add_row(
+            checked.claim.claim[:60],
+            checked.claim.quote[:40],
+            page,
+            marks[checked.verdict][0],
+        )
+    console.print(table)
+
+    unverified = sum(1 for checked in result.checked_claims if not checked.holds)
+    if unverified:
+        console.print(
+            f"[red]{unverified} of {len(result.checked_claims)} quotations did not check "
+            "out.[/red] Do not cite those without opening the document yourself."
+        )
 
 
 def _warn_about_the_answer(result: RunResult, config: Config) -> None:

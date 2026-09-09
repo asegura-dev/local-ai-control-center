@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-09-09
+
+### Added
+- **`lacc run extract_claims <path>` returns what a source asserts, and LACC checks the
+  quotations.** Each claim comes with the document's own words and a page; every quotation
+  is then looked for in the source, and each claim is marked found, not in the document,
+  or on a different page than claimed. Nothing is removed: an unverified claim stays in the
+  answer and is marked, because the point is to show what the model did.
+- A `grounding` module holding the parsing and the checking, both pure functions over text.
+
+### Notes
+- **This is the first control in LACC that does not ask a model to behave.** Every prompt
+  saying "add nothing the document does not contain" is a request. This is a check: a
+  quotation either appears in the source or it does not, and what verifies the model is not
+  another model.
+- **Matching is exact after collapsing whitespace and folding case, and deliberately not
+  fuzzy.** A quotation that only nearly appears is not a quotation - "across four hospitals"
+  for "across three hospitals" is precisely the error that must not pass. A false "not
+  found" is visible and costs a glance; a false "verified" is the failure this exists to
+  prevent.
+- **Pages are checked too**, against the `<!-- page N -->` markers ingestion preserves
+  (ADR-016). A real quotation attributed to the wrong page is reported as that, and the
+  page it actually appears on is named. A source LACC did not ingest has no markers, and
+  the page is then reported as unchecked rather than as wrong.
+- The check bounds what can be trusted and does not extend it: a verified quotation proves
+  the words are in the document, not that the claim built on them is sound. A model can
+  quote accurately and reason badly, and only the first is caught here.
+- A line-oriented format is asked for rather than JSON, because a small local model follows
+  it far more reliably and a malformed block costs one claim instead of the whole answer.
+
+
 ## [0.24.0] - 2026-09-09
 
 ### Added

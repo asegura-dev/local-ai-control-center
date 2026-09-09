@@ -101,6 +101,10 @@ carries no dates.
   version beside the original, approved against a diff; every skill can be given
   several documents. Nothing LACC writes replaces a file that already existed, and an
   action now separates what it reads from what it writes.
+- **v0.25.0 - Verified quotations.** `extract_claims` returns what a source asserts
+  with the document's own words and a page, and every quotation is checked against the
+  source before it is shown. The first control in LACC that verifies the model instead
+  of asking it to behave, and the capability v1 is defined around.
 
 ## A course correction, recorded
 

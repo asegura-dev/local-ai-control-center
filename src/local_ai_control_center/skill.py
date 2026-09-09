@@ -94,6 +94,9 @@ class SkillPlan(BaseModel):
     destination: Path | None = None
     """Where the answer should be written, for a skill that produces something to keep."""
 
+    verify_quotes: bool = False
+    """Whether the answer's quotations should be checked against the source (ADR-026)."""
+
 
 class Skill(ABC):
     """Abstract unit of work. Concrete skills declare needs and describe intent."""
@@ -213,6 +216,62 @@ class CritiqueFileSkill(Skill):
         return SkillPlan(action=action, prompt_template=prompt_template)
 
 
+class ExtractClaimsSkill(Skill):
+    """Return what a source asserts, each claim with the words that prove it.
+
+    The only skill whose output LACC can check rather than trust: every quotation is
+    looked for in the document it came from, and what is not found is marked (ADR-026).
+    """
+
+    @property
+    def name(self) -> str:
+        """Identify this skill."""
+        return "extract_claims"
+
+    @property
+    def required(self) -> frozenset[Capability]:
+        """Extracting claims reads the source, and nothing else."""
+        return frozenset({"read_files"})
+
+    def plan(self, requests: tuple[str, ...], config: Config) -> SkillPlan:
+        """Plan to extract checkable claims from the given documents."""
+        action = IntendedAction(
+            name=self.name,
+            summary=f"Extract claims from {chr(44).join(requests)}",
+            required=self.required,
+            targets=tuple(Path(item) for item in requests),
+        )
+        prompt_template = (
+            "You are extracting what a document asserts, for someone who will cite it."
+            + chr(10)
+            + chr(10)
+            + f"Write each claim in {config.output_language}, but quote in the document's "
+            "own words."
+            + chr(10)
+            + "For every claim, give the exact words from the document that establish it, "
+            "copied character for character, and the page they appear on. A quotation you "
+            "adjust, tidy or translate is no longer a quotation."
+            + chr(10)
+            + "Use this format, and nothing else:"
+            + chr(10)
+            + chr(10)
+            + "CLAIM: what the document asserts"
+            + chr(10)
+            + "QUOTE: the exact words from the document"
+            + chr(10)
+            + "PAGE: the page number"
+            + chr(10)
+            + chr(10)
+            + "One block per claim, separated by a blank line. No preamble, no numbering, "
+            "no commentary."
+            + chr(10)
+            + "If the document does not support a claim, do not make it. Every quotation "
+            "is checked against the document, and one that cannot be found is reported as "
+            "unsupported." + chr(10) + chr(10) + fenced_documents(requests)
+        )
+        return SkillPlan(action=action, prompt_template=prompt_template, verify_quotes=True)
+
+
 class ReviseFileSkill(Skill):
     """Propose a clearer version of a document, written beside it and never over it.
 
@@ -300,6 +359,7 @@ def run_skill(
         confirm,
         plan.destination,
         approve,
+        plan.verify_quotes,
     )
 
 

@@ -17,6 +17,7 @@ from local_ai_control_center.skill import (
     DOCUMENT_CLOSE,
     DOCUMENT_OPEN,
     CritiqueFileSkill,
+    ExtractClaimsSkill,
     ReviseFileSkill,
     Skill,
     SkillPlan,
@@ -358,3 +359,23 @@ def test_revise_keeps_the_language_of_the_document() -> None:
     template = ReviseFileSkill().plan(("chapter.md",), _config(output_language="English"))
     assert "the language the passage is already written in" in template.prompt_template
     assert "Write the revision in English" not in template.prompt_template
+
+
+def test_extract_claims_asks_for_its_output_to_be_checked() -> None:
+    """The only skill whose answer LACC can check rather than trust."""
+    plan = ExtractClaimsSkill().plan(("paper.md",), _config())
+    assert plan.verify_quotes is True
+    assert plan.action.required == frozenset({"read_files"})
+
+
+def test_extract_claims_asks_for_verbatim_quotations() -> None:
+    """A quotation that is tidied is no longer a quotation, and the prompt says so."""
+    template = ExtractClaimsSkill().plan(("paper.md",), _config()).prompt_template
+    assert "copied character for character" in template
+    assert "CLAIM:" in template and "QUOTE:" in template and "PAGE:" in template
+
+
+def test_extract_claims_tells_the_model_its_quotations_will_be_checked() -> None:
+    """Saying so is honest, and a model told it will be checked fabricates less."""
+    template = ExtractClaimsSkill().plan(("paper.md",), _config()).prompt_template
+    assert "checked against the document" in template

@@ -713,3 +713,68 @@ def test_an_answer_that_finished_is_not_flagged(tmp_path: Path) -> None:
     """Stopping because the model was done is the ordinary case."""
     audit = _run_measured(tmp_path, _MeasuringProvider(finish_reason="stop"))
     assert "answer_truncated" not in _kinds(audit)
+
+
+class _AnsweringProvider(MockProvider):
+    """A mock that returns a fixed answer, so what is checked can be asserted."""
+
+    def __init__(self, answer: str) -> None:
+        super().__init__()
+        self._answer = answer
+
+    def complete(self, prompt: str) -> Completion:
+        return Completion(text=self._answer, provider="mock")
+
+
+def test_quotations_are_checked_against_what_the_cycle_read(tmp_path: Path) -> None:
+    """A real quotation verifies and an invented one does not, in the same answer."""
+    _note(tmp_path, "The study analysed 240 cases across three hospitals.")
+    workspace = Workspace.ensure(tmp_path)
+    config = Config(workspace_root=tmp_path)
+    audit = AuditLog(workspace, config)
+    answer = (
+        "CLAIM: Three hospitals took part."
+        + chr(10)
+        + "QUOTE: across three hospitals"
+        + chr(10)
+        + "PAGE: 1"
+        + chr(10) * 2
+        + "CLAIM: The sample was 500 patients."
+        + chr(10)
+        + "QUOTE: the sample was 500 patients"
+        + chr(10)
+        + "PAGE: 1"
+    )
+
+    result = run_action(
+        _reading_action(),
+        _TEMPLATE,
+        Permissions(read_files=True),
+        config,
+        workspace,
+        _AnsweringProvider(answer),
+        audit,
+        "run-1",
+        _accept,
+        verify_quotes=True,
+    )
+
+    verdicts = [checked.verdict for checked in result.checked_claims]
+    assert verdicts == ["page_unknown", "not_found"]
+
+    event = next(item for item in _events(audit) if item["kind"] == "quotations_checked")
+    detail = event["detail"]
+    assert isinstance(detail, dict)
+    assert detail["quotations"] == 2
+
+
+def test_nothing_is_checked_unless_the_skill_asks(tmp_path: Path) -> None:
+    """Checking is declared, not inferred from what an answer happens to look like."""
+    _note(tmp_path, "una nota corta")
+    _, audit = _run(
+        tmp_path,
+        _reading_action(),
+        Permissions(read_files=True),
+        prompt_template=_TEMPLATE,
+    )
+    assert "quotations_checked" not in _kinds(audit)
