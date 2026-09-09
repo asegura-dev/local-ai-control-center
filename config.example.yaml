@@ -19,6 +19,16 @@ model: qwen2.5:3b
 # letting the model choose, which is a guess, not a default.
 output_language: English
 
+# The context window to run the model with, in tokens. Unset by default.
+# Unset is not unlimited: with no window named, the engine uses its own default -
+# 4096 tokens on the version this was measured against, however much the model
+# supports - and silently drops whatever does not fit, answering from the rest.
+# When you set this, LACC asks the engine for exactly this window and refuses a
+# prompt it estimates will not fit, rather than letting it be truncated.
+# See `lacc profile` for what each installed model supports. A larger window costs
+# memory: the same 3B model held 1990 MB at 2048 tokens and 2300 MB at 8192.
+# context_tokens: 32768
+
 # The largest file LACC will read or convert, in bytes. 32 MiB by default.
 # A document is read into memory whole, so this is a ceiling about the machine, not
 # about the model: whether the text then fits the model's context window is a

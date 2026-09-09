@@ -20,7 +20,12 @@ from rich.table import Table
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config, load_config
 from local_ai_control_center.converter import ConversionError, converter_for
-from local_ai_control_center.cycle import ReadError, RunResult, run_conversion
+from local_ai_control_center.cycle import (
+    PromptTooLargeError,
+    ReadError,
+    RunResult,
+    run_conversion,
+)
 from local_ai_control_center.permissions import grant
 from local_ai_control_center.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.profiler import SystemProfile, profile_system
@@ -134,18 +139,34 @@ def run(
                 result = _do_run(resolved, request, config, workspace, provider, audit)
         else:
             result = _do_run(resolved, request, config, workspace, provider, audit)
-    except (ProviderError, ReadError) as error:
+    except (ProviderError, ReadError, PromptTooLargeError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
 
     _report(result)
+    if config.context_tokens is None:
+        _warn_no_context_ceiling()
+
+
+def _warn_no_context_ceiling() -> None:
+    """Say that no context ceiling is set, because the gap is real (ADR-019).
+
+    Without `context_tokens` the engine runs with its own default window, which is far
+    smaller than most models support, and drops whatever does not fit without saying so.
+    LACC cannot detect that; the least it can do is not let the gap be invisible.
+    """
+    console.print(
+        "[yellow]No context ceiling set.[/yellow] Without `context_tokens` the engine "
+        "uses its own default window and silently drops whatever does not fit. See "
+        "`lacc profile` for what your model supports."
+    )
 
 
 def _build_provider(choice: ProviderChoice, config: Config) -> Provider:
     """Construct the chosen provider. Ollama needs a configured model; the mock does not."""
     if choice is ProviderChoice.mock:
         return MockProvider()
-    return OllamaProvider(config.model)
+    return OllamaProvider(config.model, config.context_tokens)
 
 
 def _do_run(
@@ -262,7 +283,12 @@ def _show_profile(profile: SystemProfile) -> None:
     if profile.engine_present:
         if profile.installed_models:
             lines = [
-                f"- {model.name}  ({model.size_gb} GB, {model.quantization})"
+                f"- {model.name}  ({model.size_gb} GB, {model.quantization}"
+                + (
+                    f", up to {model.context_tokens:,} tokens)"
+                    if model.context_tokens
+                    else ", window unknown)"
+                )
                 for model in profile.installed_models
             ]
             models_text = "\n".join(lines)

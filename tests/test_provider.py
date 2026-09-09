@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from pydantic import ValidationError
 
@@ -196,3 +198,35 @@ def test_provider_refuses_to_be_built_for_a_remote_host(monkeypatch: pytest.Monk
     monkeypatch.setenv("OLLAMA_HOST", "https://models.example.com")
     with pytest.raises(ProviderError):
         OllamaProvider("qwen2.5:3b")
+
+
+def _captured_request_body(provider: OllamaProvider) -> dict[str, object]:
+    """Run a completion against a stubbed engine and return the body that was sent."""
+    from unittest.mock import patch
+
+    sent: list[bytes] = []
+
+    def _capture(request: object, **_: object) -> object:
+        sent.append(request.data)  # type: ignore[attr-defined]
+        return _fake_generate_response("ok")
+
+    with patch("urllib.request.urlopen", side_effect=_capture):
+        provider.complete("a prompt")
+    return dict(json.loads(sent[0].decode("utf-8")))
+
+
+def test_a_configured_window_is_asked_for() -> None:
+    """LACC asks the engine for the window it will enforce a ceiling against.
+
+    Ollama loads with its own default - far smaller than most models support - and
+    silently drops what does not fit, so a window LACC did not request is one it cannot
+    hold the engine to (ADR-019).
+    """
+    body = _captured_request_body(OllamaProvider("qwen2.5:3b", context_tokens=8192))
+    assert body["options"] == {"num_ctx": 8192}
+
+
+def test_no_window_is_asked_for_when_none_is_configured() -> None:
+    """Unset means unset: LACC does not invent a window to send."""
+    body = _captured_request_body(OllamaProvider("qwen2.5:3b"))
+    assert "options" not in body

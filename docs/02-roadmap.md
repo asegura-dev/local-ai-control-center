@@ -67,6 +67,12 @@ carries no dates.
   since a security mechanism copied per skill is free to drift. The skill registry
   deferred in ADR-010 is declined rather than built, and the reasoning behind expecting it
   here is corrected.
+- **v0.18.0 - An honest context ceiling.** LACC asks the engine for the context window
+  it will enforce against, estimates each prompt, and refuses one too large rather than
+  letting the engine drop what does not fit and answer from the rest. Measuring showed
+  why asking matters: the engine loads a 32768-token model with 4096 unless told
+  otherwise. Taken before reading several files, since several documents in one prompt
+  is what makes prompts long.
 
 ## The route to v1.0
 
@@ -96,10 +102,11 @@ next thing that stops being impossible, not the next thing that would be nice.
   now shared rather than copied, and the skill registry was declined, since what a formal
   registry adds is discovery of skills from outside this repository - a question about
   trust rather than about how many skills exist (ADR-018).
-- **More than one file, and an honest ceiling.** Comparing what several sources say
-  requires reading several. It also reaches the first hard limit: a set of documents
-  that does not fit the model's context. LACC must detect that and say so, never
-  truncate silently and answer as though it had read everything.
+- **More than one file.** Comparing what several sources say requires reading several.
+  The ceiling this bullet used to carry was taken first, in v0.18.0, and the order was
+  reversed on purpose: several documents in one prompt is exactly what makes a prompt
+  long, so shipping this first would have made silent truncation more likely before
+  anything could detect it.
 - **Chunking.** A single document larger than the context window, split deliberately,
   with the seams visible rather than hidden.
 - **Writing, with a diff shown first.** Editing an existing file is the first

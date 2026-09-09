@@ -189,6 +189,32 @@ tree - and that is a question about trust, because a skill LACC did not write is
 declared capabilities are a claim rather than a fact. Counting skills was never the
 trigger.
 
+## Enforcing a limit you did not set is not enforcement
+
+The context window is the second ceiling in LACC, and it taught something the first one
+did not (ADR-019). `max_input_bytes` is about this machine's memory, and the machine is
+the one LACC runs on, so measuring it is straightforward. The context window belongs to
+the engine, and the engine turned out not to be using the number anyone would have looked
+up.
+
+Measured: `qwen2.5:3b` supports 32768 tokens, and Ollama loads it with 4096 unless asked
+for more. A design that reported the model's maximum and checked prompts against it would
+have passed a 20000-token prompt as comfortably within range while the engine discarded
+seven eighths of the document - and it would have looked like a check the whole time.
+
+So LACC asks for the window rather than inheriting one. That is a small intrusion into how
+the engine runs, and it is confined: one value, given to the provider at construction where
+the model name already lives, so the port itself is unchanged and the mock is untouched.
+The principle is worth keeping past this case - a limit checked against a value the system
+did not set is a limit that can be silently wrong, and the fix is to set it, not to check
+harder.
+
+The rest follows from refusing to pretend. Tokens are estimated, because LACC has no
+tokenizer, so the estimate errs toward refusing and is called an estimate everywhere.
+Nothing is trimmed to fit, because trimming is the behaviour being prevented. And when no
+window is configured, the run proceeds and says so, because an unset option should not
+quietly become an assumption in either direction.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

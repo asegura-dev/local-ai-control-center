@@ -99,3 +99,15 @@ def test_max_input_bytes_must_be_a_real_ceiling() -> None:
     for value in (0, -1):
         with pytest.raises(ValidationError):
             Config(workspace_root=Path("/tmp/lacc"), max_input_bytes=value)
+
+
+def test_context_tokens_is_unset_by_default() -> None:
+    """A guessed window is worse than none, so there is no default."""
+    assert Config(workspace_root=Path("/tmp/lacc")).context_tokens is None
+
+
+def test_context_tokens_must_be_a_usable_window() -> None:
+    """Unknown is a state LACC handles; zero is not a smaller window, it is a broken one."""
+    for value in (0, -4096):
+        with pytest.raises(ValidationError):
+            Config(workspace_root=Path("/tmp/lacc"), context_tokens=value)

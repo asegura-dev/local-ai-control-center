@@ -79,6 +79,51 @@ def _oversize(path: Path, limit: int) -> str | None:
     return _TOO_LARGE.format(name=path.name, size=size, limit=limit)
 
 
+CHARS_PER_TOKEN = 3
+"""How many characters LACC assumes one token holds, when estimating a prompt's size.
+
+Deliberately low. Four is the usual rule of thumb for English prose, and text with
+accents, code or unusual words tokenizes worse; assuming three estimates more tokens than
+there probably are, so LACC refuses slightly early. The two errors are not symmetric: a
+prompt refused that would have fitted is visible and costs one line of configuration,
+while a prompt truncated that should have been refused produces a plausible wrong answer
+nobody has reason to check (ADR-019).
+"""
+
+_MINIMUM_ANSWER_RESERVE = 512
+"""Fewest tokens held back for the completion, whatever the window."""
+
+_PROMPT_TOO_LARGE = (
+    "The prompt is an estimated {estimate:,} tokens, over the {budget:,} available: the "
+    "context window is {window:,} tokens and {reserve:,} are held back for the answer. "
+    "Nothing was sent, because an engine given more than fits does not fail - it drops "
+    "what does not fit and answers from the rest. Use a shorter document, or raise "
+    "context_tokens if the model and this machine can hold more."
+)
+
+
+def estimate_tokens(text: str) -> int:
+    """Estimate how many tokens ``text`` occupies, erring high.
+
+    An estimate, and called one everywhere it appears: LACC has no tokenizer and will not
+    carry one per model family for a number that only decides whether to refuse.
+    """
+    return -(-len(text) // CHARS_PER_TOKEN)
+
+
+def answer_reserve(window: int) -> int:
+    """Tokens held back from ``window`` so the model has room to answer."""
+    return max(window // 4, _MINIMUM_ANSWER_RESERVE)
+
+
+class PromptTooLargeError(Exception):
+    """Raised when a prompt would not fit the configured context window.
+
+    Refused rather than trimmed. Truncating is what this exists to prevent, and doing it
+    in LACC rather than in the engine would only move the dishonesty closer to home.
+    """
+
+
 class ReadError(Exception):
     """Raised when a file the action declared cannot be read.
 
@@ -258,6 +303,36 @@ def run_action(
             f"Read targets for {action.name}",
             {"action": action.name, "files": [str(path) for path in files_read]},
         )
+
+    estimate = estimate_tokens(prompt)
+    audit.record(
+        run_id,
+        "prompt_measured",
+        f"Prompt for {action.name} is an estimated {estimate} tokens",
+        {
+            "action": action.name,
+            "estimated_tokens": estimate,
+            "requested_window": config.context_tokens,
+        },
+    )
+
+    if config.context_tokens is not None:
+        reserve = answer_reserve(config.context_tokens)
+        budget = config.context_tokens - reserve
+        if estimate > budget:
+            message = _PROMPT_TOO_LARGE.format(
+                estimate=estimate,
+                budget=budget,
+                window=config.context_tokens,
+                reserve=reserve,
+            )
+            audit.record(
+                run_id,
+                "prompt_too_large",
+                f"Refused to send an oversized prompt for {action.name}",
+                {"action": action.name, "estimated_tokens": estimate, "budget": budget},
+            )
+            raise PromptTooLargeError(message)
 
     completion = provider.complete(prompt)
 

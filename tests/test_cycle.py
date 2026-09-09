@@ -18,8 +18,11 @@ from local_ai_control_center.converter import ConversionError, converter_for
 from local_ai_control_center.cycle import (
     CONTENT_PLACEHOLDER,
     ExecutionPreview,
+    PromptTooLargeError,
     ReadError,
     RunResult,
+    answer_reserve,
+    estimate_tokens,
     run_action,
     run_conversion,
 )
@@ -92,6 +95,7 @@ def test_completed_run_records_the_full_sequence(tmp_path: Path) -> None:
     assert _kinds(audit) == [
         "run_started",
         "permission_granted",
+        "prompt_measured",
         "provider_called",
         "run_finished",
     ]
@@ -532,3 +536,78 @@ def test_a_document_over_the_ceiling_is_not_converted(
     assert not (tmp_path / "document.md").exists()
     audit = AuditLog(Workspace.ensure(tmp_path), Config(workspace_root=tmp_path))
     assert _kinds(audit)[-1] == "ingestion_failed"
+
+
+def test_the_token_estimate_errs_toward_refusing() -> None:
+    """Three characters per token estimates more tokens than there probably are."""
+    assert estimate_tokens("") == 0
+    assert estimate_tokens("abc") == 1
+    assert estimate_tokens("abcd") == 2
+    assert estimate_tokens("x" * 3000) == 1000
+
+
+def test_the_answer_reserve_never_falls_below_its_floor() -> None:
+    """The window must hold the answer too, and a small window still leaves room."""
+    assert answer_reserve(32768) == 8192
+    assert answer_reserve(1024) == 512
+
+
+def test_a_prompt_over_the_window_is_refused_before_the_provider(tmp_path: Path) -> None:
+    """Nothing is sent, because an engine given too much does not fail - it truncates."""
+    _note(tmp_path, "palabra " * 4000)
+    with pytest.raises(PromptTooLargeError) as excinfo:
+        _run(
+            tmp_path,
+            _reading_action(),
+            Permissions(read_files=True),
+            prompt_template=_TEMPLATE,
+            context_tokens=4096,
+        )
+    message = str(excinfo.value)
+    assert "estimated" in message and "context_tokens" in message
+
+
+def test_an_oversized_prompt_is_recorded_as_refused(tmp_path: Path) -> None:
+    """The trail says the prompt was measured and then refused, and nothing was called."""
+    _note(tmp_path, "palabra " * 4000)
+    with pytest.raises(PromptTooLargeError):
+        _run(
+            tmp_path,
+            _reading_action(),
+            Permissions(read_files=True),
+            prompt_template=_TEMPLATE,
+            context_tokens=4096,
+        )
+    audit = AuditLog(Workspace.ensure(tmp_path), Config(workspace_root=tmp_path))
+    kinds = _kinds(audit)
+    assert kinds[-2:] == ["prompt_measured", "prompt_too_large"]
+    assert "provider_called" not in kinds
+
+
+def test_a_prompt_within_the_window_runs(tmp_path: Path) -> None:
+    """The ceiling refuses what does not fit and stays out of the way of what does."""
+    _note(tmp_path, "una nota corta")
+    result, _ = _run(
+        tmp_path,
+        _reading_action(),
+        Permissions(read_files=True),
+        prompt_template=_TEMPLATE,
+        context_tokens=32768,
+    )
+    assert result.outcome == "completed"
+
+
+def test_every_prompt_is_measured_even_without_a_ceiling(tmp_path: Path) -> None:
+    """How large a prompt was is a fact about the run, recorded whether or not it matters."""
+    _note(tmp_path, "una nota corta")
+    _, audit = _run(
+        tmp_path,
+        _reading_action(),
+        Permissions(read_files=True),
+        prompt_template=_TEMPLATE,
+    )
+    measured = next(event for event in _events(audit) if event["kind"] == "prompt_measured")
+    detail = measured["detail"]
+    assert isinstance(detail, dict)
+    assert detail["estimated_tokens"] > 0
+    assert detail["requested_window"] is None

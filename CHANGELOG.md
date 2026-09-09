@@ -5,6 +5,50 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-09-09
+
+### Added
+- `context_tokens` in the configuration: the window to run the model with. LACC asks the
+  engine for exactly this window, estimates the size of each assembled prompt, and refuses
+  one that will not fit rather than letting the engine truncate it.
+- `lacc profile` reports the context window each installed model supports, and says that
+  the engine loads with a smaller default unless it is asked otherwise.
+- New audit events: `prompt_measured`, recording the estimated size and requested window
+  of every prompt, and `prompt_too_large` when a run is refused for exceeding the ceiling.
+
+### Changed
+- `OllamaProvider` sends `num_ctx` when a window is configured. The provider port is
+  unchanged: the window is given at construction, where the model name already lives,
+  because it describes how the engine is set up for a run rather than what is being asked
+  of it. Generation parameters stay deferred, as ADR-013 left them.
+
+### Security
+- **A prompt too large for the model is refused, not truncated.** An engine given more
+  than fits does not fail: Ollama drops what does not fit and answers from the rest, so a
+  run that read the last third of a chapter returns a confident summary of the chapter,
+  indistinguishable from one that read all of it.
+- **The window LACC checks against is the window LACC asked for.** This was found by
+  measuring rather than by reading documentation: against Ollama 0.30.7, `qwen2.5:3b`
+  supports 32768 tokens and the engine loads it with 4096 unless told otherwise - a factor
+  of eight, silently. An earlier draft of ADR-019 would have had the profiler report
+  32768, the user configure 32768, and LACC conclude that a 20000-token prompt had room to
+  spare while the engine discarded seven eighths of it. A ceiling checked against a window
+  nobody is using is worse than no ceiling, because it looks like a check.
+
+### Notes
+- Token counts are estimated from characters at three per token, and are called estimates
+  everywhere they appear. Three is deliberately low: it overestimates tokens, so LACC
+  refuses slightly early. A prompt refused that would have fitted costs one line of
+  configuration; a prompt truncated that should have been refused produces a plausible
+  wrong answer nobody has reason to check.
+- A quarter of the window, and never less than 512 tokens, is held back for the answer.
+- With `context_tokens` unset, runs proceed and say so: the engine will use its own default
+  and may truncate without either side noticing. The gap is real, and the notice is what
+  keeps it from being invisible.
+- Requests for 2048, 8192 and 32768 tokens were each honoured exactly. What an engine does
+  when it cannot allocate the window it was asked for was not observed, and is not claimed.
+
+
 ## [0.17.0] - 2026-09-08
 
 ### Added

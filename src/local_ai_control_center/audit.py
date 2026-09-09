@@ -28,6 +28,8 @@ EventKind = Literal[
     "document_converted",
     "ingestion_failed",
     "read_failed",
+    "prompt_measured",
+    "prompt_too_large",
     "provider_called",
 ]
 """The closed set of events recorded today. It grows as real events appear."""

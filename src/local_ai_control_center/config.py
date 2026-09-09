@@ -67,6 +67,17 @@ class Config(BaseModel):
             "'lacc profile'."
         ),
     )
+    context_tokens: int | None = Field(
+        default=None,
+        description=(
+            "The context window to run the model with, in tokens. Unset by default, "
+            "because a guessed window is worse than none: too small refuses work that "
+            "would have run, too large cannot be allocated. When set, LACC asks the "
+            "engine for exactly this window and refuses a prompt estimated to exceed it "
+            "rather than letting the engine truncate silently. See 'lacc profile' for "
+            "what each installed model supports. A larger window costs memory."
+        ),
+    )
     max_input_bytes: int = Field(
         default=MAX_INPUT_BYTES_DEFAULT,
         description=(
@@ -87,6 +98,18 @@ class Config(BaseModel):
             "the model happens to choose."
         ),
     )
+
+    @field_validator("context_tokens")
+    @classmethod
+    def _require_a_usable_window(cls, value: int | None) -> int | None:
+        """Reject a window that cannot hold anything.
+
+        ``None`` means unknown, which is a state LACC handles by saying so. Zero or a
+        negative number is not a smaller window, it is a broken one.
+        """
+        if value is not None and value <= 0:
+            raise ValueError("context_tokens must be a positive number of tokens")
+        return value
 
     @field_validator("max_input_bytes")
     @classmethod

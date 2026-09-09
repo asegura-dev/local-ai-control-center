@@ -36,6 +36,12 @@ class InstalledModel(BaseModel):
     name: str
     size_gb: float
     quantization: str
+    context_tokens: int | None = None
+    """The largest window the model supports, or ``None`` when the engine did not say.
+
+    Not the window it will run with: Ollama loads with its own smaller default unless
+    asked for more, which is why the report says both (ADR-019).
+    """
 
 
 class ModelFit(BaseModel):
@@ -93,14 +99,39 @@ def _probe_installed_models() -> tuple[bool, tuple[InstalledModel, ...]]:
     for entry in payload.get("models", []):
         details = entry.get("details", {})
         size_bytes = entry.get("size", 0)
+        name = entry.get("name", "unknown")
         models.append(
             InstalledModel(
-                name=entry.get("name", "unknown"),
+                name=name,
                 size_gb=round(size_bytes / 1024**3, 1),
                 quantization=details.get("quantization_level", "unknown"),
+                context_tokens=_probe_context_window(name),
             )
         )
     return True, tuple(models)
+
+
+def _probe_context_window(model: str) -> int | None:
+    """Ask the engine what window ``model`` supports, or ``None`` if it will not say.
+
+    Reads and does not act (ADR-012): asking what a model is does not load it. Any
+    failure means the number is unknown, and unknown is reported as unknown rather than
+    filled in with something plausible.
+    """
+    request = urllib.request.Request(
+        f"{ollama_host()}/api/show",
+        data=json.dumps({"model": model}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=_PROBE_TIMEOUT_SECONDS * 4) as response:
+            info = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return None
+    for key, value in info.get("model_info", {}).items():
+        if key.endswith("context_length") and isinstance(value, int):
+            return value
+    return None
 
 
 def _estimate_fits(total_memory_gb: float) -> tuple[ModelFit, ...]:
@@ -188,6 +219,14 @@ def profile_system() -> SystemProfile:
         notes.append(
             f"Up {uptime_hours} hours: a restart can free fragmented memory and "
             "improve model performance."
+        )
+    if any(model.context_tokens for model in models):
+        notes.append(
+            "A model's window above is the largest it supports, not the one it will run "
+            "with: Ollama loads with its own smaller default - 4096 tokens, measured - "
+            "and silently drops whatever does not fit. Set `context_tokens` in your "
+            "configuration and LACC asks for that window and refuses a prompt too large "
+            "for it. A larger window costs memory."
         )
     if engine_note:
         notes.append(engine_note)

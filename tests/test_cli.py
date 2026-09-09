@@ -85,6 +85,7 @@ def test_run_records_to_the_audit_log(tmp_path: Path) -> None:
         "run_started",
         "permission_granted",
         "files_read",
+        "prompt_measured",
         "provider_called",
         "run_finished",
     ]

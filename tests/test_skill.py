@@ -175,6 +175,7 @@ def test_run_skill_records_the_run(tmp_path: Path) -> None:
         "run_started",
         "permission_granted",
         "files_read",
+        "prompt_measured",
         "provider_called",
         "run_finished",
     ]

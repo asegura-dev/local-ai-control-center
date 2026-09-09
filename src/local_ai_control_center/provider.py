@@ -17,6 +17,7 @@ import urllib.parse
 import urllib.request
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -147,9 +148,17 @@ class OllamaProvider(Provider):
     actionable messages rather than raised as raw errors.
     """
 
-    def __init__(self, model: str) -> None:
-        """Create the provider for a given model name (from configuration)."""
+    def __init__(self, model: str, context_tokens: int | None = None) -> None:
+        """Create the provider for a model name and, optionally, a context window.
+
+        The window is given here rather than per prompt because it describes how the
+        engine is set up for this run, not what is being asked of it. Ollama loads with
+        a default window far smaller than most models support - 4096 against 32768 for
+        qwen2.5:3b, measured - and silently drops whatever does not fit, so a window LACC
+        did not ask for is a window LACC cannot enforce a ceiling against (ADR-019).
+        """
         self._host = ollama_host()
+        self._context_tokens = context_tokens
         if not model:
             raise ProviderError(
                 "No model configured. Name one in your config (see 'lacc profile' "
@@ -168,7 +177,10 @@ class OllamaProvider(Provider):
         Translates connection, model, and timeout failures into clear messages.
         """
         url = f"{self._host}/api/generate"
-        body = json.dumps({"model": self._model, "prompt": prompt, "stream": False}).encode("utf-8")
+        payload: dict[str, Any] = {"model": self._model, "prompt": prompt, "stream": False}
+        if self._context_tokens is not None:
+            payload["options"] = {"num_ctx": self._context_tokens}
+        body = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(
             url, data=body, headers={"Content-Type": "application/json"}
         )
