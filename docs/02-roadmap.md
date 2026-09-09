@@ -83,6 +83,11 @@ carries no dates.
   shape rather than fitted to the machine it was written on, against the memory free
   now. A range with its assumptions stated, never a recommendation, and it still does
   not set `context_tokens` for anyone.
+- **v0.21.0 - Exposure controls.** The quality gate fails if anything reaches a
+  non-loopback address, so local-first is enforced rather than asserted. A workspace
+  inside a git working tree is refused, and one that looks synchronised is flagged as
+  a guess. PRINCIPLES gains the rule the release rests on: approximation is a tool for
+  performance, never for exposure.
 
 ## The route to v1.0
 

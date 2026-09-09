@@ -5,7 +5,19 @@
 
 # Base directory LACC treats as its working area. Required.
 # Paths outside this directory are refused.
-workspace_root: ./lacc-workspace
+#
+# Keep it OUTSIDE any git repository. Everything LACC reads, converts and records
+# here is your own material, and inside a working tree it is one `git add -A` away
+# from being published. LACC refuses a workspace inside a repository unless you
+# acknowledge it below. Keeping it out of a synchronising folder (OneDrive, Dropbox)
+# is the same argument: that folder copies its contents to another computer.
+workspace_root: ~/lacc-workspace
+
+# Acknowledge that the workspace sits inside a git working tree. False by default.
+# LACC cannot tell whether git ignores that path - answering it means running git,
+# which LACC does not do - so it refuses what it can see and leaves the judgement to
+# you. Set this to true only after confirming the path is ignored.
+workspace_in_repository: false
 
 # The Ollama model a real provider uses (see installed models with `lacc profile`).
 # Empty by default: naming a model is required to run against Ollama, so an empty

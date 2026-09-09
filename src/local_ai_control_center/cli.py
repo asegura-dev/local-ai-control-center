@@ -44,7 +44,12 @@ from local_ai_control_center.skill import (
     grant_for,
     run_skill,
 )
-from local_ai_control_center.workspace import Workspace, workspace_from_config
+from local_ai_control_center.workspace import (
+    Workspace,
+    WorkspaceExposed,
+    sync_folder_suspicion,
+    workspace_from_config,
+)
 
 DEFAULT_CONFIG_PATH = Path("config.yaml")
 
@@ -85,7 +90,16 @@ def _load(config_path: Path) -> tuple[Config, Workspace]:
     except (OSError, ValueError) as error:
         console.print(f"[red]Could not load configuration:[/red] {error}")
         raise typer.Exit(code=1) from error
-    workspace = workspace_from_config(config)
+
+    try:
+        workspace = workspace_from_config(config)
+    except WorkspaceExposed as error:
+        console.print(f"[red]Refusing to use this workspace.[/red] {error}")
+        raise typer.Exit(code=1) from error
+
+    suspicion = sync_folder_suspicion(workspace.root)
+    if suspicion is not None:
+        console.print(f"[yellow]Warning.[/yellow] {suspicion}")
     return config, workspace
 
 

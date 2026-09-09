@@ -44,6 +44,14 @@ aspirations.
   hold. It costs more to repair than the code cost to write. A phase whose documents do
   not match reality is not finished, however green its gate.
 
+- **Approximation is a tool for performance, never for exposure.** Where being wrong
+  costs time, an estimate that leans the safe way is good engineering: a token count that
+  errs high, a memory allowance rounded away from a single observation. Where being wrong
+  means private material left the machine, there is no safe lean and no acceptable margin.
+  That failure is one-way - nothing later recovers what has already gone - so controls on
+  exposure refuse rather than warn wherever refusing is possible, and any check that
+  cannot be certain says so where it is shown rather than sounding confident.
+
 ## Security
 
 - **Restrictive by default.** Every capability (`read_files`, `write_files`,

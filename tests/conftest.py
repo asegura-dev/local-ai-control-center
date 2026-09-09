@@ -1,4 +1,11 @@
-"""Shared fixtures: building the documents the ingestion tests need.
+"""Shared fixtures, and the guard that keeps LACC from reaching the network.
+
+The egress guard is the important half. "LACC does not use the network" was an assertion
+in a document until v0.21.0; here it becomes something the quality gate enforces, so a
+dependency, a future feature or a careless import that reaches outward fails the build
+rather than shipping (ADR-022).
+
+The rest of this file builds the documents the ingestion tests need.
 
 Both PDFs and `.docx` files are built here rather than committed as binary fixtures, so
 what a test feeds the converter is visible in the test rather than opaque bytes in the
@@ -8,11 +15,53 @@ avoid adding a PDF-writing dependency for the sake of the test suite.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import ipaddress
+import socket
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import docx
 import pytest
+
+_real_connect = socket.socket.connect
+
+
+def _is_loopback(host: object) -> bool:
+    """Whether ``host`` names this machine. Anything unrecognised is not loopback."""
+    if not isinstance(host, str):
+        return False
+    if host.lower() in ("localhost", "::1"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _no_egress() -> Iterator[None]:
+    """Fail any test that opens a connection to something other than this machine.
+
+    Autouse and session-scoped, so it covers the suite rather than the tests that
+    remember to ask for it. Loopback stays allowed: talking to a local engine is
+    inter-process communication, and PRINCIPLES treats it as the one exception.
+    """
+
+    def guarded(self: socket.socket, address: object) -> object:
+        host = address[0] if isinstance(address, tuple) else None
+        if not _is_loopback(host):
+            raise AssertionError(
+                f"LACC tried to reach {address!r}, which is not this machine. Nothing in "
+                "LACC may leave the machine; if this is a new dependency doing it, the "
+                "dependency is the problem (ADR-022)."
+            )
+        return _real_connect(self, address)
+
+    socket.socket.connect = guarded  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        socket.socket.connect = _real_connect  # type: ignore[method-assign]
 
 
 def _minimal_pdf(pages: list[str]) -> bytes:

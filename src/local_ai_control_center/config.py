@@ -67,6 +67,17 @@ class Config(BaseModel):
             "'lacc profile'."
         ),
     )
+    workspace_in_repository: bool = Field(
+        default=False,
+        description=(
+            "Acknowledge that the workspace sits inside a git working tree. False by "
+            "default, and LACC refuses to run in that case: private material one "
+            "'git add -A' away from being published is not a risk a warning covers. "
+            "LACC cannot tell whether the path is ignored - answering that means running "
+            "git, which it does not do - so it refuses what it can see and leaves the "
+            "judgement to you. Setting this to true says you have checked."
+        ),
+    )
     context_tokens: int | None = Field(
         default=None,
         description=(

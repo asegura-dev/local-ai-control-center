@@ -110,11 +110,68 @@ class Workspace(BaseModel):
         return resolved
 
 
+_SYNC_FOLDER_NAMES = ("onedrive", "dropbox", "icloud", "google drive", "box sync")
+"""Folder names that suggest a synchronising client. A guess, and treated as one."""
+
+
+class WorkspaceExposed(ValueError):
+    """Raised when a workspace sits somewhere private material could leave from."""
+
+
+def repository_above(path: Path) -> Path | None:
+    """Return the git working tree ``path`` sits in, or ``None`` if there is none.
+
+    Certain rather than approximate: a `.git` entry in an ancestor is a fact. Whether
+    the path is ignored by that repository is a different question, answerable only by
+    running git, which LACC does not do - so this reports what it knows (ADR-022).
+    """
+    for candidate in (path, *path.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def sync_folder_suspicion(path: Path) -> str | None:
+    """Return a warning if ``path`` looks like it sits in a synchronising folder.
+
+    A guess from folder names, and it says so where it is shown. A folder called
+    `Dropbox` may sync nothing and one called `work` may sync everything; refusing on a
+    name would refuse work that was never at risk and teach the user that LACC's
+    refusals are noise (ADR-022).
+    """
+    for part in path.parts:
+        for name in _SYNC_FOLDER_NAMES:
+            if name in part.lower():
+                return (
+                    f"The workspace is under a folder named {part!r}, which looks like a "
+                    "synchronising client - this is a guess from the name, not something "
+                    "LACC can confirm. If it does sync, everything LACC reads, converts "
+                    "and records there is copied to somebody else's computer."
+                )
+    return None
+
+
 def workspace_from_config(config: Config) -> Workspace:
     """Build a workspace from a configuration's ``workspace_root``.
 
     Uses explicit creation, so a configured workspace that does not yet exist is
     created deliberately. This is the seam where configuration becomes an
     operational workspace; the core modules stay unaware of each other otherwise.
+
+    Refuses a workspace inside a git working tree unless the configuration acknowledges
+    it (ADR-022). Private material one ``git add -A`` away from being published is not a
+    risk a warning covers, and the refusal is one line of configuration to lift once a
+    person has checked that git ignores the path.
     """
-    return Workspace.ensure(config.workspace_root)
+    workspace = Workspace.ensure(config.workspace_root)
+    repository = repository_above(workspace.root)
+    if repository is not None and not config.workspace_in_repository:
+        raise WorkspaceExposed(
+            f"The workspace {workspace.root} is inside the git repository at "
+            f"{repository}. Everything LACC reads, converts and records there is one "
+            "'git add -A' away from being committed and pushed. LACC cannot tell whether "
+            "git ignores this path - that would mean running git, which it does not do. "
+            "Move the workspace outside the repository, or set "
+            "workspace_in_repository: true once you have confirmed it is ignored."
+        )
+    return workspace

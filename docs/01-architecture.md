@@ -283,6 +283,39 @@ looked would change behaviour between runs for reasons nobody can see in the con
 The tool reports; the person decides; the decision is written down where it can be argued
 with.
 
+## Two kinds of wrong
+
+Several decisions in this project accept being approximately right. The token estimate errs
+high, the memory allowance is rounded away from its single observation, and both are argued
+for on the same ground: the error is cheap and points the safe way. A prompt refused that
+would have fitted costs a retry.
+
+Applying that reasoning to exposure would be a mistake, and stating why is what ADR-022
+adds. A retry undoes a refused prompt. Nothing undoes a document that left the machine.
+There is no safe lean when the failure is one-way, so the controls that guard exposure
+refuse where refusing is possible, and the ones that cannot be certain say so instead of
+sounding like the ones that can.
+
+That distinction sorts the controls neatly.
+
+Refusing is possible for a workspace inside a git working tree, because a `.git` directory
+in an ancestor is a fact. What LACC cannot know is whether that repository ignores the path
+- answering it means running git, and running commands is a capability LACC does not grant
+itself. So it refuses what it can see and hands the rest to the person who can check, as a
+named acknowledgement in a configuration file rather than a prompt clicked through.
+
+Refusing is not possible for a synchronising folder, because recognising one means matching
+a name, and names lie in both directions. That check warns and labels itself a guess. The
+labelling is not politeness: a strict refusal is only useful while its refusals are
+believable, and a confident-sounding guess spends the credibility the strict check depends
+on.
+
+And one guarantee moved from prose into the build. "LACC does not use the network" was a
+sentence in a document, true because nobody had written code that broke it. It is now
+enforced by the quality gate, which fails if any test opens a connection to something that
+is not this machine. The guarantee did not get stronger in what it claims - it got stronger
+in what would happen if it stopped being true, which is the only part that was ever soft.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

@@ -5,6 +5,55 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-09-09
+
+### Security
+- **The quality gate now fails if anything reaches for a non-loopback address.** "LACC
+  does not use the network" was an assertion in a document; it is now a property the
+  build enforces, so a dependency, a future feature or a careless import that reaches
+  outward fails rather than shipping. Loopback stays allowed: talking to a local engine
+  is inter-process communication, which PRINCIPLES treats as the one exception. Verified
+  before adopting - the suite passes with the guard installed and nothing attempts to
+  leave - and verified again by deliberately reaching out and watching it fail.
+- **A workspace inside a git working tree is refused.** Everything LACC reads, converts
+  and records there is one `git add -A` away from being committed and pushed. The
+  repository's `.gitignore` covers the default workspace name and no workspace file has
+  ever been committed - checked across the whole history - but it protects by name rather
+  than by nature: a `workspace_root` pointing at `./thesis` would have been covered by
+  nothing.
+- **A workspace inside a folder that looks synchronised is reported as a suspicion.**
+  A synchronising folder copies its contents to another computer, which is the thing LACC
+  exists to avoid. Recognising one means matching folder names, so this warns and says it
+  is guessing rather than refusing on a name.
+- A dependency audit is recorded in ADR-022 rather than left to be redone: `pypdf`,
+  `python-docx`, `rich`, `pydantic` and `pyyaml` contain no network imports at all;
+  `psutil` imports socket to read interface information rather than to open connections;
+  `lxml` has network-capable paths LACC does not travel.
+
+### Added
+- `workspace_in_repository` in the configuration: an acknowledgement, false by default,
+  that lifts the refusal above. LACC cannot tell whether git ignores a path - answering
+  that means running git, which it does not do - so it refuses what it can see and leaves
+  the judgement to the person who can check.
+
+### Changed
+- **`config.example.yaml` no longer proposes a workspace inside the repository.** Shipping
+  an example that puts private material in a git working tree was the shape of the hazard,
+  not a detail of it.
+- PRINCIPLES.md gains the distinction this release rests on: approximation is a tool for
+  performance, never for exposure. Where being wrong costs time, an estimate that leans the
+  safe way is good engineering. Where being wrong means private material left the machine,
+  there is no safe lean - that failure is one-way, and nothing later recovers what has
+  already gone.
+
+### Notes
+- This is a breaking change for anyone whose workspace sits inside a repository. That is
+  deliberate: the safe cases lose one line of configuration, and the unsafe ones are the
+  reason for the change.
+- Checks that cannot be certain say so where they are shown. A strict refusal is only
+  useful while its refusals are believable, and every confident-sounding guess spends that.
+
+
 ## [0.20.0] - 2026-09-09
 
 ### Added

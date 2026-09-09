@@ -8,7 +8,13 @@ import pytest
 from pydantic import ValidationError
 
 from local_ai_control_center.config import Config
-from local_ai_control_center.workspace import Workspace, workspace_from_config
+from local_ai_control_center.workspace import (
+    Workspace,
+    WorkspaceExposed,
+    repository_above,
+    sync_folder_suspicion,
+    workspace_from_config,
+)
 
 
 def test_construction_requires_existing_dir(tmp_path: Path) -> None:
@@ -120,3 +126,53 @@ def test_ordinary_names_are_still_accepted(tmp_path: Path) -> None:
     for name in ("notes.md", "sources/paper.pdf", "a.b.c/nul_notes.txt", "console.md"):
         assert workspace.is_within(name) is True
         assert workspace.resolve_within(name)
+
+
+def test_a_repository_above_the_workspace_is_found(tmp_path: Path) -> None:
+    """A `.git` in an ancestor is a fact, and facts are what this check reports."""
+    (tmp_path / ".git").mkdir()
+    nested = tmp_path / "docs" / "thesis"
+    nested.mkdir(parents=True)
+    assert repository_above(nested) == tmp_path
+    assert repository_above(tmp_path.parent) is None
+
+
+def test_a_workspace_inside_a_repository_is_refused(tmp_path: Path) -> None:
+    """Private material one `git add -A` from being published is not a warning's job."""
+    (tmp_path / ".git").mkdir()
+    workspace_root = tmp_path / "thesis"
+    workspace_root.mkdir()
+    with pytest.raises(WorkspaceExposed) as excinfo:
+        workspace_from_config(Config(workspace_root=workspace_root))
+    message = str(excinfo.value)
+    assert "git add -A" in message
+    assert "workspace_in_repository" in message
+
+
+def test_the_refusal_is_lifted_by_an_explicit_acknowledgement(tmp_path: Path) -> None:
+    """Sometimes it is genuinely safe, and the person who can confirm that says so."""
+    (tmp_path / ".git").mkdir()
+    workspace_root = tmp_path / "thesis"
+    workspace_root.mkdir()
+    config = Config(workspace_root=workspace_root, workspace_in_repository=True)
+    assert workspace_from_config(config).root == workspace_root.resolve()
+
+
+def test_a_workspace_outside_any_repository_is_built(tmp_path: Path) -> None:
+    """The ordinary case stays ordinary."""
+    assert workspace_from_config(Config(workspace_root=tmp_path)).root == tmp_path.resolve()
+
+
+def test_a_synchronising_folder_is_reported_as_a_suspicion(tmp_path: Path) -> None:
+    """A guess from a folder name, and it says so rather than sounding certain."""
+    suspect = tmp_path / "OneDrive" / "thesis"
+    suspect.mkdir(parents=True)
+    warning = sync_folder_suspicion(suspect)
+    assert warning is not None
+    assert "guess" in warning
+    assert "copied to somebody else" in warning
+
+
+def test_an_ordinary_folder_raises_no_suspicion(tmp_path: Path) -> None:
+    """The heuristic must stay quiet where there is nothing to say."""
+    assert sync_folder_suspicion(tmp_path / "projects" / "thesis") is None
