@@ -13,6 +13,7 @@ function rather than performed here, so the core never contains interface code.
 
 from __future__ import annotations
 
+import difflib
 from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
@@ -37,7 +38,20 @@ Outcome = Literal["completed", "refused", "declined"]
 ConfirmationFn = Callable[[ExecutionPreview], bool]
 """Given a preview, decide whether to proceed. Supplied by the caller."""
 
-CONTENT_PLACEHOLDER = "<<file_content>>"
+ApprovalFn = Callable[[str], bool]
+"""Given a diff, decide whether the result is worth keeping on disk (ADR-025)."""
+
+
+def content_slot(index: int) -> str:
+    """The marker a skill leaves for the document at ``index``.
+
+    One per document, so several can be fenced separately and the model can tell them
+    apart. The plan holds the holes; the cycle fills them with what it read.
+    """
+    return f"<<file_content:{index}>>"
+
+
+CONTENT_PLACEHOLDER = content_slot(0)
 """Marker a prompt template leaves for the cycle to replace with file contents.
 
 A skill's plan is pure, so it can only leave the hole; filling it is a side
@@ -232,7 +246,7 @@ def _read_file(path: Path, max_bytes: int) -> str:
 
 def _fill_template(
     template: str, action: IntendedAction, workspace: Workspace, max_bytes: int
-) -> tuple[str, tuple[Path, ...]]:
+) -> tuple[str, tuple[Path, ...], str]:
     """Return the prompt with the action's file contents in place, and what was read.
 
     Reads only when the action declared `read_files`: the preview has already checked
@@ -241,10 +255,29 @@ def _fill_template(
     (ADR-014). An action that declared no read gets its template back untouched.
     """
     if "read_files" not in action.required or not action.targets:
-        return template, ()
+        return template, (), ""
     paths = tuple(workspace.resolve_within(target) for target in action.targets)
-    contents = "\n\n".join(_read_file(path, max_bytes) for path in paths)
-    return template.replace(CONTENT_PLACEHOLDER, contents), paths
+    pieces = [_read_file(path, max_bytes) for path in paths]
+    filled = template
+    for index, piece in enumerate(pieces):
+        filled = filled.replace(content_slot(index), piece)
+    return filled, paths, chr(10).join(pieces)
+
+
+def diff_between(before: str, after: str, after_name: str) -> str:
+    """Return a unified diff of ``before`` and ``after``.
+
+    Pure computation on two strings. No version control system is involved and none is
+    needed: a diff is a comparison, not a history (ADR-025).
+    """
+    lines = difflib.unified_diff(
+        before.splitlines(),
+        after.splitlines(),
+        fromfile="before",
+        tofile=after_name,
+        lineterm="",
+    )
+    return chr(10).join(lines)
 
 
 def _write_new_file(path: Path, text: str) -> None:
@@ -281,6 +314,8 @@ def run_action(
     audit: AuditLog,
     run_id: str,
     confirm: ConfirmationFn,
+    destination: Path | None = None,
+    approve: ApprovalFn | None = None,
 ) -> RunResult:
     """Run ``action`` through the whole system, in order, and ask a provider.
 
@@ -293,7 +328,7 @@ def run_action(
         return stopped
 
     try:
-        prompt, files_read = _fill_template(
+        prompt, files_read, contents = _fill_template(
             prompt_template, action, workspace, config.max_input_bytes
         )
     except ReadError as error:
@@ -370,7 +405,63 @@ def run_action(
     _record_what_the_engine_reported(completion, estimate, action, config, audit, run_id)
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})
 
+    if destination is not None:
+        _offer_the_answer(
+            completion.text, contents, destination, action, workspace, audit, run_id, approve
+        )
+
     return RunResult(preview=preview, outcome="completed", completion=completion)
+
+
+def _offer_the_answer(
+    answer: str,
+    before: str,
+    destination: Path,
+    action: IntendedAction,
+    workspace: Workspace,
+    audit: AuditLog,
+    run_id: str,
+    approve: ApprovalFn | None,
+) -> None:
+    """Show what the answer would change, and write it beside the original if approved.
+
+    Never over it (ADR-025). Replacing the original would make the judgement irreversible
+    at the moment it is made; writing beside it makes the same judgement reversible by
+    doing nothing.
+    """
+    if "write_files" not in action.required:
+        audit.record(
+            run_id,
+            "permission_denied",
+            f"Refused to write for {action.name}",
+            {"action": action.name, "missing": ["write_files"]},
+        )
+        raise PermissionDenied(
+            f"{action.name} would write {destination} without declaring write_files."
+        )
+
+    resolved = workspace.resolve_within(destination)
+    if approve is not None and not approve(diff_between(before, answer, resolved.name)):
+        audit.record(
+            run_id,
+            "revision_declined",
+            f"Declined the revision for {action.name}",
+            {"action": action.name, "destination": str(resolved)},
+        )
+        return
+
+    _write_new_file(resolved, answer)
+    audit.record(
+        run_id,
+        "revision_written",
+        f"Wrote the revision for {action.name}",
+        {
+            "action": action.name,
+            "destination": str(resolved),
+            "destination_sha256": digest_of_file(resolved),
+            "characters": len(answer),
+        },
+    )
 
 
 def _record_what_the_engine_reported(

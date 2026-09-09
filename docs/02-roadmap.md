@@ -97,6 +97,34 @@ carries no dates.
   noticed and named, distinguished from an estimate that merely ran low. Closes the
   verification ADR-019 deferred, by watching for the symptom rather than asking the
   engine what it granted.
+- **v0.24.0 - Writing, and several documents.** `revise_file` proposes a clearer
+  version beside the original, approved against a diff; every skill can be given
+  several documents. Nothing LACC writes replaces a file that already existed, and an
+  action now separates what it reads from what it writes.
+
+## A course correction, recorded
+
+Between v0.18.0 and v0.23.0 six consecutive releases went to making the system honest
+about itself - ceilings, measurement, exposure, traceability. Each was justified and
+several came from real findings. None of them advanced the north.
+
+The mechanism is worth naming, because every step in it is defensible: each release
+surfaced the next gap in what the system could verify, and that gap justified the next
+release. That loop has no natural end, since there is always something more to check.
+By v0.23.0 the test suite was larger than the code and twenty-four decision records
+described a system that could summarize a file, critique a file, and convert a
+document - two of the six steps this chapter lays out, with the second finished nine
+releases earlier.
+
+Not all of it was a detour. The context ceiling and truncation detection are
+prerequisites for chunking: a document cannot be split honestly without knowing what
+fits. The exposure controls guard real private material. But the discretionary share
+was large enough to notice.
+
+So: the next releases are capability, on the path above. When a verification gap turns
+up mid-phase it is written down rather than promoted to the next release - unless it is
+a security defect, where PRINCIPLES already says the stricter reading wins. Growing in
+a straight line beats a sequence of small correct turns that arrives nowhere.
 
 ## The route to v1.0
 

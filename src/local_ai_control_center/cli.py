@@ -16,6 +16,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from local_ai_control_center.audit import AuditLog, verify_chain
 from local_ai_control_center.config import Config, load_config
@@ -40,7 +41,9 @@ from local_ai_control_center.provider import (
 from local_ai_control_center.run import new_run_id
 from local_ai_control_center.skill import (
     CritiqueFileSkill,
+    ReviseFileSkill,
     Skill,
+    SkillPlan,
     SummarizeFileSkill,
     grant_for,
     run_skill,
@@ -57,6 +60,7 @@ DEFAULT_CONFIG_PATH = Path("config.yaml")
 _SKILLS: dict[str, Skill] = {
     "summarize_file": SummarizeFileSkill(),
     "critique_file": CritiqueFileSkill(),
+    "revise_file": ReviseFileSkill(),
 }
 
 app = typer.Typer(
@@ -82,6 +86,38 @@ def _resolve_skill(name: str) -> Skill:
         console.print(f"Available skills: {available}")
         raise typer.Exit(code=1)
     return skill
+
+
+def _plan_or_exit(skill: Skill, requests: tuple[str, ...], config: Config) -> SkillPlan:
+    """Plan the skill, or exit clearly when it cannot take what it was given."""
+    try:
+        return skill.plan(requests, config)
+    except ValueError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+
+def _approve(difference: str) -> bool:
+    """Show what would change and ask whether to keep it. Defaults to no.
+
+    The second question of a revision, and the one that matters: a preview says what LACC
+    intends, a diff says what it produced (ADR-025).
+    """
+    if not difference:
+        console.print("[yellow]The revision is identical to the original.[/yellow]")
+        return False
+    rendered = Text()
+    for line in difference.splitlines():
+        if line.startswith("+") and not line.startswith("+++"):
+            rendered.append(line + chr(10), style="green")
+        elif line.startswith("-") and not line.startswith("---"):
+            rendered.append(line + chr(10), style="red")
+        elif line.startswith("@@"):
+            rendered.append(line + chr(10), style="cyan")
+        else:
+            rendered.append(line + chr(10), style="dim")
+    console.print(Panel(rendered, title="What the revision would change", expand=False))
+    return typer.confirm("Keep this revision?", default=False)
 
 
 def _load(config_path: Path) -> tuple[Config, Workspace]:
@@ -118,7 +154,10 @@ def _confirm(preview: ExecutionPreview) -> bool:
 @app.command()
 def run(
     skill: Annotated[str, typer.Argument(help="Name of the skill to run.")],
-    request: Annotated[str, typer.Argument(help="The skill's input (e.g. a file path).")],
+    requests: Annotated[
+        list[str],
+        typer.Argument(help="One or more paths inside the workspace."),
+    ],
     config_path: Annotated[
         Path,
         typer.Option("--config", "-c", help="Path to the configuration file."),
@@ -139,7 +178,7 @@ def run(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
 
-    plan = resolved.plan(request, config)
+    plan = _plan_or_exit(resolved, tuple(requests), config)
     preview = preview_action(plan.action, grant_for(resolved, config), config, workspace)
     if not _confirm(preview):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
@@ -152,9 +191,9 @@ def run(
                 status.update(
                     "Generating... (the first run loads the model into memory and may take longer)"
                 )
-                result = _do_run(resolved, request, config, workspace, provider, audit)
+                result = _do_run(resolved, tuple(requests), config, workspace, provider, audit)
         else:
-            result = _do_run(resolved, request, config, workspace, provider, audit)
+            result = _do_run(resolved, tuple(requests), config, workspace, provider, audit)
     except (ProviderError, ReadError, PromptTooLargeError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
@@ -225,7 +264,7 @@ def _build_provider(choice: ProviderChoice, config: Config) -> Provider:
 
 def _do_run(
     resolved: Skill,
-    request: str,
+    requests: tuple[str, ...],
     config: Config,
     workspace: Workspace,
     provider: Provider,
@@ -234,7 +273,7 @@ def _do_run(
     """Run the skill through the cycle with confirmation already handled."""
     return run_skill(
         resolved,
-        request,
+        requests,
         grant_for(resolved, config),
         config,
         workspace,
@@ -242,13 +281,17 @@ def _do_run(
         audit,
         new_run_id(),
         lambda _preview: True,
+        _approve,
     )
 
 
 @app.command()
 def preview(
     skill: Annotated[str, typer.Argument(help="Name of the skill to preview.")],
-    request: Annotated[str, typer.Argument(help="The skill's input (e.g. a file path).")],
+    requests: Annotated[
+        list[str],
+        typer.Argument(help="One or more paths inside the workspace."),
+    ],
     config_path: Annotated[
         Path,
         typer.Option("--config", "-c", help="Path to the configuration file."),
@@ -257,7 +300,7 @@ def preview(
     """Show what a skill would do, without asking, executing, or recording."""
     resolved = _resolve_skill(skill)
     config, workspace = _load(config_path)
-    plan = resolved.plan(request, config)
+    plan = _plan_or_exit(resolved, tuple(requests), config)
     result = preview_action(plan.action, grant_for(resolved, config), config, workspace)
     _show_preview(result)
 
@@ -292,7 +335,8 @@ def ingest(
         name="ingest",
         summary=f"Extract the text of {source} into {target}",
         required=frozenset({"read_files", "write_files"}),
-        targets=(source, target),
+        targets=(source,),
+        writes=(target,),
     )
 
     try:

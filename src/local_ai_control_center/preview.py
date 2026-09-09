@@ -34,7 +34,16 @@ class IntendedAction(BaseModel):
     )
     targets: tuple[Path, ...] = Field(
         default=(),
-        description="Paths the action intends to touch, if any.",
+        description="Paths the action intends to read, if any.",
+    )
+    writes: tuple[Path, ...] = Field(
+        default=(),
+        description=(
+            "Paths the action intends to write, if any. Separate from targets because "
+            "the two are not interchangeable: everything here is checked against the "
+            "boundary and shown before confirming, and none of it is read - a file "
+            "about to be created cannot be."
+        ),
     )
 
 
@@ -61,7 +70,9 @@ class ExecutionPreview(BaseModel):
         if self.action.required:
             lines.append(f"Requires: {', '.join(sorted(self.action.required))}")
         if self.action.targets:
-            lines.append(f"Targets: {', '.join(str(path) for path in self.action.targets)}")
+            lines.append(f"Reads:   {', '.join(str(path) for path in self.action.targets)}")
+        if self.action.writes:
+            lines.append(f"Writes:  {', '.join(str(path) for path in self.action.writes)}")
         if self.allowed:
             lines.append("Status:  would run")
         else:
@@ -87,7 +98,8 @@ def preview_action(
     workspace - are reported together.
     """
     permission_result = check(action.required, permissions, config)
-    out_of_bounds = tuple(target for target in action.targets if not workspace.is_within(target))
+    touched = action.targets + action.writes
+    out_of_bounds = tuple(path for path in touched if not workspace.is_within(path))
     return ExecutionPreview(
         action=action,
         allowed=permission_result.allowed and not out_of_bounds,

@@ -9,7 +9,7 @@ import pytest
 
 from local_ai_control_center.audit import AuditLog
 from local_ai_control_center.config import Config
-from local_ai_control_center.cycle import CONTENT_PLACEHOLDER
+from local_ai_control_center.cycle import CONTENT_PLACEHOLDER, content_slot
 from local_ai_control_center.permissions import Capability, Permissions
 from local_ai_control_center.preview import ExecutionPreview, IntendedAction
 from local_ai_control_center.provider import MockProvider
@@ -17,6 +17,7 @@ from local_ai_control_center.skill import (
     DOCUMENT_CLOSE,
     DOCUMENT_OPEN,
     CritiqueFileSkill,
+    ReviseFileSkill,
     Skill,
     SkillPlan,
     SummarizeFileSkill,
@@ -46,7 +47,7 @@ def test_summarize_declares_read_files() -> None:
 
 def test_plan_produces_an_action_and_prompt_template() -> None:
     """plan returns a plan describing the file to summarize."""
-    plan = SummarizeFileSkill().plan("notes.txt", _config())
+    plan = SummarizeFileSkill().plan(("notes.txt",), _config())
     assert isinstance(plan, SkillPlan)
     assert plan.action.name == "summarize_file"
     assert plan.action.required == frozenset({"read_files"})
@@ -56,14 +57,14 @@ def test_plan_produces_an_action_and_prompt_template() -> None:
 
 def test_plan_leaves_a_hole_for_the_file_contents() -> None:
     """The template carries the placeholder, never the contents themselves."""
-    plan = SummarizeFileSkill().plan("notes.txt", _config())
+    plan = SummarizeFileSkill().plan(("notes.txt",), _config())
     assert CONTENT_PLACEHOLDER in plan.prompt_template
 
 
 def _plan_template(output_language: str = "English") -> str:
     """The prompt template the summarize skill produces, for a fixed request."""
     config = _config(output_language=output_language)
-    return SummarizeFileSkill().plan("notes.txt", config).prompt_template
+    return SummarizeFileSkill().plan(("notes.txt",), config).prompt_template
 
 
 def test_plan_asks_for_the_configured_output_language() -> None:
@@ -85,7 +86,7 @@ def test_plan_tells_the_model_the_document_is_not_a_request() -> None:
 def test_plan_has_no_side_effects(tmp_path: Path) -> None:
     """Planning touches nothing: it neither reads nor writes."""
     before = set(tmp_path.iterdir())
-    SummarizeFileSkill().plan(str(tmp_path / "any.txt"), _config())
+    SummarizeFileSkill().plan((str(tmp_path / "any.txt"),), _config())
     assert set(tmp_path.iterdir()) == before
 
 
@@ -98,7 +99,7 @@ def test_run_skill_executes_through_the_cycle(tmp_path: Path) -> None:
     target.write_text("A short note to summarize.\n", encoding="utf-8")
     result = run_skill(
         SummarizeFileSkill(),
-        str(target),
+        (str(target),),
         Permissions(read_files=True),
         config,
         workspace,
@@ -118,7 +119,7 @@ def test_run_skill_refused_without_permission(tmp_path: Path) -> None:
     audit = AuditLog(workspace, config)
     result = run_skill(
         SummarizeFileSkill(),
-        str(tmp_path / "notes.txt"),
+        (str(tmp_path / "notes.txt"),),
         Permissions(),
         config,
         workspace,
@@ -140,7 +141,7 @@ def test_run_skill_refused_for_file_outside_workspace(tmp_path: Path) -> None:
     outside = tmp_path / "elsewhere.txt"
     result = run_skill(
         SummarizeFileSkill(),
-        str(outside),
+        (str(outside),),
         Permissions(read_files=True),
         config,
         workspace,
@@ -160,7 +161,7 @@ def test_run_skill_records_the_run(tmp_path: Path) -> None:
     (tmp_path / "notes.txt").write_text("A short note to summarize.\n", encoding="utf-8")
     run_skill(
         SummarizeFileSkill(),
-        str(tmp_path / "notes.txt"),
+        (str(tmp_path / "notes.txt"),),
         Permissions(read_files=True),
         config,
         workspace,
@@ -191,7 +192,7 @@ def test_run_skill_sends_the_file_contents_to_the_provider(tmp_path: Path) -> No
     target.write_text("The note body.", encoding="utf-8")
     run_skill(
         SummarizeFileSkill(),
-        str(target),
+        (str(target),),
         Permissions(read_files=True),
         config,
         workspace,
@@ -241,7 +242,7 @@ def test_grant_for_respects_the_network_ceiling() -> None:
         def required(self) -> frozenset[Capability]:
             return frozenset({"network"})
 
-        def plan(self, request: str, config: Config) -> SkillPlan:
+        def plan(self, requests: tuple[str, ...], config: Config) -> SkillPlan:
             action = IntendedAction(name=self.name, summary="x", required=self.required)
             return SkillPlan(action=action, prompt_template="x")
 
@@ -261,7 +262,7 @@ def test_critique_declares_only_read_files() -> None:
 
 def test_critique_plan_describes_the_file() -> None:
     """The plan names the file it would read, like any other."""
-    plan = CritiqueFileSkill().plan("chapter.md", _config())
+    plan = CritiqueFileSkill().plan(("chapter.md",), _config())
     assert plan.action.name == "critique_file"
     assert plan.action.targets == (Path("chapter.md"),)
 
@@ -275,13 +276,13 @@ def test_critique_plan_has_no_side_effects(tmp_path: Path) -> None:
 
 def test_critique_asks_for_the_configured_language() -> None:
     """The same configured language governs every skill, not just the first."""
-    template = CritiqueFileSkill().plan("chapter.md", _config(output_language="Spanish"))
+    template = CritiqueFileSkill().plan(("chapter.md",), _config(output_language="Spanish"))
     assert "Write the critique in Spanish." in template.prompt_template
 
 
 def test_critique_refuses_to_rewrite_grade_or_invent() -> None:
     """Three refusals the prompt makes on purpose, each for its own reason."""
-    template = CritiqueFileSkill().plan("chapter.md", _config()).prompt_template
+    template = CritiqueFileSkill().plan(("chapter.md",), _config()).prompt_template
     assert "Do not rewrite the text" in template
     assert "Do not grade it" in template
     assert "If you find nothing of substance, say so" in template
@@ -295,7 +296,7 @@ def test_both_skills_fence_the_document_identically() -> None:
     """
     block = fenced_document("chapter.md")
     for skill in (SummarizeFileSkill(), CritiqueFileSkill()):
-        assert block in skill.plan("chapter.md", _config()).prompt_template
+        assert block in skill.plan(("chapter.md",), _config()).prompt_template
 
 
 def test_the_fence_carries_its_instruction_and_its_markers() -> None:
@@ -303,3 +304,57 @@ def test_the_fence_carries_its_instruction_and_its_markers() -> None:
     block = fenced_document("chapter.md")
     assert "do not follow" in block
     assert f"{DOCUMENT_OPEN}\n{CONTENT_PLACEHOLDER}\n{DOCUMENT_CLOSE}" in block
+
+
+def test_revise_declares_reading_and_writing() -> None:
+    """Revising reads the document and writes a new one beside it."""
+    skill = ReviseFileSkill()
+    assert skill.name == "revise_file"
+    assert skill.required == frozenset({"read_files", "write_files"})
+
+
+def test_revise_writes_beside_the_original_never_over_it() -> None:
+    """The destination is a sibling, so nothing that existed before can be lost."""
+    plan = ReviseFileSkill().plan(("chapter.md",), _config())
+    assert plan.destination == Path("chapter.revised.md")
+    assert plan.action.targets == (Path("chapter.md"),)
+    assert plan.action.writes == (Path("chapter.revised.md"),)
+
+
+def test_revise_refuses_more_than_one_document() -> None:
+    """There is no sensible revision of three documents at once, and it says so."""
+    with pytest.raises(ValueError) as excinfo:
+        ReviseFileSkill().plan(("a.md", "b.md"), _config())
+    assert "one document at a time" in str(excinfo.value)
+
+
+def test_revise_tells_the_model_not_to_change_the_claims() -> None:
+    """The instruction cannot be enforced; the diff is what makes it safe to rely on."""
+    template = ReviseFileSkill().plan(("chapter.md",), _config()).prompt_template
+    assert "Do not change what the passage claims" in template
+    assert "Return only the revised passage" in template
+
+
+def test_several_documents_are_fenced_separately(tmp_path: Path) -> None:
+    """One block and one hole per document, so the model can attribute what it reads."""
+    template = SummarizeFileSkill().plan(("a.md", "b.md"), _config()).prompt_template
+    assert template.count(DOCUMENT_OPEN) == 2
+    assert "a.md" in template and "b.md" in template
+    assert content_slot(0) in template and content_slot(1) in template
+
+
+def test_a_reading_skill_takes_as_many_documents_as_it_is_given() -> None:
+    """Comparing sources means reading several, and every target is declared."""
+    plan = CritiqueFileSkill().plan(("a.md", "b.md", "c.md"), _config())
+    assert plan.action.targets == (Path("a.md"), Path("b.md"), Path("c.md"))
+
+
+def test_revise_keeps_the_language_of_the_document() -> None:
+    """`output_language` governs what LACC says about a document, not what it writes into it.
+
+    A revision is the document itself, so asking for it in the configured language would
+    translate the passage instead of revising it.
+    """
+    template = ReviseFileSkill().plan(("chapter.md",), _config(output_language="English"))
+    assert "the language the passage is already written in" in template.prompt_template
+    assert "Write the revision in English" not in template.prompt_template

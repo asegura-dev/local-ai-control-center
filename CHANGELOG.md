@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-09-09
+
+### Added
+- `lacc run revise_file <path>` proposes a clearer version of a document and writes it
+  beside the original, never over it. The run asks twice: the preview authorises reading
+  and asking the model, and a second question shows the unified diff and decides whether
+  the result is kept. Declining writes nothing and prints the revision.
+- Every skill can be given several documents: `lacc run <skill> <path> [<path>...]`. Each
+  is fenced separately, with its own name and its own content placeholder, so the model can
+  attribute what it reads. `revise_file` requires exactly one and says so.
+
+### Changed
+- **Nothing LACC writes replaces a file that already exists.** Ingestion already refused to
+  overwrite; that is now the rule everywhere.
+- `IntendedAction` separates what an action reads from what it writes. `targets` meant both,
+  which was ambiguous rather than merely imprecise: the revision path is checked against the
+  boundary and shown in the preview, and must not be read - a file about to be created
+  cannot be. Ingestion carried the same ambiguity without it ever surfacing.
+- The preview shows `Reads:` and `Writes:` separately.
+- `Skill.plan` takes a tuple of paths, and `SkillPlan` carries an optional destination. Both
+  amend ADR-009 again, in the open.
+
+### Notes
+- **`revise_file` deliberately ignores `output_language`.** That setting governs what LACC
+  says *about* your documents; a revision is the document itself, so asking for it in the
+  configured language translated a Spanish passage into English instead of revising it.
+  Found by reading a diff during a real run - which is precisely what the diff is for.
+- A model told not to change what a passage claims may change it anyway. The diff is not a
+  courtesy shown before writing; it is the control that makes an unreliable rewrite usable.
+
+
 ## [0.23.0] - 2026-09-09
 
 ### Added
