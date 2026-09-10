@@ -1,7 +1,17 @@
 # Example LACC configuration.
 #
-# Copy this file, adjust it, and pass it to LACC. Every field below is optional
-# except `workspace_root`; an absent field takes the default shown here.
+# Copy this file to `configs/config.yaml`, adjust it, and LACC will find it. Every
+# field below is optional except `workspace_root`; an absent field takes the default
+# shown here.
+#
+# Secrets are NOT written here. The `*_env` fields name environment variables, and
+# the values go in `configs/.env` beside this file, which LACC reads automatically.
+# That way this file holds nothing private and can be shared; the `.env` cannot.
+#
+# The whole `configs/` folder is ignored by git. Keep as many as you need there -
+# `configs/desk.yaml` for an engine on another machine, say - and name the one you
+# want with `--config`. This file is the template and holds no real values, which is
+# why it is the only one that is committed.
 
 # Base directory LACC treats as its working area. Required.
 # Paths outside this directory are refused.

@@ -148,3 +148,84 @@ def test_action_is_frozen() -> None:
     action = IntendedAction(name="x", summary="y")
     with pytest.raises(ValidationError):
         action.name = "changed"  # type: ignore[misc]
+
+
+def _reading(tmp_path: Path) -> IntendedAction:
+    return IntendedAction(
+        name="summarize_file",
+        summary="Summarize notes.txt",
+        required=frozenset({"read_files"}),
+        targets=(tmp_path / "notes.txt",),
+    )
+
+
+def test_a_remote_engine_is_named_before_anyone_confirms(tmp_path: Path) -> None:
+    """The fact the confirmation screen used to omit: the document is leaving the machine.
+
+    Every guarantee around it still held - the host is named in a file the user wrote, and
+    the run is audited - but a control nobody can see is a control nobody exercises.
+    """
+    config, workspace = _setup(tmp_path, network_access=True, engine_host="http://desk:11434")
+    preview = preview_action(
+        _reading(tmp_path),
+        Permissions(read_files=True),
+        config,
+        workspace,
+        config.remote_engine,
+    )
+    assert preview.sends_to == "http://desk:11434"
+    assert "Sends:" in preview.render()
+    assert "http://desk:11434" in preview.render()
+
+
+def test_an_engine_on_this_machine_adds_no_line(tmp_path: Path) -> None:
+    """Absence carries meaning: no destination shown means nothing leaves the computer.
+
+    A line that appears on every run is a line nobody reads, which would defeat it.
+    """
+    config, workspace = _setup(tmp_path, engine_host="http://127.0.0.1:11434")
+    preview = preview_action(
+        _reading(tmp_path),
+        Permissions(read_files=True),
+        config,
+        workspace,
+        config.remote_engine,
+    )
+    assert preview.sends_to == ""
+    assert "Sends:" not in preview.render()
+
+
+def test_the_default_configuration_names_no_destination(tmp_path: Path) -> None:
+    """Nothing configured means nothing leaves, and the preview says so by silence."""
+    config, workspace = _setup(tmp_path)
+    preview = preview_action(
+        _reading(tmp_path),
+        Permissions(read_files=True),
+        config,
+        workspace,
+        config.remote_engine,
+    )
+    assert "Sends:" not in preview.render()
+
+
+def test_a_caller_that_sends_nothing_shows_nothing_however_the_engine_is_configured(
+    tmp_path: Path,
+) -> None:
+    """Converting a document never contacts an engine, so it must not claim to.
+
+    This is why the destination is passed in rather than inferred from the action:
+    a guess from its capabilities would be wrong exactly here (ADR-028).
+    """
+    config, workspace = _setup(tmp_path, network_access=True, engine_host="http://desk:11434")
+    converting = IntendedAction(
+        name="ingest_document",
+        summary="Convert paper.pdf",
+        required=frozenset({"read_files", "write_files"}),
+        targets=(tmp_path / "paper.pdf",),
+        writes=(tmp_path / "paper.md",),
+    )
+    preview = preview_action(
+        converting, Permissions(read_files=True, write_files=True), config, workspace
+    )
+    assert preview.sends_to == ""
+    assert "Sends:" not in preview.render()

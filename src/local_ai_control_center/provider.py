@@ -9,7 +9,6 @@ engine installed.
 from __future__ import annotations
 
 import hashlib
-import ipaddress
 import json
 import os
 import urllib.error
@@ -20,6 +19,8 @@ from collections.abc import Mapping
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
+
+from local_ai_control_center.config import is_loopback, normalized_host
 
 
 class Completion(BaseModel):
@@ -58,8 +59,13 @@ class Provider(ABC):
         """Short identifier recorded on completions this provider produces."""
 
     @abstractmethod
-    def complete(self, prompt: str) -> Completion:
-        """Return a completion for ``prompt``."""
+    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
+        """Return a completion for ``prompt``.
+
+        ``temperature`` is per request because it is a property of the task, not of the
+        engine: a skill copying words out of a document needs a different setting from one
+        rewriting prose, and the skill is what knows which it is (ADR-033).
+        """
 
 
 class MockProvider(Provider):
@@ -79,8 +85,12 @@ class MockProvider(Provider):
         """Identify completions produced by this provider."""
         return "mock"
 
-    def complete(self, prompt: str) -> Completion:
-        """Return the scripted answer for ``prompt``, or a derived one."""
+    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
+        """Return the scripted answer for ``prompt``, or a derived one.
+
+        ``temperature`` is accepted and ignored: this provider is already deterministic,
+        which is precisely why the suite never noticed the engine was not.
+        """
         scripted = self._responses.get(prompt)
         text = scripted if scripted is not None else self._derive(prompt)
         return Completion(text=text, provider=self.name)
@@ -118,16 +128,6 @@ _NOT_LOOPBACK = (
 )
 
 
-def _is_loopback(hostname: str) -> bool:
-    """Whether ``hostname`` names this machine, by literal address or by `localhost`."""
-    if hostname.lower() == "localhost":
-        return True
-    try:
-        return ipaddress.ip_address(hostname).is_loopback
-    except ValueError:
-        return False
-
-
 _NOT_NAMED = (
     "The engine host {host} is not this machine, and network_access is off. A host that "
     "is not loopback is reached only when the configuration both permits network access "
@@ -135,11 +135,6 @@ _NOT_NAMED = (
     "network_access: true and engine_host in your configuration if this is a machine you "
     "own on a network you control (ADR-027)."
 )
-
-
-def _normalized_host(host: str) -> str:
-    """Return ``host`` with a scheme, so it can be parsed the same way every time."""
-    return host if host.startswith("http") else f"http://{host}"
 
 
 def resolve_engine_host(configured: str, network_access: bool) -> str:
@@ -157,9 +152,9 @@ def resolve_engine_host(configured: str, network_access: bool) -> str:
     """
     named = configured.strip()
     if named:
-        host = _normalized_host(named)
+        host = normalized_host(named)
         hostname = urllib.parse.urlparse(host).hostname
-        if hostname is not None and _is_loopback(hostname):
+        if hostname is not None and is_loopback(hostname):
             return host
         if not network_access:
             raise ProviderError(_NOT_NAMED.format(host=host))
@@ -167,9 +162,9 @@ def resolve_engine_host(configured: str, network_access: bool) -> str:
 
     from_env = os.environ.get("OLLAMA_HOST", "").strip()
     if from_env:
-        host = _normalized_host(from_env)
+        host = normalized_host(from_env)
         hostname = urllib.parse.urlparse(host).hostname
-        if hostname is None or not _is_loopback(hostname):
+        if hostname is None or not is_loopback(hostname):
             raise ProviderError(_NOT_LOOPBACK.format(host=host))
         return host
 
@@ -192,7 +187,7 @@ def ollama_host() -> str:
     if not host.startswith("http"):
         host = f"http://{host}"
     hostname = urllib.parse.urlparse(host).hostname
-    if hostname is None or not _is_loopback(hostname):
+    if hostname is None or not is_loopback(hostname):
         raise ProviderError(_NOT_LOOPBACK.format(host=host))
     return host
 
@@ -241,15 +236,21 @@ class OllamaProvider(Provider):
         """Identify completions produced by this provider."""
         return f"ollama:{self._model}"
 
-    def complete(self, prompt: str) -> Completion:
+    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
         """Send the prompt to Ollama and return the complete response.
 
         Translates connection, model, and timeout failures into clear messages.
+
+        The temperature is always sent. Leaving it out let the engine apply its own default
+        - 0.8, measured - which samples rather than taking the most likely token, and made
+        the audit's completion hashes impossible to reproduce (ADR-033).
         """
         url = f"{self._host}/api/generate"
         payload: dict[str, Any] = {"model": self._model, "prompt": prompt, "stream": False}
+        options: dict[str, Any] = {"temperature": temperature}
         if self._context_tokens is not None:
-            payload["options"] = {"num_ctx": self._context_tokens}
+            options["num_ctx"] = self._context_tokens
+        payload["options"] = options
         body = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(
             url, data=body, headers={"Content-Type": "application/json"}

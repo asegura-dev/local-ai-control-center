@@ -190,6 +190,7 @@ def _authorize(
     audit: AuditLog,
     run_id: str,
     confirm: ConfirmationFn,
+    sends_to: str = "",
 ) -> tuple[ExecutionPreview, RunResult | None]:
     """Run the opening that every kind of run shares, and record what it decides.
 
@@ -203,7 +204,7 @@ def _authorize(
     """
     audit.record(run_id, "run_started", f"Starting {action.name}", {"action": action.name})
 
-    preview = preview_action(action, permissions, config, workspace)
+    preview = preview_action(action, permissions, config, workspace, sends_to)
 
     if not preview.allowed:
         audit.record(
@@ -323,6 +324,7 @@ def run_action(
     destination: Path | None = None,
     approve: ApprovalFn | None = None,
     verify_quotes: bool = False,
+    temperature: float = 0.0,
 ) -> RunResult:
     """Run ``action`` through the whole system, in order, and ask a provider.
 
@@ -330,7 +332,9 @@ def run_action(
     into ``prompt_template``, calls the provider with the filled prompt, and records the
     result. A file that cannot be read is recorded and raised as :class:`ReadError`.
     """
-    preview, stopped = _authorize(action, permissions, config, workspace, audit, run_id, confirm)
+    preview, stopped = _authorize(
+        action, permissions, config, workspace, audit, run_id, confirm, config.remote_engine
+    )
     if stopped is not None:
         return stopped
 
@@ -390,7 +394,7 @@ def run_action(
             )
             raise PromptTooLargeError(message)
 
-    completion = provider.complete(prompt)
+    completion = provider.complete(prompt, temperature)
 
     audit.record(
         run_id,
@@ -400,6 +404,7 @@ def run_action(
             "action": action.name,
             "provider": completion.provider,
             "estimated_tokens": estimate,
+            "temperature": temperature,
             "prompt_sha256": digest_of(prompt),
             "completion_sha256": digest_of(completion.text),
             "measured_prompt_tokens": completion.prompt_tokens,
@@ -416,6 +421,10 @@ def run_action(
     if verify_quotes:
         checked = check_answer(completion.text, contents)
         held = sum(1 for claim in checked if claim.holds)
+        # How often the model misplaced a passage it quoted correctly. It is not shown to
+        # the reader, who wants the right page rather than a note about someone else's
+        # error - but it measures a model's fidelity, and that belongs here (ADR-031).
+        misplaced = sum(1 for claim in checked if claim.page_disagreed)
         audit.record(
             run_id,
             "quotations_checked",
@@ -425,6 +434,7 @@ def run_action(
                 "quotations": len(checked),
                 "verified": held,
                 "unverified": len(checked) - held,
+                "pages_the_model_got_wrong": misplaced,
             },
         )
 

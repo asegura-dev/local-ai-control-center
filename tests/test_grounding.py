@@ -72,11 +72,36 @@ def test_an_invented_quotation_is_reported_as_not_found() -> None:
     assert checked.holds is False
 
 
-def test_a_real_quotation_on_the_wrong_page_says_where_it_actually_is() -> None:
-    """Attributing a real sentence to the wrong page is its own kind of wrong."""
+def test_the_page_reported_is_the_one_found_not_the_one_claimed() -> None:
+    """A model that misplaces a passage it quoted correctly no longer produces a bad page.
+
+    On a real paper this failed often and independently of everything else: page 4 for a
+    sentence on page 1. LACC locates the quotation anyway while verifying it, so it stops
+    asking a model something it can answer itself (ADR-031).
+    """
     checked = check_claim(Claim(claim="c", quote="Mortality fell by twelve", page=1), _SOURCE)
-    assert checked.verdict == "wrong_page"
+    assert checked.verdict == "verified"
     assert checked.found_on_page == 2
+
+
+def test_the_model_being_wrong_about_the_page_is_still_recorded() -> None:
+    """Out of the answer, into the audit: it measures fidelity, so it is not thrown away."""
+    checked = check_claim(Claim(claim="c", quote="Mortality fell by twelve", page=1), _SOURCE)
+    assert checked.page_disagreed is True
+
+
+def test_a_model_that_placed_the_page_correctly_does_not_register_disagreement() -> None:
+    """The ordinary case, so the signal counts what it says it counts."""
+    checked = check_claim(Claim(claim="c", quote="Mortality fell by twelve", page=2), _SOURCE)
+    assert checked.page_disagreed is False
+
+
+def test_a_claim_with_no_page_disagrees_with_nothing() -> None:
+    """Silence is not a wrong answer, and must not be counted as one."""
+    checked = check_claim(Claim(claim="c", quote="Mortality fell by twelve"), _SOURCE)
+    assert checked.verdict == "verified"
+    assert checked.found_on_page == 2
+    assert checked.page_disagreed is False
 
 
 def test_layout_differences_do_not_hide_a_real_quotation() -> None:
@@ -94,11 +119,16 @@ def test_a_near_miss_is_not_accepted() -> None:
     assert check_claim(near, _SOURCE).verdict == "not_found"
 
 
-def test_a_source_without_page_markers_cannot_have_its_pages_checked() -> None:
-    """Unable to check is not the same as wrong, and is not reported as wrong."""
+def test_a_source_without_page_markers_yields_a_quotation_with_no_page() -> None:
+    """Unable to say is not the same as wrong, and is not reported as wrong.
+
+    Anything LACC did not ingest has no markers, so the quotation still verifies as text
+    and the page is simply unavailable.
+    """
     plain = "The study analysed 240 cases across three hospitals."
     checked = check_claim(Claim(claim="c", quote="three hospitals", page=1), plain)
     assert checked.verdict == "page_unknown"
+    assert checked.found_on_page is None
 
 
 def test_pages_are_split_on_the_markers_ingestion_writes() -> None:

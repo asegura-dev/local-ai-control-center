@@ -1,9 +1,11 @@
-# Guide - Running the model on another machine of your own
+# Guide - Choosing hardware for local models
 
-LACC can send its prompts to an Ollama running somewhere else, provided you own that
-somewhere and your configuration names it. This guide covers what that buys you, what it
-does not, and the one part that is genuinely dangerous if done carelessly.
+What actually makes a machine good at running a language model, which is not what the
+spec sheet leads with. Read this before buying anything; the answer surprises most
+people and the mistake is expensive.
 
+To set up a machine you already have, go to
+[setting up the server machine](setting-up-the-server-machine.md).
 ## Be clear about what this buys
 
 The obvious reason is speed. That is usually not the reason, and being wrong about it
@@ -152,115 +154,20 @@ The rest of the machine barely matters. The processor loads the model and feeds 
 a mid-range six-core part is not the bottleneck. Do not spend on the CPU what could have
 been VRAM.
 
-If you build one, everything else in this guide applies unchanged: Ubuntu Server,
-Tailscale, Ollama bound to the tailnet address, and the same two lines in `config.yaml`.
+Once you have the machine, [setting up the server machine](setting-up-the-server-machine.md)
+takes it from bare install to answering LACC.
 
-## Ollama has no authentication. None.
+## Measuring whether it was worth it
 
-Before anything else, know this: Ollama's API has no accounts, no tokens and no
-authorisation of any kind. **Anyone who can open a connection to its port can use it**, and
-the prompts LACC sends it contain the text of your sources.
+Do not take this guide's word for any of it, or a benchmark's. LACC can measure the thing
+that actually matters to you.
 
-The advice found everywhere is to set `OLLAMA_HOST=0.0.0.0`, which binds it to *every*
-interface the machine has - your home network, your campus network, whatever Wi-Fi it joins
-next. Bind it to the Tailscale address instead, and then verify that it did, because the
-verification is the step people skip.
-
-The exact commands for both Linux and Windows are in
-[setting up the server machine](setting-up-the-server-machine.md#step-2---ollama-bound-to-the-tailnet-and-nowhere-else).
-
-## Setting up the machine
-
-[Setting up the server machine](setting-up-the-server-machine.md) is the step-by-step:
-Tailscale on every device, Ollama bound to the tailnet, ntfy for notifications, and the
-checks that tell you which piece is broken when something does not work. It covers Linux
-and Windows.
-
-The rest of this guide is the reasoning behind those steps and the sizing that decides
-which model to pull.
-
-
-## Choosing a model for 16 GB with no GPU
-
-Sizes below are the approximate weights; add the context window on top, which
-`lacc profile` prints for the models you have installed. These are the figures
-`lacc profile` estimates, not measurements taken on the mini PC.
-
-| Model | Weights at Q4 | With a 32k window | Verdict on a dedicated 16 GB box |
-|---|---|---|---|
-| `qwen2.5:3b` | ~1.8 GB | ~3.5 GB | Runs anywhere. The baseline to beat. |
-| `qwen2.5:7b` | ~4.5 GB | ~7 GB | Comfortable. Start here. |
-| `qwen2.5:14b` | ~9 GB | ~12-13 GB | Feasible headless with nothing else running. Tight. |
-
-Qwen2.5 instruct models are a reasonable default for this work because `extract_claims`
-asks for a rigid line format and rewards instruction-following over creativity.
-
-**Do not take that table's word for it, or mine.** LACC can measure the thing that
-actually matters.
-
-## Measuring whether the bigger model was worth it
-
-`extract_claims` checks every quotation against the source and reports how many held.
-That is a number, so the question stops being a matter of taste:
-
-1. Ingest one paper you know well.
-2. Run `extract_claims` against it with `model: qwen2.5:3b`.
-3. Change `model:` to the larger one and run it again.
-4. Compare how many quotations came back **verified** rather than **not found**.
+`extract_claims` checks every quotation against the source and reports how many held. So
+run one of your own papers through it with a small model, then with the larger one the new
+hardware allows, and compare how many quotations came back **verified** rather than **not
+found**. Time both runs while you are there.
 
 A model that fabricates fewer quotations is better at this job for a reason you can point
-at. Time each run too - if the 14B model verifies twice as many claims and takes six times
-as long, that is a trade you can now make deliberately.
-
-## Pointing LACC at it
-
-Two separate statements in `config.yaml`, and both are required:
-
-```yaml
-network_access: true                       # the ceiling, off by default
-engine_host: http://100.101.102.103:11434  # the destination, named
-model: qwen2.5:14b                         # must exist on THAT machine
-context_tokens: 32768
-```
-
-`network_access: true` on its own reaches nothing. `engine_host` without it is refused.
-LACC contacts a host when the configuration both permits network access **and** writes the
-host down, so the only way to widen what it talks to is to edit a file yourself.
-
-Two consequences worth knowing:
-
-- **`OLLAMA_HOST` in your environment can never point off this machine.** LACC refuses a
-  non-loopback value there, whatever `network_access` says. An environment variable is
-  something an installer or a shell profile can set; a configuration file is something you
-  wrote.
-- **The configuration wins over `OLLAMA_HOST`.** If it did not, an ambient
-  `OLLAMA_HOST=localhost` would quietly send the work back to your laptop, and the answer
-  would come from a 3B model with nothing saying so.
-
-Then run something small and confirm it went where you think:
-
-```bash
-uv run lacc run summarize_file paper.md
-```
-
-The clearest confirmation is on the other machine: `journalctl -u ollama -f` shows the
-request arriving.
-
-## What this does not protect you from
-
-Worth saying plainly, because "local" can be heard as a stronger promise than it is.
-
-- **Documents leave this machine.** They go to whatever engine `engine_host` names. That
-  is the point of the feature, and it is exactly why the host must be written down rather
-  than discovered. Name a machine you own.
-- **Tailscale is a network, not an audit.** It controls who can reach the engine. It has
-  nothing to say about what the engine does with what it receives.
-- **Ollama still has no authentication inside the tailnet.** Any device you add to your
-  tailnet can use the engine. If you share your tailnet with anyone, use Tailscale ACLs to
-  restrict which devices can reach that port.
-
-## Next
-
-- [Notifications when a run finishes](notifications-with-self-hosted-ntfy.md) - which
-  becomes worth setting up the moment runs take long enough to walk away from, and that
-  is most of them once the model is larger.
+at, measured on your sources rather than somebody else's benchmark. If the bigger model
+verifies twice as many claims and takes six times as long, that is a trade you can now make
+deliberately instead of by feel.

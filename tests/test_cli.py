@@ -361,3 +361,223 @@ def test_an_undelivered_notification_does_not_fail_the_run(
     assert result.exit_code == 0
     assert "Result" in result.stdout
     assert "notification_failed" in _kinds(tmp_path)
+
+
+def _remote_config(tmp_path: Path) -> Path:
+    """A configuration whose engine is on another machine."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "notes.txt").write_text("A short note to summarize.\n", encoding="utf-8")
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        f"workspace_root: {workspace}\nnetwork_access: true\nengine_host: http://desk:11434\n",
+        encoding="utf-8",
+    )
+    return config
+
+
+def test_the_confirmation_prompt_says_the_document_is_leaving(tmp_path: Path) -> None:
+    """Shown before the answer, not after: it is what the person is deciding about."""
+    config = _remote_config(tmp_path)
+    result = runner.invoke(
+        app,
+        ["run", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
+        input="\n",
+    )
+    assert "Sends:" in result.stdout
+    assert "desk:11434" in result.stdout
+
+
+def test_preview_shows_the_destination_without_running_anything(tmp_path: Path) -> None:
+    """So a configuration you did not write can be checked before it is used."""
+    config = _remote_config(tmp_path)
+    result = runner.invoke(app, ["preview", "summarize_file", "notes.txt", "-c", str(config)])
+    assert result.exit_code == 0
+    assert "desk:11434" in result.stdout
+
+
+def test_ingesting_never_claims_to_send_anything(
+    tmp_path: Path, make_pdf: Callable[[Path], None]
+) -> None:
+    """Converting a document contacts no engine, however the engine is configured.
+
+    The case that would have been wrong had the preview inferred its destination from the
+    action rather than being told (ADR-028).
+    """
+    config = _remote_config(tmp_path)
+    make_pdf(tmp_path / "ws" / "paper.pdf")
+    result = runner.invoke(app, ["ingest", "paper.pdf", "-c", str(config)], input="y\n")
+    assert "Sends:" not in result.stdout
+
+
+def _config_with_dotenv(tmp_path: Path, token: str) -> Path:
+    """A configuration that names its variables, and a `.env` beside it that holds them."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "notes.txt").write_text("A short note to summarize.\n", encoding="utf-8")
+    configs = tmp_path / "configs"
+    configs.mkdir()
+    (configs / "config.yaml").write_text(
+        f"workspace_root: {workspace}\n"
+        "network_access: true\n"
+        "notifier:\n  ntfy:\n    enabled: true\n",
+        encoding="utf-8",
+    )
+    (configs / ".env").write_text(
+        f"NTFY_SERVER=http://desk:8080\nNTFY_TOPIC=lacc-tesis\nNTFY_TOKEN={token}\n",
+        encoding="utf-8",
+    )
+    return configs / "config.yaml"
+
+
+def test_the_dotenv_beside_the_configuration_is_what_configures_the_notifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No `setx`, no shell profile: the values sit next to the configuration that names them."""
+    for name in ("NTFY_SERVER", "NTFY_TOPIC", "NTFY_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    config = _config_with_dotenv(tmp_path, "tk_secret")
+    notifier = _CapturingNotifier()
+    _install_notifier(monkeypatch, notifier)
+    result = runner.invoke(app, ["notify", "test", "-c", str(config)])
+    assert result.exit_code == 0
+    assert len(notifier.sent) == 1
+
+
+def test_a_token_never_reaches_the_terminal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Names are reported so a person can see the settings were found; values never are.
+
+    A token printed to a terminal is a token in the scrollback, in a screenshot, and in
+    whatever that terminal logs to (ADR-030).
+    """
+    for name in ("NTFY_SERVER", "NTFY_TOPIC", "NTFY_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    secret = "tk_f0yn7rfgs48l94eq41y5u7"
+    config = _config_with_dotenv(tmp_path, secret)
+    _install_notifier(monkeypatch, _CapturingNotifier())
+    result = runner.invoke(app, ["notify", "test", "-c", str(config)])
+    assert secret not in result.stdout
+    assert "NTFY_TOKEN" in result.stdout
+
+
+def test_missing_settings_say_which_ones_and_where_to_put_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ "Not configured" without saying what is missing is the silence this replaces."""
+    for name in ("NTFY_SERVER", "NTFY_TOPIC", "NTFY_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    configs = tmp_path / "configs"
+    configs.mkdir()
+    config = configs / "config.yaml"
+    config.write_text(
+        f"workspace_root: {workspace}\n"
+        "network_access: true\n"
+        "notifier:\n  ntfy:\n    enabled: true\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["notify", "test", "-c", str(config)])
+    assert result.exit_code == 1
+    assert "NTFY_SERVER" in result.stdout
+    assert ".env" in result.stdout
+
+
+def test_measure_refuses_a_skill_that_writes(tmp_path: Path) -> None:
+    """Measurement observes; repeating something with effects would multiply them.
+
+    Enforced from the capabilities the skill declares, not from a list of names, so a
+    future skill that writes is refused without anyone remembering to add it (ADR-032).
+    """
+    config = _config_file(tmp_path)
+    result = runner.invoke(
+        app, ["measure", "revise_file", "notes.txt", "-c", str(config), "--provider", "mock"]
+    )
+    assert result.exit_code == 1
+    assert "writes files" in result.stdout
+
+
+def test_measure_says_how_many_times_before_asking(tmp_path: Path) -> None:
+    """The confirmation is for the repetition, not one action with a hidden multiplier."""
+    config = _config_file(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "measure",
+            "summarize_file",
+            "notes.txt",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--runs",
+            "3",
+        ],
+        input="\n",
+    )
+    assert "Run this 3 times?" in result.stdout
+    assert "Declined" in result.stdout
+
+
+def test_declining_a_measurement_runs_nothing(tmp_path: Path) -> None:
+    """Defaults to no, like every other confirmation in LACC."""
+    config = _config_file(tmp_path)
+    runner.invoke(
+        app,
+        ["measure", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
+        input="\n",
+    )
+    assert not (tmp_path / "ws" / "audit.jsonl").exists()
+
+
+def test_every_repetition_is_audited_separately(tmp_path: Path) -> None:
+    """A trail recording five executions as one would lie about what happened.
+
+    The count is also the thing being measured, so collapsing them would destroy it.
+    """
+    config = _config_file(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "measure",
+            "summarize_file",
+            "notes.txt",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--runs",
+            "4",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 0
+    log = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    started = [json.loads(line) for line in log if json.loads(line)["kind"] == "run_started"]
+    assert len(started) == 4
+    assert len({event["run_id"] for event in started}) == 4
+
+
+def test_a_measurement_shows_every_run(tmp_path: Path) -> None:
+    """Each row, then the range - because reporting a mean would repeat the error this
+    command exists to correct."""
+    config = _config_file(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "measure",
+            "summarize_file",
+            "notes.txt",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--runs",
+            "3",
+        ],
+        input="y\n",
+    )
+    assert "quotations" in result.stdout
+    assert "verified" in result.stdout

@@ -1,282 +1,123 @@
 # Guide - Setting up the machine that runs the model
 
-A complete walkthrough for turning a computer you own into the machine LACC talks to:
-private networking with Tailscale, the Ollama engine, and an ntfy server for
-notifications. Written to be followed by someone who has not done any of it before.
+Turning a computer you own into the machine LACC talks to. Read Part 1 to know what you are
+building, then follow the guide for your server's operating system, then come back for
+Part 2.
 
-Steps are given for **Linux** and for **Windows**. Follow the one your server runs; the
-client side at the end is the same either way.
+---
 
-If you are choosing hardware rather than using a machine you already have, read
-[what a dedicated machine buys you](a-remote-engine-over-tailscale.md#be-clear-about-what-this-buys)
-first - the answer is usually not what people expect.
+## Part 1 - What you are building
 
-## What you are building
-
-Three pieces on the server, one line of configuration on your laptop:
+Three pieces on the server, a few lines of configuration on your laptop:
 
 ```
    your laptop                          the server machine
-  +-------------+                      +---------------------+
-  |    LACC     | ---- Tailscale ----> |  Ollama  (port 11434)|
-  |             | <--- private net --- |  ntfy    (port 8080) |
-  +-------------+                      +---------------------+
-         ^                                       |
-         |            notification               |
-    your phone <------------------------ (also on the tailnet)
+  +-------------+                      +----------------------+
+  |    LACC     | ---- Tailscale ----> | Ollama  (port 11434) |
+  |             | <--- private net --- | ntfy    (port 8080)  |
+  +-------------+                      +----------------------+
+         ^                                        |
+         |             notification               |
+    your phone <------------------------- (also on the tailnet)
 ```
 
-**Tailscale** is what makes the other two safe. It gives every device you enrol a private
-address that only your own devices can reach, without opening a single port on your router.
-Nothing in this guide is exposed to the internet at any point.
+- **[Tailscale](https://tailscale.com)** is a private network between your own devices. It
+  is what makes the other two safe: each device gets an address only your devices can
+  reach, and **no ports are opened on your router**. Nothing here is exposed to the
+  internet at any point.
+- **[Ollama](https://ollama.com)** runs the model. It is the reason for the server: a
+  machine with memory free can hold a far larger model than a laptop with everything else
+  open.
+- **[ntfy](https://ntfy.sh)** sends a notification to your phone when a run finishes, so
+  you can walk away from a long one.
 
-Set aside about 45 minutes. Most of it is downloads.
+### What a notification carries
+
+It says **which skill ran, how it ended, and how long it took**. That is the whole message:
+
+```
+Title: LACC: extract_claims completed
+Body:  extract_claims completed after 1284s
+```
+
+Never a prompt, an answer, a file path, or the text of anything read - not even an error
+message. The destination is a machine you named, and that is still not a reason to send it
+your work.
+
+Delivery is **best effort and never blocks**: a notifier that cannot reach its server does
+not fail a run that already produced an answer. The failure is printed and recorded, and
+your result stands.
+
+LACC supports ntfy only, and deliberately supports no third-party messaging service. The
+reasoning is easy to miss because it is not about the message body: telling a service that
+you are working, on what, and at what hour is **information about your research** whatever
+the body says. Sending that to a company every day discloses your working pattern and your
+subject to somebody who keeps it. A server you run has no such party in it.
+
+Once configured there is nothing to operate: every `lacc run` that completes, is refused or
+fails sends one notification, and each is written to the audit trail as `notification_sent`
+or `notification_failed` under the same run id as the run it reports. A run you decline
+sends nothing - you were at the prompt, so there is nobody to tell.
+
+You need three devices on the tailnet: **the server**, **your laptop**, and **your phone**
+if you want notifications.
+
+If you are choosing hardware rather than using a machine you already have, read
+[choosing hardware for local models](choosing-hardware-for-local-models.md#be-clear-about-what-this-buys)
+first - the answer is usually not what people expect.
 
 ---
 
-## Step 1 - Tailscale, on every device
+## Now follow the guide for your server
 
-Do this first. The addresses it hands out are what everything else is configured against.
+Each is a single continuous path with nothing to skip over. Pick the one that matches the
+machine that will run the model - not your laptop.
 
-Create a free account at [tailscale.com](https://tailscale.com), then install it on the
-server, on your laptop, and on your phone.
+### → **[Set up the server on Linux](server-setup-on-linux.md)**
 
-**Linux:**
+Ubuntu Server and other Debian-based systems.
 
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-```
+### → **[Set up the server on Windows](server-setup-on-windows.md)**
 
-It prints a URL. Open it, sign in, and the machine joins your tailnet.
+Windows 10 and 11.
 
-**Windows:** download the installer from
-[tailscale.com/download](https://tailscale.com/download), run it, and sign in. It lives in
-the system tray.
-
-**Phone:** install the Tailscale app from your app store and sign in with the same account.
-
-Now find the server's address:
-
-```bash
-tailscale ip -4
-```
-
-**Windows:** the same command works from PowerShell, or hover the tray icon.
-
-You get something like `100.101.102.103`. **Write it down - every step below uses it.**
-This address is stable: it survives reboots and follows the machine to any network.
-
-Check the connection from your laptop before continuing:
-
-```bash
-ping 100.101.102.103
-```
-
-If that fails, stop here. Nothing downstream will work, and every later problem will look
-like a different problem.
+When you finish, you will have three things written down: the **Tailscale address**, the
+**ntfy topic**, and the **ntfy token**. Come back here with them.
 
 ---
 
-## Step 2 - Ollama, bound to the tailnet and nowhere else
+## Part 2 - Point LACC at the server
 
-This is the step where a mistake matters, so it gets its own explanation.
+Everything from here happens on **your laptop**, not on the server.
 
-**Ollama has no authentication of any kind.** No accounts, no tokens, no password. Anyone
-who can open a connection to its port can use it and read what you send it. The advice you
-will find everywhere is to set `OLLAMA_HOST=0.0.0.0`, which binds it to **every** network
-interface the machine has - your home network, your campus network, the café Wi-Fi it joins
-next week. Every device on those networks can then send prompts to your engine.
+### Your documents stay on this machine
 
-The prompts LACC sends contain the text of your sources. Bind it to the Tailscale address
-only.
+Worth stating before anything else, because the natural assumption is the opposite: the
+server runs the model, so surely the papers go there too.
 
-### Install
+They do not. **LACC reads your documents on the machine it runs on**, builds a prompt from
+what it read, and sends *that* to the engine. The PDF never leaves your laptop; only the
+text inside the prompt travels, and only for as long as the request takes. Your workspace,
+your converted Markdown and your audit trail all live here.
 
-**Linux:**
+This is why the preview says "the contents read above" rather than naming a file. It is
+also why `workspace_root` is a path on this machine and the server needs no workspace at
+all - the server holds models, and nothing of yours.
 
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-```
+### 2.1 Configuration
 
-**Windows:** download and run the installer from [ollama.com](https://ollama.com).
-
-### Bind it
-
-**Linux:**
-
-```bash
-sudo systemctl edit ollama.service
-```
-
-An editor opens. Add these lines in the space it indicates, using *your* address:
-
-```ini
-[Service]
-Environment="OLLAMA_HOST=100.101.102.103:11434"
-```
-
-Save, then:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl restart ollama
-```
-
-**Windows:** set a system environment variable named `OLLAMA_HOST` with the value
-`100.101.102.103:11434`, then restart Ollama from the tray icon. In PowerShell as
-Administrator:
-
-```powershell
-[Environment]::SetEnvironmentVariable("OLLAMA_HOST", "100.101.102.103:11434", "Machine")
-```
-
-Sign out and back in, or restart, for a machine-level variable to take effect.
-
-### Verify it, which matters more than setting it
-
-**Linux:**
-
-```bash
-ss -ltnp | grep 11434
-```
-
-**Windows:**
-
-```powershell
-Get-NetTCPConnection -LocalPort 11434 -State Listen | Select-Object LocalAddress
-```
-
-You want to see **your Tailscale address**. If you see `0.0.0.0`, `*`, or `::`, it is
-listening on every network and the work is not done. Fix it before continuing.
-
-### A firewall, as a second layer
-
-Worth ten seconds, because a future edit or a changed address can quietly reintroduce the
-problem.
-
-**Linux:**
-
-```bash
-sudo ufw default deny incoming
-sudo ufw allow in on tailscale0
-sudo ufw enable
-```
-
-**Windows:** in Windows Defender Firewall, ensure no inbound rule allows public access to
-port 11434. The Ollama installer does not create one by default; if you added one while
-troubleshooting, remove it.
-
-### Pull a model
-
-```bash
-ollama pull qwen2.5:7b
-```
-
-Which model to choose depends on memory, and if the machine has an NVIDIA GPU, on its VRAM
-rather than its RAM. The
-[sizing tables](a-remote-engine-over-tailscale.md#if-you-can-build-a-desktop-instead)
-have the numbers, including the context cache that people forget to count. If you are
-unsure, start with `qwen2.5:7b` - it fits nearly everything and is a large step up from a
-3B model.
-
-Confirm the GPU is being used, if there is one:
-
-```bash
-ollama run qwen2.5:7b "hello"     # then, in another terminal:
-nvidia-smi                        # memory in use means it is on the card
-```
-
-A model that quietly ran on the CPU is the most common reason a fast machine feels slow.
-
----
-
-## Step 3 - ntfy, so a long run tells you it finished
-
-Optional, but the point of a server machine is that you stop watching it.
-
-### Install
-
-**Linux:**
-
-```bash
-sudo apt install ntfy
-```
-
-**Windows:** run it under Docker Desktop, which is the practical path:
-
-```powershell
-docker run -d --name ntfy --restart unless-stopped `
-  -p 100.101.102.103:8080:80 `
-  -v ntfy-data:/var/lib/ntfy `
-  binwiederhier/ntfy serve
-```
-
-Binding the published port to the Tailscale address, rather than leaving it as `-p 8080:80`,
-is what keeps it off your other networks. The same reasoning as Ollama.
-
-### Configure it, on Linux
-
-Edit `/etc/ntfy/server.yml`:
-
-```yaml
-listen-http: "100.101.102.103:8080"
-base-url: "http://100.101.102.103:8080"
-auth-file: "/var/lib/ntfy/user.db"
-auth-default-access: "deny-all"
-```
-
-`auth-default-access: deny-all` is the line that matters. Without it, ntfy lets anyone
-publish to and read any topic, and the topic name becomes the only thing protecting your
-notifications.
-
-```bash
-sudo systemctl enable --now ntfy
-ss -ltnp | grep 8080          # verify: your address, not 0.0.0.0
-```
-
-### Create a user and a token
-
-```bash
-sudo ntfy user add --role=admin lacc          # it asks for a password
-sudo ntfy token add lacc
-```
-
-Under Docker, prefix each with `docker exec -it ntfy`.
-
-Copy the token it prints. It goes in your environment, never in a file.
-
-### Choose a topic nobody can guess
-
-A topic is just a name, and on any server without authentication it *is* the
-authentication - whoever knows it can read your notifications and send you fake ones. So
-do not call it `lacc`:
-
-```
-lacc-tesis-7h3k9x
-```
-
-### Subscribe your phone
-
-Open the ntfy app, add a server with your Tailscale address and port, sign in with the user
-you created, and subscribe to that topic. **Your phone must have Tailscale connected** to
-reach a server bound to the tailnet.
-
----
-
-## Step 4 - Point LACC at it, from your laptop
-
-Nothing here runs on the server. This is your working machine.
-
-In `config.yaml`:
+In `configs/config.yaml`, using your own address. Keeping the remote engine in its own
+file - `configs/desk.yaml`, say - is worth doing once you have both: then
+`--config configs/desk.yaml` sends work to the server and plain `lacc run` keeps it
+here, and which one you used is never a guess.
 
 ```yaml
 workspace_root: ~/lacc-workspace
-model: qwen2.5:7b                          # must exist on the SERVER
+model: qwen2.5:7b                          # must be a model you pulled on the SERVER
 context_tokens: 32768
 
-network_access: true                       # the ceiling, off by default
-engine_host: http://100.101.102.103:11434  # the destination, named
+network_access: true                       # permission
+engine_host: http://100.101.102.103:11434  # destination
 
 notifier:
   ntfy:
@@ -286,86 +127,126 @@ notifier:
     token_env: NTFY_TOKEN
 ```
 
-Both `network_access: true` and `engine_host` are required, and they are separate on
-purpose: permission and destination are different statements, and LACC contacts a host only
-when the configuration makes both.
+`network_access: true` and `engine_host` are both required, and they are separate
+statements on purpose: one is permission, the other is a destination. LACC contacts a
+machine only when the configuration makes both, so nothing it was not told about is ever
+reached.
 
-Then set the secrets in your environment, not in any file:
+### 2.2 Secrets go in a `.env` beside it, never in the configuration
 
-```bash
-export NTFY_SERVER=http://100.101.102.103:8080
-export NTFY_TOPIC=lacc-tesis-7h3k9x
-export NTFY_TOKEN=tk_...
+Create `configs/.env` with the three values you wrote down:
+
+```
+NTFY_SERVER=http://100.101.102.103:8080
+NTFY_TOPIC=lacc-tesis-7h3k9x
+NTFY_TOKEN=tk_...
 ```
 
-**Windows, PowerShell:**
+That is all. No `export`, no `setx`, no new terminal.
 
-```powershell
-$env:NTFY_SERVER = "http://100.101.102.103:8080"
-$env:NTFY_TOPIC  = "lacc-tesis-7h3k9x"
-$env:NTFY_TOKEN  = "tk_..."
+The split is the point. `configs/config.yaml` **names** the variables and holds no secret,
+so you can share it, commit it to your own notes, or paste it into a thesis appendix.
+`configs/.env` holds the values and is never shared. Both live in `configs/`, which git
+ignores in full.
+
+A variable already set in your shell always wins over the file, so a server or a CI job can
+override it without editing anything.
+
+Two things this does not do, said plainly. A `.env` in a synchronising folder is still
+synchronised, and a `.env` in a backup is still in the backup: this makes the
+*configuration* safe to share, not the secret safe to store carelessly. And `.env` supplies
+secrets only - `network_access` and `engine_host` stay in the YAML, because no environment
+may decide where your documents go.
+
+If you write a value where a variable name belongs, LACC now refuses the configuration and
+says so:
+
 ```
-
-Those last only for the session. To keep them, use `setx` on Windows or add the exports to
-your shell profile on Linux and macOS. A token written into `config.yaml` is a token in
-every backup and every copy of that folder, which is why LACC has no field for it.
+`token_env` names an environment variable; it does not hold the value.
+Got 'tk_f0yn...', which is not the name of one - they are written in upper
+case, like `NTFY_TOKEN`. Put that name here and the value in your environment.
+```
 
 ---
 
-## Step 5 - Check each piece separately
+## Part 3 - Check each piece separately
 
-Check them in order and stop at the first failure. Each rules out everything before it.
+Run these in order and **stop at the first failure**. Each one rules out everything before
+it, which is what turns a vague "it does not work" into a specific answer.
 
-```bash
-# 1. the network
+**3.1 The network reaches the server:**
+
+```
 ping 100.101.102.103
+```
 
-# 2. the engine answers, and knows the model
+**3.2 The engine answers, and has your model:**
+
+```
 curl http://100.101.102.103:11434/api/tags
+```
 
-# 3. notifications arrive
+You should get a block of JSON listing the models on the server. If `qwen2.5:7b` is not in
+it, you pulled it on the wrong machine.
+
+**3.3 Notifications arrive:**
+
+```
 uv run lacc notify test
+```
 
-# 4. the whole thing
+Your phone should buzz.
+
+**3.4 The whole thing:**
+
+```
 uv run lacc run summarize_file paper.md
 ```
 
-Watch the request land, from the server:
-
-```bash
-journalctl -u ollama -f          # Linux
-```
+To watch the request land, on a **Linux** server run `journalctl -u ollama -f` while it
+goes; on a **Windows** server, watch the Ollama tray icon's log window.
 
 ---
 
 ## When something does not work
 
-| What you see | What it usually is |
-|---|---|
-| `ping` fails | Tailscale is not up on one of the two devices. Check the tray icon or `tailscale status`. |
-| `curl` hangs | Ollama is bound to the wrong address. Re-run the verify command in step 2. |
-| `curl` refused | Ollama is not running, or the firewall is blocking. |
-| `model not found` | The model is pulled on your laptop, not on the server. Pull it there. |
-| `No notifier configured` | One of three things: `network_access: true`, `enabled: true`, or the environment variables in *this* shell. |
-| Notification sends, phone silent | The phone is not on the tailnet, or subscribed to a different topic. |
-| Answers are slow and the GPU is idle | Ollama fell back to CPU. Check `nvidia-smi` while a run is in progress. |
-| A run is refused for prompt size | The document is larger than the window. Raise `context_tokens`, at a cost in memory. |
+| What you see                                   | What it usually is                                                                                                                                                    |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ping` fails                                   | Tailscale is not connected on one of the two devices. Check the tray icon, or run `tailscale status`.                                                                 |
+| `curl` hangs and never answers                 | Packets are being dropped, not refused - on Windows that is the firewall. Do step 4 of the Windows guide. On Linux, check the bind address in step 3.                 |
+| ntfy answers but the engine does not           | A firewall rule exists for one port and not the other. Docker adds its own when it publishes a port; the Ollama installer does not, because by default it needs none. |
+| `curl` says connection refused                 | Ollama is not running, or a firewall is blocking it.                                                                                                                  |
+| `model not found`                              | The model is on your laptop, not on the server. Pull it there.                                                                                                        |
+| `No notifier configured`                       | One of three things: `network_access: true`, `enabled: true`, or the environment variables not being set in *this* terminal window.                                   |
+| Test says sent, phone silent                   | The phone is not on the tailnet, or is subscribed to a different topic.                                                                                               |
+| Answers are slow and the graphics card is idle | Ollama fell back to the processor. Check `nvidia-smi` while a run is in progress.                                                                                     |
+| A run is refused for prompt size               | The document is larger than the context window. Raise `context_tokens`, at a cost in memory.                                                                          |
 
 ---
 
-## What this setup does and does not protect
+## What this protects, and what it does not
 
 Worth stating plainly, because "local" gets heard as a stronger promise than it is.
 
 - **Your documents leave your laptop.** They go to the engine you named. That is the point
-  of the feature, and the reason the host must be written in your configuration rather than
+  of the feature, and it is why the host must be written in your configuration rather than
   discovered. Name a machine you own.
 - **Tailscale controls who can reach the engine, not what it does.** It is a network, not
   an audit.
 - **Ollama still has no authentication inside your tailnet.** Any device you enrol can use
-  it. If you share your tailnet with anyone, restrict that port with Tailscale ACLs.
-- **Nothing here is exposed to the internet.** No ports are opened on your router, and both
+  it. If you share your tailnet with anyone, restrict that port with
+  [Tailscale ACLs](https://tailscale.com/kb/1018/acls).
+- **Nothing is exposed to the internet.** No ports are opened on your router, and both
   services refuse anything that is not on the tailnet.
+- **Anyone on your tailnet who knows your ntfy topic can publish to it.** They cannot read
+  your documents - those never go to the notifier at all - but they can send you messages
+  that look like LACC's.
+- **Notification titles are folded to ASCII.** HTTP headers are latin-1, so an accented
+  character survives as its unaccented form and an emoji becomes `?`. That is deliberate:
+  the alternative was an exception, and an exception there would take down a run that had
+  already produced its answer.
+
+---
 
 ## Now do the thing it was for
 
@@ -377,7 +258,12 @@ uv run lacc ingest paper.pdf
 uv run lacc run extract_claims paper.md
 ```
 
-Write down how many quotations came back **verified** and how many **not found**. Run the
-same document against a smaller model and compare. That number is the only honest answer to
-whether the larger model was worth the setup, and it is specific to your sources rather than
-to somebody's benchmark.
+Write down how many quotations came back **verified** and how many **not found**. Then run
+the same document against a smaller model and compare.
+
+That number is the only honest answer to whether the larger model was worth the setup, and
+it is specific to your sources rather than to somebody else's benchmark.
+
+For everyday use afterwards - and for getting your graphics card back when you want it
+for something else - see
+[running the server day to day](running-the-server-day-to-day.md).

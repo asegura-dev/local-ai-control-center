@@ -41,10 +41,19 @@ does not fail - it just becomes unusably slow.
 
 ## Configuration
 
-Copy the example and edit it:
+Copy the example into the `configs/` folder and edit it:
 
 ```bash
-cp config.example.yaml config.yaml
+mkdir -p configs
+cp config.example.yaml configs/config.yaml
+```
+
+`configs/` is where LACC looks when you do not pass `--config`, and the whole folder
+is ignored by git - more than one configuration is normal, and none of them belongs in
+a repository. When you have several, name the one you want:
+
+```bash
+uv run lacc run summarize_file paper.md --config configs/desk.yaml
 ```
 
 Every field is documented in the file itself. Three decide whether your first run works:
@@ -83,6 +92,10 @@ held 2.0 GB at 4,096 tokens and 3.5 GB at 32,768.
 
 `workspace_root` is the only directory LACC will read from or write to. Paths that escape
 it - through `..`, a symlink or an absolute path - are refused before anything is opened.
+
+It is on **the machine you run LACC from**, always. Even when the model runs somewhere
+else, your documents do not move: LACC reads them here, and only the prompt built from
+them is sent to the engine.
 
 **Keep it out of a git repository.** LACC refuses to run if the workspace is inside a
 working tree, unless you set `workspace_in_repository: true`. That is not fussiness: your
@@ -131,10 +144,14 @@ marked:
 
 | Mark | What it means |
 |---|---|
-| **verified** | The quotation appears in the source, on the page claimed. |
-| **not found** | Those words are not in the document. The model made them up. |
-| **wrong page** | Real quotation, wrong attribution. The page it is actually on is named. |
-| **page unknown** | The quotation is there, but the source has no page markers to check against. |
+| **found** | The quotation appears in the source, and the page shown is where LACC located it. |
+| **NOT IN THE DOCUMENT** | Those words are not in the document. The model made them up. |
+| **found, page unknown** | The quotation is there, but no page can be given: the source has no markers, or the passage spans a boundary. |
+
+**The page shown is the one LACC found, not the one the model claimed.** Locating the
+quotation is how it gets verified, so the page comes from searching the text rather than
+from a model recalling where it read something. On a real paper that distinction mattered:
+the model gave page 4 for a sentence on page 1, with the quotation itself correct.
 
 Nothing is removed. An unverified claim stays in the answer and is marked, because the
 point is to show you what the model did rather than tidy it away.
@@ -156,7 +173,7 @@ it?" an experiment instead of an opinion. Run the same document through `extract
 with different models and compare how many quotations hold:
 
 ```bash
-# edit `model:` in config.yaml between runs
+# edit `model:` in configs/config.yaml between runs
 uv run lacc run extract_claims paper.md
 ```
 
@@ -212,7 +229,8 @@ were asked and said no, which is the system working.
 
 ## Next
 
-- [Running the model on another machine](a-remote-engine-over-tailscale.md), when this
-  one is not the place the work should be good.
-- [Notifications when a run finishes](notifications-with-self-hosted-ntfy.md), for runs
+- [Setting up the machine that runs the model](setting-up-the-server-machine.md), when
+  this one is not the place the work should be good - including notifications, for runs
   long enough that you walk away.
+- [Choosing hardware for local models](choosing-hardware-for-local-models.md), if you are
+  buying or building that machine.

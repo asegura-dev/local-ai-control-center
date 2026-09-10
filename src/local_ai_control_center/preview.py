@@ -60,6 +60,12 @@ class ExecutionPreview(BaseModel):
     allowed: bool
     missing_capabilities: tuple[Capability, ...] = ()
     out_of_bounds: tuple[Path, ...] = ()
+    sends_to: str = ""
+    """Where the contents read would be sent, when that is not this machine.
+
+    Empty for a run that contacts nothing, or an engine on this machine. Absence carries
+    meaning here: no destination shown means nothing leaves the computer (ADR-028).
+    """
 
     def render(self) -> str:
         """Return a short readable block intended to be shown before confirming."""
@@ -73,6 +79,8 @@ class ExecutionPreview(BaseModel):
             lines.append(f"Reads:   {', '.join(str(path) for path in self.action.targets)}")
         if self.action.writes:
             lines.append(f"Writes:  {', '.join(str(path) for path in self.action.writes)}")
+        if self.sends_to:
+            lines.append(f"Sends:   the contents read above, to {self.sends_to}")
         if self.allowed:
             lines.append("Status:  would run")
         else:
@@ -90,12 +98,18 @@ def preview_action(
     permissions: Permissions,
     config: Config,
     workspace: Workspace,
+    sends_to: str = "",
 ) -> ExecutionPreview:
     """Report whether ``action`` would be allowed, and why not.
 
     Has no side effects: nothing is written, no provider is called, nothing is
     created. Both kinds of refusal - missing capabilities and paths escaping the
     workspace - are reported together.
+
+    ``sends_to`` is passed by the caller rather than derived here, because whether a run
+    contacts an engine at all is something only the caller knows: converting a document
+    never does. Inferring it from the action's capabilities would be a guess, and it would
+    be wrong (ADR-028).
     """
     permission_result = check(action.required, permissions, config)
     touched = action.targets + action.writes
@@ -105,4 +119,5 @@ def preview_action(
         allowed=permission_result.allowed and not out_of_bounds,
         missing_capabilities=permission_result.missing,
         out_of_bounds=out_of_bounds,
+        sends_to=sends_to,
     )

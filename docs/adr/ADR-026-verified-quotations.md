@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted.
+Accepted. The page-checking part is superseded by
+[ADR-031](ADR-031-the-page-is-found-not-asked-for.md): the page is now found by LACC rather
+than taken from the model and checked against it, so the *wrong page* verdict below no
+longer exists. Everything about the quotation itself stands.
 
 ## Context
 

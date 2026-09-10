@@ -201,7 +201,7 @@ def test_provider_refuses_to_be_built_for_a_remote_host(monkeypatch: pytest.Monk
         OllamaProvider("qwen2.5:3b")
 
 
-def _captured_request_body(provider: OllamaProvider) -> dict[str, object]:
+def _captured_request_body(provider: OllamaProvider, temperature: float = 0.0) -> dict[str, object]:
     """Run a completion against a stubbed engine and return the body that was sent."""
     from unittest.mock import patch
 
@@ -212,7 +212,7 @@ def _captured_request_body(provider: OllamaProvider) -> dict[str, object]:
         return _fake_generate_response("ok")
 
     with patch("urllib.request.urlopen", side_effect=_capture):
-        provider.complete("a prompt")
+        provider.complete("a prompt", temperature)
     return dict(json.loads(sent[0].decode("utf-8")))
 
 
@@ -224,13 +224,28 @@ def test_a_configured_window_is_asked_for() -> None:
     hold the engine to (ADR-019).
     """
     body = _captured_request_body(OllamaProvider("qwen2.5:3b", context_tokens=8192))
-    assert body["options"] == {"num_ctx": 8192}
+    assert body["options"]["num_ctx"] == 8192
 
 
 def test_no_window_is_asked_for_when_none_is_configured() -> None:
     """Unset means unset: LACC does not invent a window to send."""
     body = _captured_request_body(OllamaProvider("qwen2.5:3b"))
-    assert "options" not in body
+    assert "num_ctx" not in body["options"]
+
+
+def test_a_temperature_is_always_sent() -> None:
+    """Leaving it out let the engine apply 0.8 and sample, which for copying text out of a
+    document is the wrong setting - and it made the audit's completion hashes impossible to
+    reproduce (ADR-033)."""
+    body = _captured_request_body(OllamaProvider("qwen2.5:3b"))
+    assert body["options"]["temperature"] == 0.0
+
+
+def test_the_temperature_sent_is_the_one_asked_for() -> None:
+    """It is per request, because it is a property of the task rather than the engine."""
+    provider = OllamaProvider("qwen2.5:3b")
+    body = _captured_request_body(provider, temperature=0.7)
+    assert body["options"]["temperature"] == 0.7
 
 
 def _fake_response_with(payload: dict[str, object]) -> object:

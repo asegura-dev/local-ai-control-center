@@ -628,7 +628,7 @@ class _MeasuringProvider(MockProvider):
         self._prompt_tokens = prompt_tokens
         self._finish_reason = finish_reason
 
-    def complete(self, prompt: str) -> Completion:
+    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
         base = super().complete(prompt)
         return Completion(
             text=base.text,
@@ -722,7 +722,7 @@ class _AnsweringProvider(MockProvider):
         super().__init__()
         self._answer = answer
 
-    def complete(self, prompt: str) -> Completion:
+    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
         return Completion(text=self._answer, provider="mock")
 
 

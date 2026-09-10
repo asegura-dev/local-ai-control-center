@@ -97,6 +97,15 @@ class SkillPlan(BaseModel):
     verify_quotes: bool = False
     """Whether the answer's quotations should be checked against the source (ADR-026)."""
 
+    temperature: float = 0.0
+    """How much the engine may sample rather than take the most likely token.
+
+    Zero by default, and every skill LACC ships takes the default. Sampling is wrong for
+    work that copies text out of a document, and it makes the audit's completion hashes
+    impossible to reproduce - which for a record meant to be citable is the more serious of
+    the two (ADR-033). A skill declares otherwise only when its task genuinely needs it.
+    """
+
 
 class Skill(ABC):
     """Abstract unit of work. Concrete skills declare needs and describe intent."""
@@ -360,6 +369,7 @@ def run_skill(
         plan.destination,
         approve,
         plan.verify_quotes,
+        plan.temperature,
     )
 
 

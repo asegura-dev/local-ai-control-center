@@ -8,6 +8,7 @@ a skill, previews it, asks for confirmation (defaulting to no), and executes;
 
 from __future__ import annotations
 
+import os
 import time
 from enum import StrEnum
 from pathlib import Path
@@ -20,7 +21,12 @@ from rich.table import Table
 from rich.text import Text
 
 from local_ai_control_center.audit import AuditLog, verify_chain
-from local_ai_control_center.config import Config, load_config
+from local_ai_control_center.config import (
+    DOTENV_FILENAME,
+    Config,
+    load_config,
+    load_dotenv,
+)
 from local_ai_control_center.converter import ConversionError, converter_for
 from local_ai_control_center.cycle import (
     WINDOW_TOLERANCE,
@@ -63,7 +69,16 @@ from local_ai_control_center.workspace import (
     workspace_from_config,
 )
 
-DEFAULT_CONFIG_PATH = Path("config.yaml")
+DEFAULT_CONFIG_PATH = Path("configs/config.yaml")
+"""Where LACC looks when no --config is given.
+
+A folder rather than a single file, because more than one is normal: an engine on
+this machine and an engine elsewhere are different configurations of the same tool.
+The whole folder is ignored by git, so a private one cannot be committed by accident.
+Only this exact path is a default - LACC never searches for a configuration, since
+guessing which one was meant is precisely what a tool that sends documents somewhere
+must not do.
+"""
 
 _SKILLS: dict[str, Skill] = {
     "summarize_file": SummarizeFileSkill(),
@@ -130,7 +145,14 @@ def _approve(difference: str) -> bool:
 
 
 def _load(config_path: Path) -> tuple[Config, Workspace]:
-    """Load configuration and build the workspace, or exit on failure."""
+    """Load configuration and build the workspace, or exit on failure.
+
+    A `.env` beside the configuration supplies the variables it names, without overwriting
+    anything already in the environment (ADR-030). It is read from that one directory: LACC
+    does not search, because guessing which configuration was meant is what a tool that
+    sends documents somewhere must not do.
+    """
+    load_dotenv(config_path.parent)
     try:
         config = load_config(config_path)
     except (OSError, ValueError) as error:
@@ -188,7 +210,9 @@ def run(
         raise typer.Exit(code=1) from error
 
     plan = _plan_or_exit(resolved, tuple(requests), config)
-    preview = preview_action(plan.action, grant_for(resolved, config), config, workspace)
+    preview = preview_action(
+        plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
+    )
     if not _confirm(preview):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
@@ -230,10 +254,9 @@ def _show_checked_quotations(result: RunResult) -> None:
         return
 
     marks = {
-        "verified": ("[green]found[/green]", ""),
-        "not_found": ("[red]NOT IN THE DOCUMENT[/red]", ""),
-        "wrong_page": ("[yellow]wrong page[/yellow]", ""),
-        "page_unknown": ("[yellow]page unchecked[/yellow]", ""),
+        "verified": "[green]found[/green]",
+        "not_found": "[red]NOT IN THE DOCUMENT[/red]",
+        "page_unknown": "[yellow]found, page unknown[/yellow]",
     }
     table = Table(title="Quotations checked against the source", expand=False)
     table.add_column("Claim")
@@ -241,14 +264,15 @@ def _show_checked_quotations(result: RunResult) -> None:
     table.add_column("Page")
     table.add_column("Checked")
     for checked in result.checked_claims:
-        page = str(checked.claim.page) if checked.claim.page else "-"
-        if checked.verdict == "wrong_page" and checked.found_on_page:
-            page = f"{page} (really {checked.found_on_page})"
+        # The page shown is the one LACC located, never the one the model claimed: the
+        # first is right by construction, and the second is a citation error waiting to
+        # be repeated by whoever trusts it (ADR-031).
+        page = str(checked.found_on_page) if checked.found_on_page else "-"
         table.add_row(
             checked.claim.claim[:60],
             checked.claim.quote[:40],
             page,
-            marks[checked.verdict][0],
+            marks[checked.verdict],
         )
     console.print(table)
 
@@ -408,7 +432,9 @@ def preview(
     resolved = _resolve_skill(skill)
     config, workspace = _load(config_path)
     plan = _plan_or_exit(resolved, tuple(requests), config)
-    result = preview_action(plan.action, grant_for(resolved, config), config, workspace)
+    result = preview_action(
+        plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
+    )
     _show_preview(result)
 
 
@@ -474,6 +500,121 @@ def _report_ingestion(result: RunResult, destination: Path) -> None:
         _exit_refused()
     else:
         console.print("[yellow]Declined.[/yellow] Nothing was written.")
+
+
+def _spread(values: list[int]) -> str:
+    """Describe a set of measurements by its range and middle, never by its average.
+
+    A mean would reproduce the error this command exists to correct: it reports a single
+    number for something whose whole finding is that a single number misleads (ADR-032).
+    """
+    if not values:
+        return "-"
+    ordered = sorted(values)
+    median = ordered[len(ordered) // 2]
+    if ordered[0] == ordered[-1]:
+        return f"{ordered[0]}"
+    return f"{ordered[0]} - {ordered[-1]}  (median {median})"
+
+
+@app.command()
+def measure(
+    skill: Annotated[str, typer.Argument(help="Name of the skill to measure.")],
+    requests: Annotated[
+        list[str],
+        typer.Argument(help="One or more paths inside the workspace."),
+    ],
+    runs: Annotated[
+        int,
+        typer.Option("--runs", "-n", min=2, max=25, help="How many times to run it."),
+    ] = 5,
+    config_path: Annotated[
+        Path,
+        typer.Option("--config", "-c", help="Path to the configuration file."),
+    ] = DEFAULT_CONFIG_PATH,
+    provider_choice: Annotated[
+        ProviderChoice,
+        typer.Option("--provider", help="Which provider to run against."),
+    ] = ProviderChoice.ollama,
+) -> None:
+    """Run a skill several times and report the spread, not a single number.
+
+    Measuring is a different act from running: it characterises a configuration rather than
+    doing work, so it refuses any skill that writes and never varies the action between
+    repetitions (ADR-032). One preview, one confirmation, covering all of them.
+    """
+    resolved = _resolve_skill(skill)
+    if "write_files" in resolved.required:
+        console.print(
+            f"[red]{skill} writes files, and measuring must not act.[/red] Repeating an "
+            "action that has effects would multiply them; a measurement only observes."
+        )
+        raise typer.Exit(code=1)
+
+    config, workspace = _load(config_path)
+    audit = AuditLog(workspace, config)
+    try:
+        provider = _build_provider(provider_choice, config)
+    except ProviderError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    plan = _plan_or_exit(resolved, tuple(requests), config)
+    preview = preview_action(
+        plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
+    )
+    _show_preview(preview)
+    if not preview.allowed:
+        _exit_refused()
+    # The confirmation is for the repetition, not for one action with a multiplier hidden
+    # behind it: the person is told how many times before being asked.
+    if not typer.confirm(f"Run this {runs} times?", default=False):
+        console.print("[yellow]Declined.[/yellow] Nothing was run.")
+        return
+
+    rows: list[tuple[int, int, int]] = []
+    with console.status(f"Measuring {resolved.name}...") as status:
+        for attempt in range(1, runs + 1):
+            status.update(f"Run {attempt} of {runs}...")
+            try:
+                result = _do_run(
+                    resolved, tuple(requests), config, workspace, provider, audit, new_run_id()
+                )
+            except (ProviderError, ReadError, PromptTooLargeError) as error:
+                console.print(f"[red]Run {attempt} failed:[/red] {error}")
+                raise typer.Exit(code=1) from error
+            checked = result.checked_claims
+            rows.append((attempt, len(checked), sum(1 for c in checked if c.holds)))
+
+    _report_the_spread(resolved.name, config.model, rows)
+
+
+def _report_the_spread(skill_name: str, model: str, rows: list[tuple[int, int, int]]) -> None:
+    """Show every run, then the range each column covered."""
+    table = Table(title=f"{skill_name} against {model or 'the mock provider'}", expand=False)
+    table.add_column("Run", justify="right")
+    table.add_column("Quotations", justify="right")
+    table.add_column("Verified", justify="right")
+    table.add_column("Rate", justify="right")
+    for attempt, total, held in rows:
+        rate = f"{held * 100 // total}%" if total else "-"
+        table.add_row(str(attempt), str(total), str(held), rate)
+    console.print(table)
+
+    totals = [total for _, total, _ in rows]
+    verified = [held for _, _, held in rows]
+    rates = [held * 100 // total for _, total, held in rows if total]
+    console.print(f"  quotations  {_spread(totals)}")
+    console.print(f"  verified    {_spread(verified)}")
+    console.print(f"  rate        {_spread(rates)}")
+
+    if rates and max(rates) - min(rates) >= 10:
+        console.print()
+        console.print(
+            f"[yellow]This configuration varied by {max(rates) - min(rates)} points "
+            f"across {len(rows)} runs.[/yellow] A single run would not have told you "
+            "that, and cannot be compared against another single run."
+        )
 
 
 @app.command()
@@ -651,6 +792,19 @@ notify_app = typer.Typer(help="Check and use the configured notifier.", no_args_
 app.add_typer(notify_app, name="notify")
 
 
+def _report_where_the_settings_came_from(config: Config, config_path: Path) -> None:
+    """Say which named variables were found, by name only.
+
+    Never their values: a token printed to a terminal is a token in the scrollback, in a
+    screenshot, and in whatever the terminal logs to (ADR-030).
+    """
+    settings = config.notifier.ntfy
+    named = (settings.server_url_env, settings.topic_env, settings.token_env)
+    found = [name for name in named if os.environ.get(name, "").strip()]
+    if found:
+        console.print(f"[dim]Found {', '.join(found)} in the environment.[/dim]")
+
+
 @notify_app.command("test")
 def notify_test(
     config_path: Annotated[
@@ -665,6 +819,7 @@ def notify_test(
     config, workspace = _load(config_path)
     audit = AuditLog(workspace, config)
     run_id = new_run_id()
+    _report_where_the_settings_came_from(config, config_path)
 
     try:
         notifier = notifier_from_config(config)
@@ -673,10 +828,21 @@ def notify_test(
         raise typer.Exit(code=1) from error
 
     if notifier is None:
+        settings = config.notifier.ntfy
+        missing = [
+            name
+            for name in (settings.server_url_env, settings.topic_env)
+            if not os.environ.get(name, "").strip()
+        ]
         console.print(
             "[yellow]No notifier configured.[/yellow] Notifications need `network_access: true`, "
-            "`notifier.ntfy.enabled: true`, and the named environment variables set."
+            "`notifier.ntfy.enabled: true`, and the named variables set."
         )
+        if missing:
+            console.print(
+                f"Nothing found for: {', '.join(missing)}. Put them in "
+                f"[bold]{config_path.parent / DOTENV_FILENAME}[/bold] or in your environment."
+            )
         raise typer.Exit(code=1)
 
     delivery = notifier.send(

@@ -5,6 +5,179 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.0] - 2026-09-10
+
+### Added
+- **The preview names where your documents are going.** A run against an engine on another
+  machine now says so before you confirm:
+
+  ```
+  Reads:   paper.md
+  Sends:   the contents read above, to http://100.101.102.103:11434
+  ```
+
+  The line appears only when the engine is elsewhere; a loopback engine adds nothing, and
+  absence carries meaning. `Config.remote_engine` becomes the single definition of "not
+  this machine", used by the code that discloses it and the code that enforces it.
+- **A `configs/` folder**, ignored by git in full, is where LACC looks when no `--config`
+  is given. More than one configuration is normal - an engine here and an engine elsewhere
+  are different configurations of the same tool.
+- **A `.env` beside the configuration supplies the variables it names.** No `setx`, no
+  shell profile, no new terminal. The configuration still holds no secret and can be
+  shared; the `.env` holds the values and is never shared. A variable already set in the
+  environment always wins, so a server or a CI job keeps the last word.
+- **A `*_env` field must name a variable, in upper case, or the configuration is refused**
+  with a message saying what to put there instead.
+
+- **`lacc measure <skill> <path> --runs N`** runs a skill several times and reports the
+  spread rather than a number. It exists because the first real run produced a comparison
+  between two models that did not survive being repeated, and because the extraction work
+  that comes next cannot be evaluated without it.
+
+  Measuring is treated as a different act from running: a separate command, not a flag, so
+  `run` keeps its meaning exactly. It refuses any skill declaring `write_files`, because
+  repeating something with effects would multiply them. The confirmation says how many
+  times before asking, rather than hiding a multiplier behind "Proceed?". Every repetition
+  is audited separately, with its own run id.
+
+  It reports minimum, maximum and median, never an average - a mean would reproduce the
+  error the command exists to correct.
+
+- **A skill declares the temperature it needs, and it is zero.** LACC had never sent one,
+  so the engine applied its own default of 0.8 - sampling rather than taking the most likely
+  token, on work whose entire job is copying words out of a document. Measured: three
+  requests at 0.8 gave three different answers; three at 0.0 gave one.
+
+  The deciding reason was not accuracy but the audit. Every run records `prompt_sha256` and
+  `completion_sha256`, and at a non-zero temperature those hashes cannot be reproduced - the
+  trail said something happened and nobody could obtain it again. For a record meant to be
+  citable, reproducibility is what makes it mean anything.
+
+  There is no configuration override: temperature is a property of the task, and a setting
+  able to raise it could quietly make a grounded task unreliable while everything appeared
+  to work.
+
+### Changed
+- **The page a claim is reported with is the one LACC found, not the one the model said.**
+  Locating a quotation is already how it gets verified, so the page falls out of work being
+  done anyway - and it is right by construction, where a model asked to remember a page was
+  wrong often enough on a real paper to put a bad citation into a thesis. The `wrong page`
+  verdict is gone, because the situation it described no longer produces a bad page. How
+  often the model misplaced a passage it quoted correctly is recorded in the audit instead,
+  where a fidelity signal belongs and a person checking citations does not have to read it.
+- The default configuration path is `configs/config.yaml` rather than `config.yaml`. Move
+  an existing one: `mkdir configs && mv config.yaml configs/`.
+- Guides reorganised by operating system. `server-setup-on-linux` and
+  `server-setup-on-windows` are each a single continuous path, because alternating
+  "Linux:" and "Windows:" made a reader filter half of every page - which is exactly what
+  someone who has not done this before cannot do. The hub explains what is being built and
+  sends you to one of them.
+- `choosing-hardware-for-local-models` replaces `a-remote-engine-over-tailscale`, which had
+  become a hardware guide with a title about something else. `notifications-with-self-hosted-ntfy`
+  is gone, its unique content folded into the hub.
+
+### Measured
+
+**This is the first release of LACC tested end to end against the hardware it was designed
+for**, rather than declared finished. An RTX 5080 reached over Tailscale, a self-hosted
+ntfy, and a real seven-page paper from a real bibliography.
+
+| Document | Model | Claims | Verified | Failed |
+|---|---|---|---|---|
+| Synthetic, written for the test | qwen2.5:7b | 7 | 6 | 1 |
+| Synthetic, written for the test | qwen2.5:14b | 7 | 7 | 0 |
+| **A real paper** | qwen2.5:7b | 3 | **1** | 2 |
+| **A real paper** | qwen2.5:14b | 4 | **2** | 2 |
+
+- **The two paths that had never been executed, were.** The engine reached another machine
+  and answered; a notification was delivered, recorded in the audit trail, and arrived on a
+  phone. Both had been covered only by tests with injected transports - the right way to
+  test them, and not the same as knowing they work.
+- **The synthetic test was far too easy and flattered the result.** 86% and 100% verified
+  there, against 33% and 50% on a real paper. A document written for a test has short,
+  clean, quotable sentences; a real paper has dense prose, hyphenation across line breaks
+  and tables. Publishing on the synthetic number would have meant publishing something not
+  true of anything anyone would actually do.
+- **The comparison between models does not survive contact with repetition, and it was
+  published here before it was checked.** Running the 14B four times on the same paper gave
+  4, 5, 7 and 3 claims, of which 2, 4, 3 and 2 verified - a rate between 43% and 80%. That
+  spread is wider than the gap measured between the 7B and the 14B on one run each, so the
+  single-run comparison distinguishes nothing. What was written first - that a larger model
+  helps but does not solve it - is not supported by this evidence. The honest statement is
+  that **one run per configuration cannot tell these models apart at all**, and any future
+  claim about model choice needs repeats.
+- **What repetition does support:** every run fabricated at least one quotation, and every
+  run had the check catch it. Across five runs on a real paper there was no configuration
+  in which the output could have been trusted unchecked.
+- **The check earned its place, and is the only thing that did.** Without it a fabricated
+  range of sensitivity values would have gone into a citation. With it the claim was
+  marked, and the run said not to cite it without opening the document.
+- **The roadmap's definition of v1.0 has been rewritten** to what the measurements
+  support: not that the model does the work, but that you can work from your own sources
+  without being deceived.
+- Left open, and neither is the model being small: only three and four claims were
+  extracted from seven pages, with `finish_reason: stop` and no truncation - so the prompt
+  rather than capacity. And page attribution failed systematically, giving page 4 for
+  something on page 1. LACC locates the quotation itself while checking it, so that is a
+  question it need not ask the model at all.
+
+**After temperature was fixed** (ADR-033), the same paper measured five times per model:
+
+| Model | Quotations | Verified | Rate | Spread across 5 runs |
+|---|---|---|---|---|
+| qwen2.5:7b | 3 | 2 | 66% | none - identical every run |
+| qwen2.5:14b | 7 | 4 | 57% | 57-60% |
+
+- **Variance fell from sixty points to three.** The comparison that was noise before is a
+  measurement now.
+- **The rate the variance was hiding is worse than its median suggested.** The 14B settled
+  at 57%, below the old median of 66% and far below the lucky 85% run. Sampling had been
+  producing occasional good runs and concealing the real quality behind them.
+- **The larger model is better, and not for the reason anyone assumed.** Its rate is
+  *lower* - it extracts more than twice as many claims, and delivers twice as many verified
+  ones. For work that needs checkable facts, claims delivered matters more than the
+  proportion, since the unverified ones are marked and cost a glance rather than a citation.
+- One document. Enough to answer a question that could not be answered at all before, not
+  enough to generalise.
+
+### Notes
+- **`engine_host` shipped in v0.26.0 and the preview did not follow.** PRINCIPLES puts the
+  human in the centre and makes the preview the place that promise is kept, so the most
+  consequential fact of a remote run - that the text of a document is about to leave this
+  computer - was the one thing the confirmation screen did not say. Every guarantee around
+  it held; a control nobody can see is a control nobody exercises.
+- **The destination is passed to the preview, never inferred.** Guessing it from an
+  action's capabilities would be wrong exactly where it matters: converting a PDF contacts
+  no engine, and a preview that claimed otherwise would be lying in the direction that
+  teaches people to ignore it. There is a test for that case.
+- **The naming indirection was protecting nobody, because it depended on a step people
+  skip.** The first person to follow the setup guide wrote the server URL, the topic and a
+  live token straight into the `*_env` fields. Nothing complained: LACC looked for
+  variables with those literal names, found none, and reported itself unconfigured. The
+  misreading is entirely reasonable - the fields sit in a configuration file and look like
+  where values go - and it put a secret into a file, which is the exact outcome naming the
+  variable exists to prevent. The `.env` removes the step; the validation catches the
+  misreading.
+- **Requiring upper case is what makes the validation work.** A shape check alone accepts
+  `tk_f0yn7rfgs48l94eq41y5u7ddh2irw`, which is a valid identifier and also precisely the
+  thing being guarded against. Case is the only thing that reliably separates the name of
+  a variable from the value of one.
+- **A `.env` cannot redirect your documents.** It supplies secrets; `network_access` and
+  `engine_host` stay in the YAML. ADR-027's rule is that no environment may widen what
+  LACC contacts, and a test proves that an `OLLAMA_HOST` arriving through `.env` is still
+  refused.
+- **`config.yaml` was not in `.gitignore`.** Anyone creating one inside the checkout could
+  commit their workspace path and their tailnet address with a `git add -A`. The rule now
+  matches `config*` at the root by shape and re-includes the template by name, because the
+  file that actually turned up was called `config.yaml.txt` - a rule that catches only the
+  spelling you predicted catches nothing you did not.
+- **The `configs/` folder is ignored in full, never a mix.** A folder where some
+  configurations are tracked and others are not is how a private one eventually gets
+  committed by someone filling in the wrong file - and everything keeps working, which is
+  what makes it hard to notice. `config.example.yaml` stays at the root, holds no real
+  values, and is the only configuration that is committed.
+
+
 ## [0.27.0] - 2026-09-10
 
 ### Added

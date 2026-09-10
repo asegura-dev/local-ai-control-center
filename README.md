@@ -57,7 +57,8 @@ cd local-ai-control-center
 uv sync
 
 uv run lacc profile                  # what this machine can run
-cp config.example.yaml config.yaml   # then set workspace_root, model, context_tokens
+mkdir -p configs                          # LACC looks here; git ignores it
+cp config.example.yaml configs/config.yaml   # set workspace_root, model, context_tokens
 uv run lacc ingest paper.pdf         # PDF or Word into text LACC can read
 uv run lacc run extract_claims paper.md
 ```
@@ -71,13 +72,16 @@ refuses a prompt too large for it.
 **Guides**
 
 - [Setting up the machine that runs the model](docs/guides/setting-up-the-server-machine.md)
-  - Tailscale, Ollama and ntfy on a machine you own, step by step, for Linux and Windows.
+  - what you are building, then step by step for
+  [Linux](docs/guides/server-setup-on-linux.md) or
+  [Windows](docs/guides/server-setup-on-windows.md).
+- [Running the server day to day](docs/guides/running-the-server-day-to-day.md) -
+  getting your VRAM back without shutting anything down.
 - [Running LACC for the first time](docs/guides/running-lacc-for-the-first-time.md) - the
   full walkthrough, including how to read a verified or not-found mark.
-- [Running the model on another machine](docs/guides/a-remote-engine-over-tailscale.md) -
-  why, what hardware actually helps, and how much VRAM a model plus its context needs.
-- [Notifications when a run finishes](docs/guides/notifications-with-self-hosted-ntfy.md) -
-  self-hosted ntfy, for runs long enough to walk away from.
+- [Choosing hardware for local models](docs/guides/choosing-hardware-for-local-models.md) -
+  what actually makes a machine fast at this, and how much VRAM a model plus its
+  context window really needs.
 - [Keeping the virtual environment out of a sync folder](docs/guides/virtualenv-outside-a-sync-folder.md)
   - read this first if your checkout is inside OneDrive or Dropbox.
 

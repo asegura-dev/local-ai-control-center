@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-Verdict = Literal["verified", "not_found", "wrong_page", "page_unknown"]
+Verdict = Literal["verified", "not_found", "page_unknown"]
 """What checking one quotation concluded. A closed set, not a free string."""
 
 _PAGE_MARKER = re.compile(r"<!--\s*page\s+(\d+)\s*-->", re.IGNORECASE)
@@ -44,11 +44,26 @@ class CheckedClaim(BaseModel):
     claim: Claim
     verdict: Verdict
     found_on_page: int | None = None
+    """The page LACC located the quotation on. Correct by construction: it comes from
+    searching the text, not from a model recalling where it read something (ADR-031)."""
 
     @property
     def holds(self) -> bool:
-        """Whether the quotation was found where the claim said it would be."""
+        """Whether the quotation was found in the source."""
         return self.verdict == "verified"
+
+    @property
+    def page_disagreed(self) -> bool:
+        """Whether the model placed a correctly-quoted passage on the wrong page.
+
+        Not shown to the reader, who wants the right page rather than a note about
+        somebody else's error. Recorded in the audit, where a fidelity signal belongs.
+        """
+        return (
+            self.claim.page is not None
+            and self.found_on_page is not None
+            and self.claim.page != self.found_on_page
+        )
 
 
 def parse_claims(text: str) -> tuple[Claim, ...]:
@@ -116,23 +131,23 @@ def check_claim(claim: Claim, source: str) -> CheckedClaim:
     Exact substring after normalizing whitespace and case. Deliberately not fuzzy: a
     quotation that only nearly appears is not a quotation, and accepting near-misses would
     defeat the check (ADR-026).
+
+    The page is **found here, not taken from the claim**. Locating the quotation is already
+    how it gets verified, so the page falls out of work being done anyway - and it is right
+    by construction, where a model asked to remember a page is wrong often enough to put a
+    bad citation into a thesis (ADR-031). What the model said is kept on the claim, for
+    comparison, and never reported as the answer.
     """
     needle = _normalized(claim.quote)
     if not needle or needle not in _normalized(source):
         return CheckedClaim(claim=claim, verdict="not_found")
 
-    pages = pages_in(source)
-    if not pages:
-        return CheckedClaim(claim=claim, verdict="page_unknown")
-
     found_on = next(
-        (number for number, text in pages if needle in _normalized(text)),
+        (number for number, text in pages_in(source) if needle in _normalized(text)),
         None,
     )
-    if claim.page is None or found_on is None:
-        return CheckedClaim(claim=claim, verdict="page_unknown", found_on_page=found_on)
-    if found_on != claim.page:
-        return CheckedClaim(claim=claim, verdict="wrong_page", found_on_page=found_on)
+    if found_on is None:
+        return CheckedClaim(claim=claim, verdict="page_unknown")
     return CheckedClaim(claim=claim, verdict="verified", found_on_page=found_on)
 
 

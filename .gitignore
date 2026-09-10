@@ -17,6 +17,18 @@ wheels/
 htmlcov/
 
 # LACC: local user data must never be committed
+# Configurations. Anything at the root whose name starts with `config` is ignored,
+# and the template is re-included by name. Matching the shape rather than the exact
+# filename is deliberate: the first person to follow the guide saved theirs as
+# `config.yaml.txt`, which a rule naming only `config.yaml` would have missed - and it
+# held a live ntfy token. A rule that catches only the spelling you predicted is a rule
+# that catches nothing you did not.
+#
+# The configs/ folder is ignored in full, never a mix of tracked and untracked files:
+# a folder where some configurations are committed and others are not is how a private
+# one eventually gets committed by someone filling in the wrong file.
+/config*
+!/config.example.yaml
 /workspaces/
 /.local_workspaces/
 *.local.yaml

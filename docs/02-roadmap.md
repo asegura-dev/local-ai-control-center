@@ -195,53 +195,86 @@ built on something finished rather than becoming the place where behaviour is de
 Converting the finished Markdown to LaTeX is not on this list. Pandoc does that well
 already, and LACC has no reason to reimplement it.
 
-## What v1.0 means
+## What the first real run showed
 
-That a paper can be written with it. Sources read from the formats they arrive in, what
-they claim extracted with quotations that have been checked against the documents, a
-revision proposed beside a draft rather than over it, run against a machine of your own
-that is good enough for the work - with permission, preview, confirmation and a checkable
-record around every step, and documentation good enough for someone else to build on.
+v0.28.0 was gated on running LACC against a real source, on real hardware, rather than
+declaring the feature list complete. That run happened, and it did not go the way the
+feature list implied.
+
+The setup: an RTX 5080 with 15.9 GB, reached over Tailscale, running Ollama; a
+self-hosted ntfy for notifications; the same seven-page paper from a real bibliography put
+through `extract_claims` twice.
+
+| Document | Model | Claims | Verified | Failed |
+|---|---|---|---|---|
+| Synthetic, written for the test | qwen2.5:7b | 7 | 6 | 1 |
+| Synthetic, written for the test | qwen2.5:14b | 7 | 7 | 0 |
+| **A real paper** | qwen2.5:7b | 3 | **1** | 2 |
+| **A real paper** | qwen2.5:14b | 4 | **2** | 2 |
+
+**The two paths that had never been executed, were.** The engine reached another machine
+and answered; a notification was delivered and recorded. Both had been covered only by
+tests with injected transports, which was the right way to test them and not the same as
+knowing they work.
+
+**The synthetic test was far too easy, and it flattered the result.** 86% and 100%
+verified there; 33% and 50% on a real paper. A document written for a test has short,
+clean, quotable sentences. A real paper has dense prose, hyphenation across line breaks,
+tables and figure captions. Had the synthetic run been the evidence, v1.0 would have
+shipped on a number that was not true of anything anyone would actually do.
+
+**The comparison between models does not survive repetition.** Running the 14B four times
+on the same paper gave 4, 5, 7 and 3 claims, of which 2, 4, 3 and 2 verified - a rate
+between 43% and 80%. That spread is wider than the gap between the 7B and the 14B on one
+run each, so a single run per configuration distinguishes nothing.
+
+This is worth recording as a mistake and not only as a result. The one-run comparison was
+written into this document before it was repeated, and it read as a finding. It was noise.
+Two runs are a story; four are a measurement.
+
+So the premise v0.26.0 was built on remains untested rather than refuted. "A larger model
+produces work good enough to publish" is not something these numbers can speak to yet, and
+any future claim about model choice needs repeats before it is written down.
+
+**What repetition does support** is harder to argue with: every run fabricated at least one
+quotation, and every run had the check catch it. Across five runs against a real paper
+there was no configuration whose output could have been trusted unchecked.
+
+**The check earned its place, and it is the only thing that did.** Without it, a fabricated
+range of sensitivity values would have been copied into a citation. With it, the claim was
+marked and the run said not to cite it without opening the document. That happened on a
+real paper, on the first attempt.
+
+## What v1.0 means, rewritten
+
+The definition that stood here until v0.28.0 said "that a paper can be written with it",
+and it was written before there was any evidence. The evidence narrows it.
+
+v1.0 does **not** mean the model does the work. On a seven-page paper, three quarters of
+what a 7B model produced could not be trusted, and half of a 14B's could not. Any claim
+built on the model being reliable is a claim this project's own measurements contradict.
+
+What v1.0 means is this: **you can work from your own sources without being deceived.**
+Every quotation is checked against the document it claims to come from, what cannot be
+found is reported as unsupported rather than presented as fact, and the whole run leaves a
+record that can be verified afterwards. That is a smaller promise than the one the feature
+list implied, and it is one the numbers support.
 
 It does not mean every feature exists. It means nothing it produces has to be taken on
 faith, and that the parts which cannot be verified say so.
 
-## Why v1.0 is not the next release
+## What the run left open
 
-By v0.27.0 every capability on the list above is built, documented and under test. The
-obvious move is to call it v1.0. That would be applying the project's own standard to
-everything except itself.
+Two findings, both from the real paper, neither of them the model being small:
 
-**Three things stand between the feature list and the claim.**
+**Very few claims are extracted** - three and four from seven pages. The audit shows
+`finish_reason: stop` and answers of 260 and 214 tokens, so nothing was truncated: the
+models simply stopped. That points at the prompt rather than at capacity.
 
-*Two whole paths have never once been executed.* The engine reaching another machine, and
-a notification actually being delivered, are covered by unit tests with injected
-transports - which is the correct way to test them, because the egress guard deliberately
-prevents the suite from reaching the network. So their logic is verified and their
-behaviour is unobserved. This is the same shape of gap ADR-019 was written to name, and it
-was not acceptable then.
-
-*The premise behind v0.26.0 is untested.* The argument for reaching another machine is
-that a larger model produces work good enough to publish. Nobody has run LACC against a
-larger model. If a 14B or 32B model still fabricates quotations at a rate that makes the
-output unusable, then v1 does not do what v1 says it does, and no amount of documentation
-repairs that.
-
-*Nothing real has been written with it.* v1.0 means a paper can be written with LACC. That
-is a claim about an outcome, and the only evidence for it is the outcome.
-
-**So v1.0 is gated on a run, not on a feature.** A real source from a real bibliography, on
-a real machine over Tailscale, with notifications arriving on a real phone, producing
-extraction whose verified-versus-fabricated counts are written down. If it works, v1.0
-follows and says so with evidence. If it does not, what it reveals is the content of the
-next release, and v1.0 arrives one version later - which is the project working, not the
-project slipping.
-
-The verification counts make this measurable rather than impressionistic, which is the
-one genuinely good reason to have built that check before this point.
-
-Further ideas - a dashboard consuming the same core, chaining skills together - are under
-consideration, not commitments. Some may not happen at all.
+**Page attribution fails systematically.** Page 4 for something on page 1; page 3 for
+something on page 5. The quotations were real and the pages were not, which in a citation
+is its own kind of wrong. Worth noting that LACC already locates the quotation itself while
+checking it - so this is a question the tool can answer without asking the model at all.
 
 ## What this roadmap is not
 
