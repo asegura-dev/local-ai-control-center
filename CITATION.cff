@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+title: Local AI Control Center
+message: >-
+  If you use this software in work that gets published, please cite it
+  using the metadata in this file.
+type: software
+authors:
+  - given-names: Alejandro
+    family-names: Segura
+    alias: asegura-dev
+repository-code: "https://github.com/asegura-dev/local-ai-control-center"
+abstract: >-
+  A local-first Python framework for AI-assisted work on your own
+  documents, built for research that cannot be sent to a hosted service.
+  Capabilities are off by default and configuration is a ceiling that
+  removes rather than grants; every path is checked against a workspace
+  boundary; every run is previewed and confirmed before it acts, and
+  recorded in a hash-chained audit trail. Quotations returned by a model
+  are checked against the source document they claim to come from, so a
+  fabricated citation is reported rather than presented as fact. The
+  engine runs locally, or on another machine the user owns and names in
+  their configuration. It is a control layer, not an autonomous agent.
+keywords:
+  - local-first
+  - reproducible-research
+  - large-language-models
+  - provenance
+  - audit-trail
+  - citation-verification
+  - human-in-the-loop
+  - ollama
+license: MIT
+version: 0.27.0
+date-released: "2026-09-10"

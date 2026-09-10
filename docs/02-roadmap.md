@@ -110,6 +110,10 @@ carries no dates.
   so through a notifier you host yourself. PRINCIPLES changes its network rule to match
   what VISION already said, and the rule that replaces it is narrower than "network
   access": every destination is written down in a file the user wrote.
+- **v0.27.0 - Adoption.** Guides written from what the tool does, a citation file, and a
+  README that tells someone how to run it. Completes the v1 feature list, and records why
+  v1.0 still does not follow: two paths have never been executed and the premise behind
+  them is untested.
 
 ## A course correction, recorded
 
@@ -160,7 +164,7 @@ fluency but grounding.
   provided it says when it is done. A notifier the user hosts themselves, reached over their own private network -
   not a third-party messaging service, which would tell somebody else when you work and on
   what, whatever the message said.
-- **Adoption, and citability.** *The last one left.* LACC is public and is meant to be cited in the thesis it
+- **Adoption, and citability.** *Delivered in v0.27.0.* LACC is public and is meant to be cited in the thesis it
   helps write, so that others can build on it. That makes guides, a clear install and a
   citable record part of the deliverable rather than an afterthought.
 
@@ -201,6 +205,40 @@ record around every step, and documentation good enough for someone else to buil
 
 It does not mean every feature exists. It means nothing it produces has to be taken on
 faith, and that the parts which cannot be verified say so.
+
+## Why v1.0 is not the next release
+
+By v0.27.0 every capability on the list above is built, documented and under test. The
+obvious move is to call it v1.0. That would be applying the project's own standard to
+everything except itself.
+
+**Three things stand between the feature list and the claim.**
+
+*Two whole paths have never once been executed.* The engine reaching another machine, and
+a notification actually being delivered, are covered by unit tests with injected
+transports - which is the correct way to test them, because the egress guard deliberately
+prevents the suite from reaching the network. So their logic is verified and their
+behaviour is unobserved. This is the same shape of gap ADR-019 was written to name, and it
+was not acceptable then.
+
+*The premise behind v0.26.0 is untested.* The argument for reaching another machine is
+that a larger model produces work good enough to publish. Nobody has run LACC against a
+larger model. If a 14B or 32B model still fabricates quotations at a rate that makes the
+output unusable, then v1 does not do what v1 says it does, and no amount of documentation
+repairs that.
+
+*Nothing real has been written with it.* v1.0 means a paper can be written with LACC. That
+is a claim about an outcome, and the only evidence for it is the outcome.
+
+**So v1.0 is gated on a run, not on a feature.** A real source from a real bibliography, on
+a real machine over Tailscale, with notifications arriving on a real phone, producing
+extraction whose verified-versus-fabricated counts are written down. If it works, v1.0
+follows and says so with evidence. If it does not, what it reveals is the content of the
+next release, and v1.0 arrives one version later - which is the project working, not the
+project slipping.
+
+The verification counts make this measurable rather than impressionistic, which is the
+one genuinely good reason to have built that check before this point.
 
 Further ideas - a dashboard consuming the same core, chaining skills together - are under
 consideration, not commitments. Some may not happen at all.

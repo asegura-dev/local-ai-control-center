@@ -5,6 +5,58 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2026-09-10
+
+### Added
+- **Four guides, which is what "adoption" meant.** Setting up the server machine from
+  nothing - Tailscale, Ollama and ntfy, step by step, for Linux and for Windows; running
+  LACC for the first time; the reasoning and sizing behind a remote engine; and
+  notifications. Written from what the tool actually does, with the numbers measured
+  rather than estimated.
+- **The setup walkthrough is the one authoritative copy of every instruction.** The other
+  two guides keep the reasoning and point at it for the steps, because two copies of a
+  binding instruction is two copies that drift, and the one that drifts is the one nobody
+  re-reads.
+- **`CITATION.cff`**, so the project can be cited in published work and GitHub can offer a
+  formatted citation. Its version and release date are now part of the release checklist -
+  a citation file naming an older version tells someone they used a release they did not.
+- **A "Getting started" section in the README.** Someone landing on the repository could
+  read what LACC is, what it is not, and its whole design philosophy without ever learning
+  how to run it.
+- A "Releasing" section in the development chapter, naming the three places a version
+  lives.
+
+### Notes
+- **The remote-engine guide leads with the thing that is actually dangerous.** Ollama has
+  no authentication of any kind, and the advice found everywhere is to set
+  `OLLAMA_HOST=0.0.0.0`, which binds it to every interface the machine has - including
+  whatever network it joins next. The guide binds it to the tailnet address, and then
+  verifies with `ss` rather than trusting the configuration, because the verification is
+  the part people skip.
+- **The GPU advice counts the context window, not only the weights.** The first draft of
+  the guide said 12 GB of VRAM holds a 14B model, which is true of the weights and false
+  of the configuration LACC actually runs: the KV cache lives in VRAM too and a 32k window
+  adds 3 GB at 8-bit, putting the total at 12.0 GB against roughly 11.5 usable. So 12 GB
+  buys a choice - the same 7-8B model with headroom, or a 14B model over a shorter
+  document - and 16 GB is the first size that holds both a 14B model and a full window.
+  The corrected figures use the same formula `lacc profile` uses.
+- **The hardware advice is ordered by memory bandwidth, not by processor.** Generating a
+  token means reading the whole model out of memory once, so bandwidth sets the speed and
+  cores mostly do not. That reordering matters commercially: a machine sold as "16 GB" may
+  ship one memory stick and run at half the bandwidth of the same capacity as two, and
+  nothing on the listing distinguishes them.
+- **The verification counts are documented as an experiment.** Running the same document
+  through `extract_claims` with different models and comparing how many quotations hold
+  turns "is a bigger model worth it" into a measurement. This is the first use of the
+  grounding check for something other than trusting a single answer.
+- **v1.0 does not follow from this release, and the roadmap now says why.** Every
+  capability on the v1 list is built, but the engine has never once reached another
+  machine, a notification has never once been delivered, and the premise that a larger
+  model produces publishable work has never been tested. Their logic is verified and their
+  behaviour is unobserved - the same shape of gap ADR-019 was written to name. v1.0 is
+  gated on a real run, not on a feature.
+
+
 ## [0.26.0] - 2026-09-09
 
 ### Added

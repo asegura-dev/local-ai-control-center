@@ -51,12 +51,17 @@ one, rather than all at once.
 
 | File | What's in it |
 |---|---|
+| [setting-up-the-server-machine](guides/setting-up-the-server-machine.md) | The full walkthrough for turning a machine you own into the one LACC talks to: Tailscale on every device, Ollama bound to the tailnet rather than to every interface, a self-hosted ntfy, and the client configuration. Steps for Linux and for Windows, written to be followed by someone who has not done any of it. Includes a table of what each symptom usually means, and ends with the measurement that says whether the bigger model was worth the setup. |
+| [running-lacc-for-the-first-time](guides/running-lacc-for-the-first-time.md) | From nothing to a checked answer about your own document: what to install, what `lacc profile` tells you before you pick a model, why `context_tokens` is the setting that bites (unset means the engine's own 4096 and silent truncation), how to choose a workspace that is not inside git or a sync folder, and how to read a verified, not-found or wrong-page mark. Includes using the verification counts to compare models as an experiment rather than an opinion. |
+| [a-remote-engine-over-tailscale](guides/a-remote-engine-over-tailscale.md) | Running the model on a machine you own. Leads with the part that is dangerous: Ollama has no authentication of any kind, so the usual `OLLAMA_HOST=0.0.0.0` advice exposes the engine to every network the machine joins - bind it to the tailnet address and verify with `ss`. Also what a dedicated box actually buys (free memory and being always on, not speed), what to look for when buying one (dual-channel memory is the invisible trap), and when building a desktop with a GPU is the better answer. |
+| [notifications-with-self-hosted-ntfy](guides/notifications-with-self-hosted-ntfy.md) | Setting up ntfy so a long run says when it finished. What the notification carries and what it never carries, why third-party messaging is refused even though the body is harmless, `auth-default-access: deny-all`, choosing a topic nobody guesses, and keeping the token in the environment rather than in a file that gets backed up. |
 | [virtualenv-outside-a-sync-folder](guides/virtualenv-outside-a-sync-folder.md) | Why a `.venv` inside OneDrive or another sync folder breaks `uv`: compiled extensions hollowed out by Files On-Demand, which fail quietly and are the reason that decides it, plus locked files that fail loudly and turn out to have more than one cause. The directory-link fix, the two alternatives, and what each costs. |
 
 ## Top-level files
 
 | File | What's in it |
 |---|---|
+| [CITATION.cff](../CITATION.cff) (repo root) | Citation metadata in Citation File Format, so the project can be cited in published work. GitHub reads it and offers a formatted citation. Its `version` and `date-released` are part of the release checklist. |
 | [README.md](../README.md) (repo root) | The public landing page: what LACC is, its design principles, what it is not, and the current status. |
 | [docs/README.md](README.md) | The book's table of contents: the numbered chapters with per-version status, the guiding principle, and the ADR index. |
 | [CHANGELOG.md](../CHANGELOG.md) (repo root) | Notable changes, newest first. The "what's new since I last looked" skim. |

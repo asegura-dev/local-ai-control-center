@@ -46,6 +46,44 @@ enforced rather than merely intended, it says which mechanism enforces it.
   hosts your configuration names, and by default it reaches none.
 - Not a large platform. It grows in small, reviewed increments.
 
+## Getting started
+
+You need Python 3.11+, [`uv`](https://docs.astral.sh/uv/), and [Ollama](https://ollama.com)
+with a model pulled.
+
+```bash
+git clone https://github.com/asegura-dev/local-ai-control-center
+cd local-ai-control-center
+uv sync
+
+uv run lacc profile                  # what this machine can run
+cp config.example.yaml config.yaml   # then set workspace_root, model, context_tokens
+uv run lacc ingest paper.pdf         # PDF or Word into text LACC can read
+uv run lacc run extract_claims paper.md
+```
+
+One setting decides whether your first run tells you the truth. Leaving `context_tokens`
+unset does not mean unlimited - the engine falls back to its own default of 4096 tokens
+and silently drops whatever does not fit, so you get a confident answer about the first
+few pages and nothing says the rest went unread. Set it, and LACC asks for that window and
+refuses a prompt too large for it.
+
+**Guides**
+
+- [Setting up the machine that runs the model](docs/guides/setting-up-the-server-machine.md)
+  - Tailscale, Ollama and ntfy on a machine you own, step by step, for Linux and Windows.
+- [Running LACC for the first time](docs/guides/running-lacc-for-the-first-time.md) - the
+  full walkthrough, including how to read a verified or not-found mark.
+- [Running the model on another machine](docs/guides/a-remote-engine-over-tailscale.md) -
+  why, what hardware actually helps, and how much VRAM a model plus its context needs.
+- [Notifications when a run finishes](docs/guides/notifications-with-self-hosted-ntfy.md) -
+  self-hosted ntfy, for runs long enough to walk away from.
+- [Keeping the virtual environment out of a sync folder](docs/guides/virtualenv-outside-a-sync-folder.md)
+  - read this first if your checkout is inside OneDrive or Dropbox.
+
+The [documentation](docs/README.md) explains the design, and every decision has a record
+in [`docs/adr/`](docs/adr/) with its context, its trade-off and the alternative rejected.
+
 ## Status
 
 Early development, but working end to end against a real local model.
@@ -82,6 +120,11 @@ variable can widen that.
 
 What remains for v1 is adoption: guides, a clear install, and a citable record - see
 the [roadmap](docs/02-roadmap.md).
+
+## Citing LACC
+
+If you use LACC in published work, [`CITATION.cff`](CITATION.cff) holds the metadata and
+GitHub offers a formatted citation from the sidebar.
 
 ## License
 

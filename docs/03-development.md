@@ -85,6 +85,18 @@ described in the present tense; what is planned is described as direction, with
 words like "will", "is intended to", or "is designed to". When a feature moves
 from plan to implementation, its documentation moves with it.
 
+## Releasing
+
+Version numbers live in three places, and all three move together:
+
+- `pyproject.toml`
+- `src/local_ai_control_center/__init__.py`
+- `CITATION.cff` - both `version` and `date-released`
+
+A `CITATION.cff` naming an older version is worse than none: it tells someone citing the
+project that they used a release they did not. Then `uv lock`, a green gate, a commit, an
+annotated tag, and push both the branch and the tag.
+
 ## Chapter layout
 
 The documentation is written as a short book of numbered chapters, compiled into
