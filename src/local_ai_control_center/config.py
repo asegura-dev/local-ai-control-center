@@ -25,6 +25,32 @@ MAX_INPUT_BYTES_DEFAULT = 32 * 1024 * 1024
 that meeting it says something rather than merely being a nuisance."""
 
 
+class NtfySettings(BaseModel):
+    """How to reach an ntfy server, without holding its secrets.
+
+    Every secret is named rather than written: the value comes from the environment
+    variable this points at. A token in a configuration file is a token in a backup
+    (ADR-027).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    enabled: bool = False
+    server_url_env: str = "NTFY_SERVER"
+    topic_env: str = "NTFY_TOPIC"
+    token_env: str = "NTFY_TOKEN"
+    priority: int = 3
+    tags: tuple[str, ...] = ()
+
+
+class NotifierSettings(BaseModel):
+    """Where LACC may say that a run finished. Nothing is enabled by default."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    ntfy: NtfySettings = Field(default_factory=NtfySettings)
+
+
 class Config(BaseModel):
     """Validated configuration for one LACC run.
 
@@ -87,6 +113,22 @@ class Config(BaseModel):
             "engine for exactly this window and refuses a prompt estimated to exceed it "
             "rather than letting the engine truncate silently. See 'lacc profile' for "
             "what each installed model supports. A larger window costs memory."
+        ),
+    )
+    engine_host: str = Field(
+        default="",
+        description=(
+            "Where the model runs, when it is not on this machine. Empty means loopback. "
+            "A host that is not loopback is reached only when network_access also permits "
+            "it, and only because this names it: an environment variable can never widen "
+            "what LACC contacts."
+        ),
+    )
+    notifier: NotifierSettings = Field(
+        default_factory=NotifierSettings,
+        description=(
+            "Where LACC says that a long run finished. Off by default, and it never "
+            "carries document content: which skill ran, how it ended, how long it took."
         ),
     )
     max_input_bytes: int = Field(

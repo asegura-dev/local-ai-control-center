@@ -66,11 +66,13 @@ aspirations.
   against the workspace boundary before any access. Paths that escape it (via `..`,
   symlinks, absolute paths) are refused.
 
-- **No network access by default.** LACC does not reach the network unless a skill
-  declares `network` and the config permits it. Talking to a local engine over
-  loopback (`127.0.0.1`) is inter-process communication, not network access, and is
-  the one explicit exception - a non-loopback host is real network access and out of
-  scope.
+- **LACC reaches only hosts the configuration names.** Nothing is contacted unless
+  `network_access` permits it *and* the destination is written down in the
+  configuration. Loopback needs neither: talking to an engine on this machine is
+  inter-process communication. A machine the user owns, on a network they control,
+  is reachable when named - that is local in the sense this project means, since
+  nothing is entrusted to a third party. An environment variable can never widen
+  this; the only escape hatch is a file the user wrote.
 
 - **Meaningful executions are audited.** Every run that does something leaves a
   traceable record. Content (prompts, completions, file contents) is recorded only

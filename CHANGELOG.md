@@ -5,6 +5,62 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.0] - 2026-09-09
+
+### Added
+- **A configured engine may run on another machine you own.** `engine_host` names where
+  Ollama is, and `network_access: true` is the ceiling over it. A host that is not written
+  down is never contacted; `OLLAMA_HOST` may still only ever point at this machine.
+- **Notifications when a run finishes**, through a `Notifier` port with an ntfy adapter.
+  Self-hosted ntfy only, reached over your own private network. Off by default.
+- **`lacc notify test`** sends one notification, so settings are checked before they are
+  relied on. Exits non-zero when nothing was delivered, so a script can check it.
+- A `notifier` block in the configuration. It names the environment variables the server,
+  topic and token are read from; it does not hold their values.
+- Two audit events, `notification_sent` and `notification_failed`, recorded under the same
+  run id as the run they report.
+
+### Changed
+- **PRINCIPLES no longer says a non-loopback host is out of scope.** Local means not
+  depending on someone else's computer, not staying on one machine - which is what VISION
+  already said. The rule that replaces it is narrower than "network access": every
+  destination is named in a file the user wrote.
+- **The configuration now wins over `OLLAMA_HOST`.** A file naming a stronger machine is a
+  deliberate choice, and an ambient variable quietly sending the work back to this laptop
+  would answer from a smaller model without saying so.
+
+### Notes
+- **A notification carries no document content.** It says which skill ran, how it ended and
+  how long it took. Never a prompt, an answer, a path, or the text of anything read. The
+  destination is a machine the user named, and that is still not a reason to send it work.
+- **Delivery is best effort and never blocks.** A notifier that cannot be built or cannot
+  reach its server does not fail a run that already succeeded; the failure is printed and
+  recorded, and the answer stands.
+- **The quality gate still forbids reaching the network.** Tests inject the transport, so
+  the egress guard from ADR-022 is exactly as strict as it was: LACC gained the ability to
+  reach out, and the suite still fails if anything does it by accident.
+- Secrets are named, not written. A token in a configuration file is a token in a backup.
+  There is no field that could hold the topic either: on a server without authentication the
+  topic *is* the authentication, and a configuration that could hold it is one that ends up
+  committed with it. Refusing the field beats warning about it - a warning that prevents
+  nothing is the guard that gets ignored.
+- **Notification titles are folded to ASCII, and the body is clipped on character
+  boundaries.** An HTTP header is latin-1, so a title carrying an emoji raised
+  `UnicodeEncodeError` - a `ValueError`, not an `OSError` - which would have sailed past the
+  handler catching network failures and taken down a run that had already produced its
+  answer. Accents fold rather than drop, so "Revisión lista" stays readable; a carriage
+  return can no longer reach a header at all. Clipping the encoded body directly had the
+  matching flaw: a body in Spanish ended on half an accented character and arrived as
+  invalid UTF-8. Neither could be triggered by today's titles, all of which are ASCII
+  literals - which is exactly the problem, since the guarantee would have held by accident.
+- The ntfy server address is checked to be `http` or `https` before anything is posted to
+  it. It arrives from the environment, and the environment is not a place to discover that
+  LACC will post a body to an arbitrary scheme.
+- Telegram is not implemented and will not be. It is a third party, and a message telling
+  it that you are working, on what and when, is information about your research whatever
+  the body says.
+
+
 ## [0.25.0] - 2026-09-09
 
 ### Added

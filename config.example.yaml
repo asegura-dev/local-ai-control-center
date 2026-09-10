@@ -51,8 +51,45 @@ max_input_bytes: 33554432
 # Whether LACC may use the network. Off by default (local-first).
 # Setting this to true does not grant network access to anything by itself: a
 # skill must also request the `network` capability. Configuration is a ceiling,
-# not a grant.
+# not a grant. It is also the ceiling over `engine_host` and `notifier` below:
+# neither of them reaches anywhere while this is false.
 network_access: false
+
+# Where the Ollama engine runs. Empty by default, which means this machine.
+# Local-first means not depending on someone else's computer, not staying on one
+# machine: a desktop you own, on a network you control, is still local. Reaching it
+# needs `network_access: true` AND this line - a host that is not written down here
+# is never contacted, so no installer or environment variable can widen what LACC
+# talks to. `OLLAMA_HOST` may only ever point at this machine, and this line wins
+# over it, so an ambient variable cannot quietly send the work back to a smaller
+# model. Documents go to whatever engine this names: name a machine you own.
+# engine_host: http://desk:11434
+
+# Where LACC says that a run finished. Off by default.
+# For work that takes minutes on a bigger model and is waited on elsewhere. A
+# notification says which skill ran, how it ended and how long it took - never a
+# prompt, an answer, a path, or the text of anything read. Delivery is best effort:
+# a notifier that cannot reach its server never fails a run that already worked.
+# Check it with `lacc notify test` before relying on it.
+#
+# The server, topic and token are NOT written here: this names the environment
+# variables they are read from, because a token in a configuration file is a token
+# in a backup. There is no field that could hold the topic itself, and that is on
+# purpose - on an ntfy server without authentication the topic IS the authentication,
+# so anyone who has it can read your notifications and publish to them. Choose an
+# unpredictable one (`lacc-tesis-7h3k9x`, not `lacc`).
+#
+# Only ntfy is supported, self-hosted, reached over your own private network.
+# Third-party messaging services are not: a message telling one that you are working,
+# on what and when, is information about your research whatever the body says.
+notifier:
+  ntfy:
+    enabled: false
+    server_url_env: NTFY_SERVER
+    topic_env: NTFY_TOPIC
+    token_env: NTFY_TOKEN
+    priority: 3
+    tags: []
 
 # How much detail the audit trail records.
 #   standard - metadata only: which capabilities were requested, whether they

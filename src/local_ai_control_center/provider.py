@@ -128,6 +128,54 @@ def _is_loopback(hostname: str) -> bool:
         return False
 
 
+_NOT_NAMED = (
+    "The engine host {host} is not this machine, and network_access is off. A host that "
+    "is not loopback is reached only when the configuration both permits network access "
+    "and names it, so that no environment or installer can widen what LACC contacts. Set "
+    "network_access: true and engine_host in your configuration if this is a machine you "
+    "own on a network you control (ADR-027)."
+)
+
+
+def _normalized_host(host: str) -> str:
+    """Return ``host`` with a scheme, so it can be parsed the same way every time."""
+    return host if host.startswith("http") else f"http://{host}"
+
+
+def resolve_engine_host(configured: str, network_access: bool) -> str:
+    """Decide which engine address to use, and refuse the ones that were never named.
+
+    An environment variable may only ever point at this machine: that protection is from
+    ADR-022 and it does not move. A host elsewhere comes from the configuration alone,
+    and only when network access is permitted - so the escape hatch is a file the user
+    wrote rather than a variable something else set (ADR-027).
+
+    The configuration wins over the variable. A file naming a stronger machine is a
+    deliberate choice, and an ambient `OLLAMA_HOST` quietly sending the work back to this
+    laptop would be the wrong kind of surprise: the answer would come from a smaller model
+    and nothing would say so.
+    """
+    named = configured.strip()
+    if named:
+        host = _normalized_host(named)
+        hostname = urllib.parse.urlparse(host).hostname
+        if hostname is not None and _is_loopback(hostname):
+            return host
+        if not network_access:
+            raise ProviderError(_NOT_NAMED.format(host=host))
+        return host
+
+    from_env = os.environ.get("OLLAMA_HOST", "").strip()
+    if from_env:
+        host = _normalized_host(from_env)
+        hostname = urllib.parse.urlparse(host).hostname
+        if hostname is None or not _is_loopback(hostname):
+            raise ProviderError(_NOT_LOOPBACK.format(host=host))
+        return host
+
+    return DEFAULT_OLLAMA_HOST
+
+
 def ollama_host() -> str:
     """The engine address, honoring OLLAMA_HOST, defaulting to loopback.
 
@@ -168,7 +216,9 @@ class OllamaProvider(Provider):
     actionable messages rather than raised as raw errors.
     """
 
-    def __init__(self, model: str, context_tokens: int | None = None) -> None:
+    def __init__(
+        self, model: str, context_tokens: int | None = None, host: str | None = None
+    ) -> None:
         """Create the provider for a model name and, optionally, a context window.
 
         The window is given here rather than per prompt because it describes how the
@@ -177,7 +227,7 @@ class OllamaProvider(Provider):
         qwen2.5:3b, measured - and silently drops whatever does not fit, so a window LACC
         did not ask for is a window LACC cannot enforce a ceiling against (ADR-019).
         """
-        self._host = ollama_host()
+        self._host = host if host is not None else ollama_host()
         self._context_tokens = context_tokens
         if not model:
             raise ProviderError(

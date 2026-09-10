@@ -14,6 +14,7 @@ from local_ai_control_center.provider import (
     Provider,
     ProviderError,
     ollama_host,
+    resolve_engine_host,
 )
 
 
@@ -292,3 +293,54 @@ def test_the_mock_reports_no_counts() -> None:
     completion = MockProvider().complete("hi")
     assert completion.prompt_tokens is None
     assert completion.finish_reason is None
+
+
+def test_an_unnamed_remote_engine_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Network access alone does not send documents anywhere; the host must be named."""
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    with pytest.raises(ProviderError):
+        resolve_engine_host("http://desk:11434", network_access=False)
+
+
+def test_a_named_remote_engine_is_used_when_network_access_permits_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The one way to reach another machine: written in the configuration, under the ceiling."""
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    assert resolve_engine_host("http://desk:11434", network_access=True) == "http://desk:11434"
+
+
+def test_a_configured_loopback_engine_needs_no_network_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Talking to a local engine is inter-process communication, not network access."""
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    assert resolve_engine_host("127.0.0.1:11434", network_access=False) == "http://127.0.0.1:11434"
+
+
+def test_the_environment_can_never_name_a_remote_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The ADR-022 protection does not move: a variable cannot send documents away.
+
+    Even with network access permitted, which is the case that would have widened it.
+    """
+    monkeypatch.setenv("OLLAMA_HOST", "https://models.example.com")
+    with pytest.raises(ProviderError):
+        resolve_engine_host("", network_access=True)
+
+
+def test_the_configuration_wins_over_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A file naming a stronger machine is deliberate; an ambient variable is not.
+
+    Letting `OLLAMA_HOST=localhost` quietly override it would answer from a smaller model
+    and say nothing about it.
+    """
+    monkeypatch.setenv("OLLAMA_HOST", "http://127.0.0.1:11434")
+    assert resolve_engine_host("http://desk:11434", network_access=True) == "http://desk:11434"
+
+
+def test_nothing_configured_and_nothing_in_the_environment_stays_on_this_machine(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The default is unchanged: loopback, with no network access needed or granted."""
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    assert resolve_engine_host("", network_access=True) == ollama_host()

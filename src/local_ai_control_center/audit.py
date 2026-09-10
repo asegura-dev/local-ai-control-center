@@ -38,6 +38,8 @@ EventKind = Literal[
     "prompt_was_truncated",
     "ceiling_underestimated",
     "answer_truncated",
+    "notification_sent",
+    "notification_failed",
 ]
 """The closed set of events recorded today. It grows as real events appear."""
 

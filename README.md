@@ -42,26 +42,46 @@ enforced rather than merely intended, it says which mechanism enforces it.
 ## What LACC is not
 
 - Not an autonomous agent that acts without supervision.
-- Not dependent on paid APIs or a network connection.
+- Not dependent on paid APIs, or on anybody's computer but your own. It reaches only
+  hosts your configuration names, and by default it reaches none.
 - Not a large platform. It grows in small, reviewed increments.
 
 ## Status
 
-Early development, but working end to end. `lacc run summarize_file <path>` plans
-the action, shows a preview, asks for confirmation (defaulting to no), reads the
-file inside the workspace boundary under the `read_files` permission, sends its
-contents to a local Ollama model, and records the run in an append-only audit log.
-`lacc ingest <document>` turns a PDF or Word file inside the workspace into text LACC
-can read, writing it as Markdown you can open and correct - after the same preview and
-confirmation, and never overwriting a file that is already there. `lacc preview` shows
-what would happen without doing it; `lacc profile` reports what the machine offers.
+Early development, but working end to end against a real local model.
+
+Every run takes the same shape: LACC plans the action, shows a preview, asks for
+confirmation defaulting to no, reads what it was pointed at inside the workspace
+boundary under the `read_files` permission, and records the whole thing in an
+append-only, hash-chained audit log.
+
+- `lacc run summarize_file <path>` and `critique_file` answer about a document.
+- `lacc run extract_claims <path>` returns what a source asserts, each claim with the
+  document's own words and a page - and **every quotation is checked against the
+  source**. What cannot be found is marked as not found rather than presented as fact.
+- `lacc run revise_file <path>` proposes a clearer version *beside* the original,
+  approved against a diff. Nothing LACC writes replaces a file that already existed.
+- `lacc ingest <document>` turns a PDF or Word file into Markdown you can open and
+  correct, preserving page markers so quotations stay checkable.
+- `lacc preview` shows what would happen without doing it, `lacc profile` reports what
+  the machine offers, `lacc verify` walks the audit chain, and `lacc notify test`
+  checks notification settings before you rely on them.
 
 The control core is in place: configuration, workspaces with boundary enforcement,
 permissions, a provider port with a deterministic mock and a real Ollama
-implementation, the audit log, execution previews, the execution cycle, skills,
-document conversion, and the command-line interface. The engine is reached over
-loopback only: a non-loopback address is refused rather than used. What remains is hardening through real use and
-documentation for adoption - see the [roadmap](docs/02-roadmap.md).
+implementation, the hash-chained audit log, execution previews, the execution cycle,
+skills, document conversion, quotation checking, a notifier port, and the
+command-line interface.
+
+By default LACC contacts nothing but a local engine. It reaches another machine only
+when the configuration both permits network access and names the host - so the model
+can run on a desktop you own, on a network you control, and a run that takes minutes
+can say when it finished through an ntfy server you host yourself. No destination is
+ever contacted unless it is written down in your configuration, and no environment
+variable can widen that.
+
+What remains for v1 is adoption: guides, a clear install, and a citable record - see
+the [roadmap](docs/02-roadmap.md).
 
 ## License
 

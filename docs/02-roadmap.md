@@ -105,6 +105,11 @@ carries no dates.
   with the document's own words and a page, and every quotation is checked against the
   source before it is shown. The first control in LACC that verifies the model instead
   of asking it to behave, and the capability v1 is defined around.
+- **v0.26.0 - Machines of your own.** The engine may run on a desktop you own, named in
+  the configuration and reached over your own private network; a run that finishes says
+  so through a notifier you host yourself. PRINCIPLES changes its network rule to match
+  what VISION already said, and the rule that replaces it is narrower than "network
+  access": every destination is written down in a file the user wrote.
 
 ## A course correction, recorded
 
@@ -141,21 +146,21 @@ invented one. A tool that fabricates a citation is not merely unhelpful for publ
 it is dangerous to the person who publishes it. So the capability that defines v1 is not
 fluency but grounding.
 
-- **Grounded extraction.** What a source claims, returned with quotations and page numbers,
+- **Grounded extraction.** *Delivered in v0.25.0.* What a source claims, returned with quotations and page numbers,
   and **each quotation checked against the document it came from**. What cannot be found is
   reported as unsupported rather than presented as fact. This is the one thing LACC can do
   that a chat service cannot, and it is mechanical: a substring search, deterministic, with
   no model involved in the checking.
-- **A stronger machine of your own.** v1 assumes the model runs somewhere better than a
-  laptop - a desktop on a private network, reached over Tailscale. This laptop stays the
+- **A stronger machine of your own.** *Delivered in v0.26.0.* v1 assumes the model runs
+  somewhere better than a laptop - a desktop on a private network, reached over Tailscale. This laptop stays the
   place where LACC is developed and tested, because that is faster; it is not the place the
   work is expected to be good. The decision record for this comes before the code, and it
   resolves the contradiction between PRINCIPLES and VISION over what counts as local.
-- **Finishing without watching.** A run that takes minutes is fine, provided it says when it
-  is done. A notifier the user hosts themselves, reached over their own private network -
+- **Finishing without watching.** *Delivered in v0.26.0.* A run that takes minutes is fine,
+  provided it says when it is done. A notifier the user hosts themselves, reached over their own private network -
   not a third-party messaging service, which would tell somebody else when you work and on
   what, whatever the message said.
-- **Adoption, and citability.** LACC is public and is meant to be cited in the thesis it
+- **Adoption, and citability.** *The last one left.* LACC is public and is meant to be cited in the thesis it
   helps write, so that others can build on it. That makes guides, a clear install and a
   citable record part of the deliverable rather than an afterthought.
 

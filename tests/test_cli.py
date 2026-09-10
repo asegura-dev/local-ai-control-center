@@ -12,9 +12,11 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from local_ai_control_center.cli import app
+from local_ai_control_center.notifier import Delivery, Notification, Notifier
 
 runner = CliRunner()
 
@@ -232,3 +234,130 @@ def test_critique_previews_as_a_read_only_action(tmp_path: Path) -> None:
     assert "critique_file" in result.stdout
     assert "read_files" in result.stdout
     assert "write_files" not in result.stdout
+
+
+class _CapturingNotifier(Notifier):
+    """A notifier that keeps what it was given instead of sending it."""
+
+    def __init__(self, delivered: bool = True) -> None:
+        self.delivered = delivered
+        self.sent: list[Notification] = []
+
+    @property
+    def name(self) -> str:
+        return "recorder"
+
+    def send(self, notification: Notification) -> Delivery:
+        self.sent.append(notification)
+        return Delivery(transport=self.name, delivered=self.delivered, detail="HTTP 200")
+
+
+def _install_notifier(monkeypatch: pytest.MonkeyPatch, notifier: Notifier | None) -> None:
+    """Put ``notifier`` behind the CLI's factory, so no transport is involved."""
+    monkeypatch.setattr(
+        "local_ai_control_center.cli.notifier_from_config",
+        lambda config, post=None: notifier,
+    )
+
+
+def _kinds(tmp_path: Path) -> list[str]:
+    log = tmp_path / "ws" / "audit.jsonl"
+    return [json.loads(line)["kind"] for line in log.read_text(encoding="utf-8").splitlines()]
+
+
+def test_notify_test_says_so_when_nothing_is_configured(tmp_path: Path) -> None:
+    """The default configuration has no notifier, and the check reports that clearly."""
+    config = _config_file(tmp_path)
+    result = runner.invoke(app, ["notify", "test", "-c", str(config)])
+    assert result.exit_code == 1
+    assert "No notifier configured" in result.stdout
+
+
+def test_notify_test_sends_one_notification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The point of the command: check the settings before relying on them."""
+    config = _config_file(tmp_path)
+    notifier = _CapturingNotifier()
+    _install_notifier(monkeypatch, notifier)
+    result = runner.invoke(app, ["notify", "test", "-c", str(config)])
+    assert result.exit_code == 0
+    assert len(notifier.sent) == 1
+    assert "notification_sent" in _kinds(tmp_path)
+
+
+def test_notify_test_exits_non_zero_when_nothing_arrived(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Usable from a script: a check that cannot deliver does not report success."""
+    config = _config_file(tmp_path)
+    _install_notifier(monkeypatch, _CapturingNotifier(delivered=False))
+    result = runner.invoke(app, ["notify", "test", "-c", str(config)])
+    assert result.exit_code == 1
+    assert "notification_failed" in _kinds(tmp_path)
+
+
+def test_a_finished_run_is_announced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The reason the notifier exists: a run that took minutes says it is done."""
+    config = _config_file(tmp_path)
+    notifier = _CapturingNotifier()
+    _install_notifier(monkeypatch, notifier)
+    result = runner.invoke(
+        app,
+        ["run", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
+        input="y\n",
+    )
+    assert result.exit_code == 0
+    assert len(notifier.sent) == 1
+    assert "summarize_file" in notifier.sent[0].title
+    assert "completed" in notifier.sent[0].title
+
+
+def test_a_notification_carries_no_document_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The rule that matters: the destination is a machine, and it still gets no work.
+
+    The note in the workspace is read, summarized and written about; none of its words,
+    nor the answer's, may appear in what leaves the machine (ADR-027).
+    """
+    config = _config_file(tmp_path)
+    notifier = _CapturingNotifier()
+    _install_notifier(monkeypatch, notifier)
+    runner.invoke(
+        app,
+        ["run", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
+        input="y\n",
+    )
+    said = notifier.sent[0].title + notifier.sent[0].body
+    assert "A short note to summarize" not in said
+    assert "notes.txt" not in said
+
+
+def test_a_declined_run_is_not_announced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Declining happens with the user present; there is nobody to tell."""
+    config = _config_file(tmp_path)
+    notifier = _CapturingNotifier()
+    _install_notifier(monkeypatch, notifier)
+    runner.invoke(
+        app,
+        ["run", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
+        input="\n",
+    )
+    assert notifier.sent == []
+
+
+def test_an_undelivered_notification_does_not_fail_the_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Best effort, and it is the run that matters: the answer still stands."""
+    config = _config_file(tmp_path)
+    _install_notifier(monkeypatch, _CapturingNotifier(delivered=False))
+    result = runner.invoke(
+        app,
+        ["run", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
+        input="y\n",
+    )
+    assert result.exit_code == 0
+    assert "Result" in result.stdout
+    assert "notification_failed" in _kinds(tmp_path)

@@ -8,6 +8,7 @@ a skill, previews it, asks for confirmation (defaulting to no), and executes;
 
 from __future__ import annotations
 
+import time
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -29,6 +30,11 @@ from local_ai_control_center.cycle import (
     answer_reserve,
     run_conversion,
 )
+from local_ai_control_center.notifier import (
+    Notification,
+    NotifierMisconfigured,
+    notifier_from_config,
+)
 from local_ai_control_center.permissions import grant
 from local_ai_control_center.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.profiler import SystemProfile, profile_system
@@ -37,6 +43,7 @@ from local_ai_control_center.provider import (
     OllamaProvider,
     Provider,
     ProviderError,
+    resolve_engine_host,
 )
 from local_ai_control_center.run import new_run_id
 from local_ai_control_center.skill import (
@@ -186,20 +193,26 @@ def run(
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 
+    run_id = new_run_id()
     generating = provider_choice is ProviderChoice.ollama
+    started = time.monotonic()
     try:
         if generating:
             with console.status("Contacting Ollama...") as status:
                 status.update(
                     "Generating... (the first run loads the model into memory and may take longer)"
                 )
-                result = _do_run(resolved, tuple(requests), config, workspace, provider, audit)
+                result = _do_run(
+                    resolved, tuple(requests), config, workspace, provider, audit, run_id
+                )
         else:
-            result = _do_run(resolved, tuple(requests), config, workspace, provider, audit)
+            result = _do_run(resolved, tuple(requests), config, workspace, provider, audit, run_id)
     except (ProviderError, ReadError, PromptTooLargeError) as error:
+        _announce(resolved.name, "failed", time.monotonic() - started, config, audit, run_id)
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
 
+    _announce(resolved.name, result.outcome, time.monotonic() - started, config, audit, run_id)
     _report(result)
     _show_checked_quotations(result)
     _warn_about_the_answer(result, config)
@@ -302,7 +315,8 @@ def _build_provider(choice: ProviderChoice, config: Config) -> Provider:
     """Construct the chosen provider. Ollama needs a configured model; the mock does not."""
     if choice is ProviderChoice.mock:
         return MockProvider()
-    return OllamaProvider(config.model, config.context_tokens)
+    host = resolve_engine_host(config.engine_host, config.network_access)
+    return OllamaProvider(config.model, config.context_tokens, host)
 
 
 def _do_run(
@@ -312,6 +326,7 @@ def _do_run(
     workspace: Workspace,
     provider: Provider,
     audit: AuditLog,
+    run_id: str,
 ) -> RunResult:
     """Run the skill through the cycle with confirmation already handled."""
     return run_skill(
@@ -322,10 +337,59 @@ def _do_run(
         workspace,
         provider,
         audit,
-        new_run_id(),
+        run_id,
         lambda _preview: True,
         _approve,
     )
+
+
+_OUTCOME_TAGS = {
+    "completed": "white_check_mark",
+    "refused": "no_entry",
+    "declined": "raised_hand",
+    "failed": "warning",
+}
+
+
+def _announce(
+    skill_name: str,
+    outcome: str,
+    elapsed: float,
+    config: Config,
+    audit: AuditLog,
+    run_id: str,
+) -> None:
+    """Tell the configured notifier that a run finished.
+
+    Best effort: a notifier that cannot be built or cannot reach its server never fails a
+    run that already happened (ADR-027). The message says which skill ran, how it ended and
+    how long it took, and nothing else - not the paths, not the answer, not the error text.
+    """
+    try:
+        notifier = notifier_from_config(config)
+    except NotifierMisconfigured as error:
+        audit.record(run_id, "notification_failed", "Notifier misconfigured", {"error": str(error)})
+        console.print(f"[yellow]Notification not sent:[/yellow] {error}")
+        return
+    if notifier is None:
+        return
+
+    notification = Notification(
+        title=f"LACC: {skill_name} {outcome}",
+        body=f"{skill_name} {outcome} after {elapsed:.0f}s",
+        tags=(_OUTCOME_TAGS.get(outcome, "bell"),),
+    )
+    delivery = notifier.send(notification)
+    audit.record(
+        run_id,
+        "notification_sent" if delivery.delivered else "notification_failed",
+        f"Notification via {delivery.transport}: {delivery.detail}",
+        {"transport": delivery.transport, "delivered": delivery.delivered},
+    )
+    if not delivery.delivered:
+        console.print(
+            f"[yellow]Notification not delivered[/yellow] ({delivery.transport}): {delivery.detail}"
+        )
 
 
 @app.command()
@@ -581,6 +645,57 @@ def _exit_refused() -> None:
     """
     console.print("[red]Refused:[/red] the action would not be allowed.")
     raise typer.Exit(code=1)
+
+
+notify_app = typer.Typer(help="Check and use the configured notifier.", no_args_is_help=True)
+app.add_typer(notify_app, name="notify")
+
+
+@notify_app.command("test")
+def notify_test(
+    config_path: Annotated[
+        Path,
+        typer.Option("--config", "-c", help="Path to the configuration file."),
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Send one test notification, so settings are checked before being relied on.
+
+    Exits non-zero when nothing was delivered, so the check is usable from a script.
+    """
+    config, workspace = _load(config_path)
+    audit = AuditLog(workspace, config)
+    run_id = new_run_id()
+
+    try:
+        notifier = notifier_from_config(config)
+    except NotifierMisconfigured as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    if notifier is None:
+        console.print(
+            "[yellow]No notifier configured.[/yellow] Notifications need `network_access: true`, "
+            "`notifier.ntfy.enabled: true`, and the named environment variables set."
+        )
+        raise typer.Exit(code=1)
+
+    delivery = notifier.send(
+        Notification(
+            title="LACC: notifier test",
+            body="If this arrived, notifications are configured.",
+            tags=("bell",),
+        )
+    )
+    audit.record(
+        run_id,
+        "notification_sent" if delivery.delivered else "notification_failed",
+        f"Test notification via {delivery.transport}: {delivery.detail}",
+        {"transport": delivery.transport, "delivered": delivery.delivered},
+    )
+    if not delivery.delivered:
+        console.print(f"[red]Not delivered[/red] ({delivery.transport}): {delivery.detail}")
+        raise typer.Exit(code=1)
+    console.print(f"[green]Sent[/green] via {delivery.transport}: {delivery.detail}")
 
 
 def main() -> None:

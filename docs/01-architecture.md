@@ -52,8 +52,9 @@ implementation (`provider`), an append-only audit
 log (`audit`), a side-effect-free execution preview (`preview`), the execution
 cycle that runs an action through all of them (`cycle`), skills that produce those
 actions (`skill`), a converter port that turns documents into text LACC can read
-(`converter`), and a command-line interface that ties everything into a usable
-tool (`cli`). Interface code (Typer, Rich) lives only in the CLI; the core stays
+(`converter`), the quotation checking that verifies an answer against its source
+(`grounding`), a notifier port that says when a run finished (`notifier`), and a
+command-line interface that ties everything into a usable tool (`cli`). Interface code (Typer, Rich) lives only in the CLI; the core stays
 free of it. A profiler (`profiler`) detects and reports what the machine offers -
 the local engine, installed models, hardware, and rough capacity guidance - without
 acting; it is Ollama-specific for now, while the provider port stays engine-agnostic.
@@ -376,6 +377,47 @@ clipped - and it is wrong, because the estimate is deliberately high. A healthy 
 fewer tokens than estimated every time. Two of the system's own honest choices, put next to
 each other carelessly, produce a false alarm on every good run; the correct comparison is
 against the window, which is the thing that actually does the clipping.
+
+## Naming every destination
+
+Until v0.26.0 the network rule was one line: loopback only. It was simple to state, easy to
+enforce, and wrong - or at least, it contradicted the other document. PRINCIPLES said a
+non-loopback host was out of scope; VISION said local-first means not depending on somebody
+else's cloud, and that hardware you own on a network you control still qualifies. Both had
+been on the page for months. Only when the work needed a model bigger than a laptop could
+hold did anything depend on which one won (ADR-027).
+
+VISION won, and the reason is what local was ever protecting: not a machine boundary but a
+dependency. Nothing entrusted to a third party, no service that can read, retain or
+discontinue the work. A desktop in the next room does not violate that.
+
+What replaces "loopback only" is not "network access is now allowed". It is that **every
+destination is written down**. A host is contacted when the configuration permits network
+access *and* names it - two separate statements in a file the user wrote. `OLLAMA_HOST`
+keeps the treatment it got in v0.21.0 and may still only ever point at this machine, so no
+installer, no shell profile and no inherited environment can widen what LACC talks to. The
+configuration also wins over the variable, which closes the quieter failure: a config
+naming the strong machine, an ambient `OLLAMA_HOST=localhost`, and an answer that comes
+back from a three-billion-parameter model with nothing saying so.
+
+The notifier is the same rule applied to a smaller thing. It posts to an ntfy server the
+user hosts, named through environment variables the configuration points at - the YAML
+holds the *name* of the variable, never the token, because a token in a configuration file
+is a token in a backup. A third-party messaging service is refused on a ground that is easy
+to miss: the body of the message is not the only thing it discloses. That you are working,
+on what, and at what hour is information about the research, whatever the message says.
+
+Two properties of the notifier are worth separating because they are easy to conflate. A
+notification **carries no document content** - which skill ran, how it ended, how long it
+took, and nothing else, not a path and not an error string. And delivery is **best effort**:
+a notifier that cannot be built or cannot reach its server prints and records the failure
+and returns, because a run that already produced an answer is not failed by a message
+about it.
+
+The gate did not loosen. The egress guard from ADR-022 still fails any test that opens a
+connection off this machine; the notifier tests inject the transport, and the provider
+tests assert on the resolved host rather than dialling it. LACC gained the ability to reach
+out, and the suite still proves that nothing does it by accident.
 
 ## Future direction
 
