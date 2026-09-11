@@ -35,6 +35,7 @@ from local_ai_control_center.cycle import (
     RunResult,
     answer_reserve,
     run_conversion,
+    write_new_file,
 )
 from local_ai_control_center.notifier import (
     Notification,
@@ -686,6 +687,146 @@ def _report_the_spread(skill_name: str, model: str, rows: list[tuple[int, int, i
             f"[yellow]This configuration varied by {max(rates) - min(rates)} points "
             f"across {len(rows)} runs.[/yellow] A single run would not have told you "
             "that, and cannot be compared against another single run."
+        )
+
+
+def _collected_markdown(
+    skill_name: str, model: str, gathered: list[tuple[str, RunResult | str]]
+) -> str:
+    """Assemble the collected claims into a file meant to be worked from.
+
+    The quotation comes before the claim in each block, because the quotation is what
+    carries authority: the claim is the model's paraphrase, and a generated file invites
+    being treated as a source when it is not (ADR-039).
+    """
+    lines = [
+        f"# Claims collected by {skill_name}",
+        "",
+        f"From {len(gathered)} documents, using {model or 'the mock provider'}. Every "
+        "quotation was checked against the document it came from; the page is the one LACC "
+        "located, not the one the model gave.",
+        "",
+        "This file is generated. It is not a source: each claim is the model's paraphrase, "
+        "and the quotation beneath it is what can be cited.",
+        "",
+    ]
+    for name, outcome in gathered:
+        lines.append(f"## {name}")
+        lines.append("")
+        if isinstance(outcome, str):
+            lines += [f"**Not collected.** {outcome}", ""]
+            continue
+        claims = outcome.checked_claims
+        held = sum(1 for c in claims if c.holds)
+        lines += [f"*{held} of {len(claims)} quotations verified.*", ""]
+        for checked in claims:
+            page = f"p. {checked.found_on_page}" if checked.found_on_page else "page unknown"
+            mark = "verified" if checked.holds else "**NOT IN THE DOCUMENT**"
+            lines += [
+                f"> {checked.claim.quote}",
+                "",
+                f"{page} - {mark}",
+                "",
+                checked.claim.claim,
+                "",
+            ]
+            if checked.nearest:
+                lines += [f"Closest text in the source: {checked.nearest}", ""]
+    return chr(10).join(lines) + chr(10)
+
+
+@app.command()
+def collect(
+    skill: Annotated[str, typer.Argument(help="Name of the skill to run on each document.")],
+    requests: Annotated[list[str], typer.Argument(help="Paths inside the workspace.")],
+    into: Annotated[Path, typer.Option("--into", help="Where to write the collected results.")],
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+    provider_choice: Annotated[
+        ProviderChoice, typer.Option("--provider", help="Which provider to run against.")
+    ] = ProviderChoice.ollama,
+) -> None:
+    """Run a skill across many documents, one at a time, and collect what it found.
+
+    A library does not fit in a context window - thirty papers are twelve times the budget
+    of the largest one this hardware can run. Each document therefore gets the whole window
+    to itself, which also makes it impossible for a quotation to be attributed to the wrong
+    paper: the source is a fact about which run produced it (ADR-039).
+    """
+    resolved = _resolve_skill(skill)
+    config, workspace = _load(config_path)
+    if not resolved.plan((requests[0],), config).verify_quotes:
+        console.print(
+            f"[red]{skill} does not check its quotations, so there is nothing to collect "
+            "that could be trusted.[/red] A long file of unchecked prose is no better than "
+            "the model that wrote it."
+        )
+        raise typer.Exit(code=1)
+
+    audit = AuditLog(workspace, config)
+    try:
+        provider = _build_provider(provider_choice, config)
+    except ProviderError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    destination = workspace.resolve_within(into)
+    action = IntendedAction(
+        name="collect",
+        summary=f"Collect {skill} from {len(requests)} documents into {into}",
+        required=frozenset({"read_files", "write_files"}),
+        targets=tuple(Path(item) for item in requests),
+        writes=(Path(into),),
+    )
+    preview = preview_action(
+        action, grant(action.required, config), config, workspace, config.remote_engine
+    )
+    _show_preview(preview)
+    if not preview.allowed:
+        _exit_refused()
+    if not typer.confirm(f"Read {len(requests)} documents and write {into}?", default=False):
+        console.print("[yellow]Declined.[/yellow] Nothing was run.")
+        return
+
+    gathered: list[tuple[str, RunResult | str]] = []
+    with console.status("Collecting...") as status:
+        for index, request in enumerate(requests, start=1):
+            status.update(f"{request} ({index} of {len(requests)})...")
+            try:
+                gathered.append(
+                    (
+                        request,
+                        _do_run(
+                            resolved, (request,), config, workspace, provider, audit, new_run_id()
+                        ),
+                    )
+                )
+            except (ProviderError, ReadError, PromptTooLargeError) as error:
+                # One unreadable file should cost one document, not the traverse (ADR-039).
+                gathered.append((request, str(error)))
+
+    try:
+        write_new_file(destination, _collected_markdown(resolved.name, config.model, gathered))
+    except ConversionError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    failed = [name for name, outcome in gathered if isinstance(outcome, str)]
+    verified = sum(
+        sum(1 for c in outcome.checked_claims if c.holds)
+        for _, outcome in gathered
+        if not isinstance(outcome, str)
+    )
+    total = sum(
+        len(outcome.checked_claims) for _, outcome in gathered if not isinstance(outcome, str)
+    )
+    console.print(
+        Panel(f"{verified} of {total} quotations verified, written to {into}", title="Collected")
+    )
+    if failed:
+        console.print(
+            f"[yellow]{len(failed)} documents were not collected:[/yellow] {', '.join(failed)}"
         )
 
 

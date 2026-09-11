@@ -339,8 +339,11 @@ def diff_between(before: str, after: str, after_name: str) -> str:
     return chr(10).join(lines)
 
 
-def _write_new_file(path: Path, text: str) -> None:
+def write_new_file(path: Path, text: str) -> None:
     """Write ``text`` to ``path``, refusing to touch a file that is already there.
+
+    Public because collecting writes its own file outside the cycle, and nothing LACC
+    writes should reach disk by a route that does not refuse an existing file (ADR-039).
 
     Opened for exclusive creation rather than checked first. PRINCIPLES says to attempt
     and translate the failure at a volatile boundary rather than pre-check a state that
@@ -559,7 +562,7 @@ def _offer_the_answer(
         )
         return
 
-    _write_new_file(resolved, answer)
+    write_new_file(resolved, answer)
     audit.record(
         run_id,
         "revision_written",
@@ -682,7 +685,7 @@ def run_conversion(
 
     try:
         text = converter.extract_text(resolved_source)
-        _write_new_file(resolved_destination, text)
+        write_new_file(resolved_destination, text)
     except ConversionError as error:
         audit.record(
             run_id,

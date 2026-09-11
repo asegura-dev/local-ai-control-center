@@ -101,6 +101,9 @@ append-only, hash-chained audit log.
 - `lacc run extract_claims <path>` returns what a source asserts, each claim with the
   document's own words and a page - and **every quotation is checked against the
   source**. What cannot be found is marked as not found rather than presented as fact.
+- `lacc collect extract_claims <paths> --into claims.md` runs across a whole
+  bibliography, one document at a time, and assembles a body of claims whose
+  quotations have each been checked against the paper they came from.
 - `lacc run revise_file <path>` proposes a clearer version *beside* the original,
   approved against a diff. Nothing LACC writes replaces a file that already existed.
 - `lacc ingest <document>` turns a PDF or Word file into Markdown you can open and

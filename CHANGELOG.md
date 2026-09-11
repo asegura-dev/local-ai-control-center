@@ -5,6 +5,50 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.33.0] - 2026-09-10
+
+### Added
+- **`lacc collect <skill> <paths> --into <file>` runs a skill across many documents, one at
+  a time, and assembles the results.** A library does not fit in a context window: one
+  seven-page paper is about ten thousand tokens, a 32k window has a budget of 24,576, and
+  thirty papers are three hundred thousand.
+
+  No model size changes that. Parameters do not buy context; context is bought in VRAM. A
+  70B at a 128k window needs about 80 GB before a document is loaded, and the 32B measured
+  here already runs 45% outside a 16 GB card, takes seventeen times longer than the 14B, and
+  verifies fewer quotations.
+
+  **The stronger argument is correctness.** With several documents in one prompt a model can
+  attribute a quotation from paper A to paper B, and the check will report it **verified** -
+  the words really are in the text it was given. One document per run makes the source a
+  fact about which run produced it rather than something a model can get wrong. The same
+  move as ADR-031: stop asking a model a question the system can answer itself.
+
+  The collected file is grouped by source, with the quotation first and the model's
+  paraphrase beneath it, because the quotation is what carries authority. It says of itself
+  that it is not a source.
+
+  Measured on two real papers: 22 of 25 quotations verified, about eleven seconds a
+  document. Thirty papers would run in roughly six minutes.
+
+- One preview and one confirmation cover the whole traverse, naming every document and the
+  destination. Each document's run is audited separately, because each is a document sent to
+  an engine. A document that fails costs that document and not the traverse. The destination
+  is never overwritten.
+- `collect` refuses a skill that does not check its quotations: a long file of unchecked
+  prose is no better than the model that wrote it.
+
+### Notes
+- ADR-025's several-documents-in-one-prompt stays, now documented as being for comparing a
+  handful rather than for traversing a library.
+- The cost of reading one document at a time is that the model never sees two papers
+  together, so it cannot notice that one contradicts another. That is the thing a library
+  most wants, and it does not fit in any window that exists. The claim corpus is what makes
+  it approachable later - across collected claims rather than across documents.
+- This is the first artefact LACC produces that is an input to writing rather than an answer
+  to a question.
+
+
 ## [0.32.0] - 2026-09-10
 
 ### Security

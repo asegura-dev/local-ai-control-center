@@ -651,3 +651,173 @@ def test_an_ordinary_document_produces_no_warning(tmp_path: Path) -> None:
     )
     assert "shaped like an instruction" not in result.stdout
     assert "fence markers were removed" not in result.stdout
+
+
+def _library(tmp_path: Path, count: int = 3) -> Path:
+    """A workspace holding several documents, as a bibliography would."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    for index in range(count):
+        (workspace / f"paper{index}.md").write_text(
+            f"<!-- page 1 -->\n\nThe study analysed {200 + index} installations.\n",
+            encoding="utf-8",
+        )
+    config = tmp_path / "config.yaml"
+    config.write_text(f"workspace_root: {workspace}\n", encoding="utf-8")
+    return config
+
+
+def test_collect_refuses_a_skill_that_does_not_check_its_quotations(tmp_path: Path) -> None:
+    """A long file of unchecked prose is no better than the model that wrote it.
+
+    What makes the collected artefact worth having is that every quotation in it has
+    provenance (ADR-039).
+    """
+    config = _library(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "collect",
+            "summarize_file",
+            "paper0.md",
+            "--into",
+            "out.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "does not check its quotations" in result.stdout
+
+
+def test_collect_previews_every_document_and_the_destination(tmp_path: Path) -> None:
+    """One confirmation covers the whole traverse, so it must show the whole traverse."""
+    config = _library(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "collect",
+            "extract_claims",
+            "paper0.md",
+            "paper1.md",
+            "--into",
+            "out.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+        input="\n",
+    )
+    assert "paper0.md" in result.stdout
+    assert "paper1.md" in result.stdout
+    assert "Writes:  out.md" in result.stdout
+    assert "Read 2 documents and write out.md?" in result.stdout
+
+
+def test_collect_runs_once_per_document(tmp_path: Path) -> None:
+    """A document each, so a quotation's source is a fact rather than a model's answer.
+
+    With several documents in one prompt, a model can attribute a quotation from one paper
+    to another and the check verifies it, because the words are genuinely in the text it was
+    given (ADR-039).
+    """
+    config = _library(tmp_path, count=3)
+    result = runner.invoke(
+        app,
+        [
+            "collect",
+            "extract_claims",
+            "paper0.md",
+            "paper1.md",
+            "paper2.md",
+            "--into",
+            "out.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 0
+    started = [k for k in _kinds(tmp_path) if k == "run_started"]
+    assert len(started) == 3
+
+
+def test_collect_writes_a_file_naming_its_sources(tmp_path: Path) -> None:
+    """The artefact is grouped by source, because provenance is the point of it."""
+    config = _library(tmp_path, count=2)
+    runner.invoke(
+        app,
+        [
+            "collect",
+            "extract_claims",
+            "paper0.md",
+            "paper1.md",
+            "--into",
+            "out.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+        input="y\n",
+    )
+    written = (tmp_path / "ws" / "out.md").read_text(encoding="utf-8")
+    assert "## paper0.md" in written
+    assert "## paper1.md" in written
+    assert "not a source" in written
+
+
+def test_collect_never_overwrites(tmp_path: Path) -> None:
+    """Like ingestion and revision: nothing LACC writes replaces a file already there."""
+    config = _library(tmp_path)
+    (tmp_path / "ws" / "out.md").write_text("something already here\n", encoding="utf-8")
+    result = runner.invoke(
+        app,
+        [
+            "collect",
+            "extract_claims",
+            "paper0.md",
+            "--into",
+            "out.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 1
+    assert (tmp_path / "ws" / "out.md").read_text(encoding="utf-8") == "something already here\n"
+
+
+def test_one_unreadable_document_does_not_end_the_traverse(tmp_path: Path) -> None:
+    """Thirty papers with one bad file should produce twenty-nine papers of results."""
+    config = _library(tmp_path, count=2)
+    result = runner.invoke(
+        app,
+        [
+            "collect",
+            "extract_claims",
+            "paper0.md",
+            "missing.md",
+            "paper1.md",
+            "--into",
+            "out.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 0
+    written = (tmp_path / "ws" / "out.md").read_text(encoding="utf-8")
+    assert "## paper0.md" in written
+    assert "## paper1.md" in written
+    assert "Not collected" in written
+    assert "1 documents were not collected" in result.stdout
