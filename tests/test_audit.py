@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ from local_ai_control_center.system.audit import (
     GENESIS_DIGEST,
     AuditLog,
     AuditWriteError,
+    ChainCheck,
     digest_of,
     digest_of_file,
     verify_chain,
@@ -214,3 +216,61 @@ def test_a_digest_identifies_without_exposing(tmp_path: Path) -> None:
 def test_an_unreadable_file_has_no_digest(tmp_path: Path) -> None:
     """Unreadable means unknown; a record saying the wrong thing is worse than silence."""
     assert digest_of_file(tmp_path / "absent.md") is None
+
+
+def _tampered(tmp_path: Path, mutate: Callable[[list[str]], list[str]]) -> ChainCheck:
+    """Write a short valid trail, alter it, and report what the check concluded."""
+    workspace = Workspace.ensure(tmp_path)
+    log = AuditLog(workspace, Config(workspace_root=tmp_path))
+    for index in range(5):
+        log.record("run", "run_started", f"event {index}")
+    lines = log.path.read_text(encoding="utf-8").splitlines()
+    log.path.write_text("\n".join(mutate(lines)) + "\n", encoding="utf-8")
+    return verify_chain(log.path)
+
+
+def test_an_edited_record_breaks_the_chain(tmp_path: Path) -> None:
+    """The case the chain was built for, and it holds."""
+
+    def edit(lines: list[str]) -> list[str]:
+        record = json.loads(lines[2])
+        record["message"] = "something else"
+        lines[2] = json.dumps(record)
+        return lines
+
+    assert _tampered(tmp_path, edit).intact is False
+
+
+def test_a_record_removed_from_the_middle_breaks_the_chain(tmp_path: Path) -> None:
+    """The link from the record after it no longer matches."""
+    assert _tampered(tmp_path, lambda lines: lines[:2] + lines[3:]).intact is False
+
+
+def test_reordering_records_breaks_the_chain(tmp_path: Path) -> None:
+    """Order is part of what the chain vouches for."""
+    reordered = _tampered(tmp_path, lambda lines: lines[:1] + [lines[2], lines[1]] + lines[3:])
+    assert reordered.intact is False
+
+
+def test_records_removed_from_the_end_are_not_detected(tmp_path: Path) -> None:
+    """Documented because it is true, and because it is the easiest tampering of all.
+
+    A shorter chain is still a valid chain: every remaining record still links correctly to
+    the one before it. No hash chain can catch this from the file alone, and the message
+    `lacc verify` prints says so rather than implying otherwise (ADR-043).
+    """
+    result = _tampered(tmp_path, lambda lines: lines[:-2])
+    assert result.intact is True
+    assert result.records == 3
+
+
+def test_the_trail_reports_when_it_starts_and_ends(tmp_path: Path) -> None:
+    """The only signal a person has against a truncated tail.
+
+    A trail whose last record predates your last run has lost something, and that is
+    checkable by a human without any external state.
+    """
+    result = _tampered(tmp_path, lambda lines: lines)
+    assert result.first_seen
+    assert result.last_seen
+    assert result.first_seen <= result.last_seen

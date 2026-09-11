@@ -210,6 +210,15 @@ class ChainCheck(BaseModel):
 
     intact: bool
     records: int
+    first_seen: str = ""
+    last_seen: str = ""
+    """When the trail starts and ends.
+
+    The only signal a person has against records removed from the end, which no hash chain
+    can detect from the file alone: a trail whose last record predates your last run is a
+    trail that lost something (ADR-043).
+    """
+
     unverifiable: int = 0
     broken_at: int | None = None
     unreadable_at: int | None = None
@@ -230,9 +239,11 @@ def verify_chain(path: Path) -> ChainCheck:
 
     previous = GENESIS_DIGEST
     unverifiable = 0
+    stamps: list[str] = []
     for position, line in enumerate(lines, start=1):
         try:
             recorded = AuditEvent.model_validate_json(line)
+            stamps.append(recorded.timestamp)
         except ValueError:
             return ChainCheck(intact=False, records=len(lines), unreadable_at=position)
         if not recorded.digest:
@@ -248,7 +259,13 @@ def verify_chain(path: Path) -> ChainCheck:
                 broken_at=position,
             )
         previous = recorded.digest
-    return ChainCheck(intact=True, records=len(lines), unverifiable=unverifiable)
+    return ChainCheck(
+        intact=True,
+        records=len(lines),
+        unverifiable=unverifiable,
+        first_seen=stamps[0] if stamps else "",
+        last_seen=stamps[-1] if stamps else "",
+    )
 
 
 _CONTENT_KEYS = frozenset({"prompt", "completion"})

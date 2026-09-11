@@ -953,15 +953,22 @@ def verify(
         f"[green]The trail holds.[/green] {result.records} records in {audit.path}, "
         "each linked to the one before it."
     )
+    if result.first_seen:
+        console.print(f"From {result.first_seen} to {result.last_seen}.")
     if result.unverifiable:
         console.print(
             f"[yellow]{result.unverifiable} of them predate the chain[/yellow] and cannot "
             "be vouched for either way."
         )
+    # Two limits, and the one that was never stated is the easier attack. Tested: editing,
+    # deleting a middle record and reordering are all caught; removing records from the end
+    # is not, and no chain can catch it from the file alone (ADR-043).
     console.print(
-        "[dim]This detects modification by anything that does not know the file is a "
-        "chain. It does not detect a deliberate rewrite: whatever can write the file can "
-        "recompute the digests.[/dim]"
+        "[dim]This catches a record edited, removed from the middle, or reordered. It does "
+        "not catch records removed from the end - a shorter chain is still a valid chain - "
+        "nor a deliberate rewrite, since whatever can write the file can recompute the "
+        "digests. The dates above are your check against the first: a trail ending before "
+        "your last run has lost something.[/dim]"
     )
 
 

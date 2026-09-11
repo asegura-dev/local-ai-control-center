@@ -5,6 +5,46 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.38.0] - 2026-09-11
+
+### Security
+- **Records removed from the end of the audit trail are not detected, and now `lacc verify`
+  says so.** After four releases in which a limit of this project was reported as the model's
+  dishonesty, seven safety claims were tested against running code rather than read:
+
+  | Claim | Result |
+  |---|---|
+  | The chain catches an edited record, one removed from the middle, or reordering | **holds** |
+  | **Records removed from the end** | **does not hold** |
+  | The workspace boundary refuses `..`, absolute paths, junctions, device names, alternate streams | **holds** |
+  | `audit_failure_policy: abort` stops a run that cannot be recorded | **holds** |
+  | `max_input_bytes` is enforced | **holds** |
+  | Declining a diff writes nothing; approving one without `write_files` is refused | **holds** |
+
+  One failure, and it is the cheapest attack of the set. Editing a record requires knowing
+  the file is a chain; truncating it requires deleting the last lines. ADR-023 named the
+  sophisticated attack - a full rewrite with recomputed digests - and left the trivial one
+  unstated, so `verify` reported "the trail holds" of a trail with records removed.
+
+  **Nothing in the file can catch it**: a shorter chain is a valid chain, and a sequence
+  number does not help because the next append continues from the shortened tail. Detection
+  needs state outside the file, which LACC does not have and will not invent quietly.
+
+### Added
+- **`lacc verify` reports when the trail starts and ends.** The only check available without
+  external state: a trail whose last record predates your last run has lost something. Weak,
+  honest, and two lines.
+- Five tests state exactly what the chain catches and that truncation is not among them, so
+  the limit is a known property rather than a surprise for whoever reads the code next.
+
+### Notes
+- The workspace boundary held against Windows directory junctions, which an earlier note
+  listed as unverified. It is verified now.
+- Naming this hole tells anyone who wants to remove evidence how. Accepted: deleting the last
+  lines of a file is not an insight, and a user who believes their trail is tamper-evident
+  when it is not is worse off than one who knows where it stops.
+
+
 ## [0.37.0] - 2026-09-11
 
 ### Fixed

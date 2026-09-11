@@ -219,10 +219,16 @@ each record carries the hash of the one before it.
 uv run lacc verify
 ```
 
-This walks the chain and reports whether it is intact. Editing a past record breaks its
-digest and every one after it, so tampering becomes locatable rather than invisible. It
-does not stop a deliberate rewrite of the whole file - a chain proves consistency, not
-authorship.
+This walks the chain and reports whether it is intact, and when the trail starts and ends.
+
+**Know exactly what it catches**, because two of these were tested and one was assumed. A
+record edited, removed from the middle, or reordered breaks the chain and `verify` says
+where. **Records removed from the end do not** - a shorter chain is still a valid chain, and
+no hash chain can catch that from the file alone. Neither is a deliberate rewrite: whatever
+can write the file can recompute the digests.
+
+The dates are your only check against a truncated trail. One ending before your last run has
+lost something.
 
 By default the trail records metadata only: which capabilities were requested, whether
 they were granted, which model was called. Prompt and completion text are written only
