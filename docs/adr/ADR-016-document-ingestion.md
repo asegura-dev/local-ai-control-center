@@ -1,6 +1,10 @@
 # ADR-016 - Ingestion: turning documents into text LACC can read
 
-- **Status:** Accepted - implemented (v0.15.0)
+- **Status:** Accepted - implemented (v0.15.0). Decision 6 - that what is produced is
+  extracted text and is not called more than that - is amended by
+  [ADR-036](ADR-036-dropping-the-furniture-of-a-page.md): ingestion now drops running
+  headers, footers and page numbers, so it edits rather than only transcribing.
+  Everything else stands.
 - **Date:** 2026-09-08
 - **Context:** LACC reads UTF-8 text and refuses anything else with a clear error
   (ADR-014). The material it exists to work on does not arrive that way: research

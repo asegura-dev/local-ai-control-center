@@ -122,6 +122,12 @@ Those markers are what makes page checking possible later, so keep them.
 
 Ingestion never overwrites: if `paper.md` exists, the run is refused.
 
+It also **drops page furniture** - running headers, footers and page numbers repeated across
+pages - and says how many lines it removed. This is not pure transcription: a journal's
+running header gets extracted in the middle of a sentence, which breaks the sentence for a
+reader and makes any quotation from it impossible to verify. Open the Markdown and check it
+if the count looks large.
+
 Then ask something:
 
 ```bash

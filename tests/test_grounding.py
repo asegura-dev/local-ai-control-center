@@ -235,3 +235,39 @@ def test_a_verified_quotation_carries_no_suggestion() -> None:
     """There is nothing to repair, so there is nothing to say."""
     checked = check_claim(Claim(claim="c", quote="across three hospitals", page=1), _SOURCE)
     assert checked.nearest == ""
+
+
+def test_a_quotation_spanning_a_page_break_still_verifies() -> None:
+    """LACC's own annotation sat inside the sentence and made this impossible.
+
+    The page marker is not one of the document's words, so a sentence running across a
+    break could never be found - in every multi-page document (ADR-035).
+    """
+    source = (
+        "<!-- page 3 -->"
+        + chr(10) * 2
+        + "The organ mask has three channels, which"
+        + chr(10) * 2
+        + "<!-- page 4 -->"
+        + chr(10) * 2
+        + "encode the prostate and bladder."
+    )
+    claim = Claim(claim="c", quote="three channels, which encode the prostate and bladder")
+    assert check_claim(claim, source).verdict != "not_found"
+
+
+def test_a_quotation_spanning_a_break_is_attributed_to_no_single_page() -> None:
+    """It is on two, so naming one would be a citation error of the kind ADR-031 removed."""
+    source = (
+        "<!-- page 3 -->"
+        + chr(10) * 2
+        + "The organ mask has three channels, which"
+        + chr(10) * 2
+        + "<!-- page 4 -->"
+        + chr(10) * 2
+        + "encode the prostate and bladder."
+    )
+    claim = Claim(claim="c", quote="three channels, which encode the prostate and bladder")
+    checked = check_claim(claim, source)
+    assert checked.verdict == "page_unknown"
+    assert checked.found_on_page is None

@@ -16,7 +16,9 @@ from local_ai_control_center.converter import (
     DocxConverter,
     PdfConverter,
     converter_for,
+    furniture_in,
     supported_suffixes,
+    without_furniture,
 )
 
 
@@ -184,3 +186,42 @@ def test_docx_does_not_resolve_external_entities(
     except ConversionError:
         return  # refusing to parse it at all is also a correct outcome
     assert "PRIVATE-CONTENT" not in text
+
+
+def test_a_running_header_carrying_a_page_number_is_recognised() -> None:
+    """It is never literally identical, which is why counting repeated lines finds nothing.
+
+    The page number is glued to the front, so `3413European Journal...` and
+    `3417European Journal...` are different strings and the same furniture (ADR-036).
+    """
+    pages = [
+        "3413European Journal of Nuclear Medicine\nbody text of the first page",
+        "3414European Journal of Nuclear Medicine\nbody text of the second page",
+        "3415European Journal of Nuclear Medicine\nbody text of the third page",
+    ]
+    assert furniture_in(pages) == frozenset({"#European Journal of Nuclear Medicine"})
+
+
+def test_a_line_on_one_page_of_several_is_content() -> None:
+    """Body text does not repeat, and a heuristic that dropped it would be worse than the
+    problem it solves."""
+    pages = ["unique to the first page", "ordinary text", "more ordinary text"]
+    assert furniture_in(pages) == frozenset()
+
+
+def test_a_single_page_has_no_furniture_to_find() -> None:
+    """With one page there is nothing to compare against, so nothing is dropped."""
+    assert furniture_in(["a header\nand some body text"]) == frozenset()
+
+
+def test_furniture_removal_reports_how_many_lines_went() -> None:
+    """Ingestion edits rather than only transcribing now, so what it removed is counted.
+
+    A heuristic that quietly deletes text from a document the user keeps is the wrong
+    shape for this project (ADR-036).
+    """
+    pages = ["1 3\nreal text here", "1 3\nmore real text", "1 3\nfurther real text"]
+    cleaned, dropped = without_furniture(pages)
+    assert dropped == 3
+    assert all("1 3" not in page for page in cleaned)
+    assert "real text here" in cleaned[0]

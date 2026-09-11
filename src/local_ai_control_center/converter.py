@@ -13,7 +13,9 @@ correct, rather than a parse hidden inside a read.
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
+from collections import Counter
 from pathlib import Path
 
 from docx import Document
@@ -67,6 +69,58 @@ class Converter(ABC):
         """
 
 
+_DIGITS = re.compile(r"\d+")
+
+
+def _shape_of(line: str) -> str:
+    """The line with digit runs replaced, so a page number does not make it unique.
+
+    A running header carries the page number glued to it, so `3413European Journal...` and
+    `3417European Journal...` are different strings and counting repeats finds nothing.
+    Comparing shapes finds them (ADR-036).
+    """
+    return _DIGITS.sub("#", line.strip())
+
+
+def furniture_in(pages: list[str]) -> frozenset[str]:
+    """Return the shapes of lines belonging to the page rather than to the text.
+
+    A shape on at least half the pages is a running header, a footer or a page number; one
+    on a single page of seven is content. Never fewer than two pages, because with a short
+    document "half" is not evidence of anything.
+    """
+    if len(pages) < 2:
+        return frozenset()
+    seen: Counter[str] = Counter()
+    for page in pages:
+        seen.update({_shape_of(line) for line in page.splitlines() if line.strip()})
+    threshold = max(2, len(pages) // 2)
+    return frozenset(shape for shape, count in seen.items() if count >= threshold)
+
+
+def without_furniture(pages: list[str]) -> tuple[list[str], int]:
+    """Drop the furniture from each page, and report how many lines went.
+
+    The count is returned rather than discarded. A heuristic that quietly deletes text from
+    a document the user keeps is the wrong shape for this project, and an ingestion that
+    dropped an implausible amount should be visible afterwards (ADR-036).
+    """
+    shapes = furniture_in(pages)
+    if not shapes:
+        return pages, 0
+
+    kept, dropped = [], 0
+    for page in pages:
+        lines = []
+        for line in page.splitlines():
+            if line.strip() and _shape_of(line) in shapes:
+                dropped += 1
+                continue
+            lines.append(line)
+        kept.append("\n".join(lines))
+    return kept, dropped
+
+
 class PdfConverter(Converter):
     """Extracts text from a PDF, one page at a time, marking page boundaries.
 
@@ -75,10 +129,19 @@ class PdfConverter(Converter):
     kind of decision this port exists to contain (ADR-016).
     """
 
+    def __init__(self) -> None:
+        """Start with nothing dropped."""
+        self._dropped = 0
+
     @property
     def name(self) -> str:
         """Identify this converter."""
         return "pdf"
+
+    @property
+    def furniture_dropped(self) -> int:
+        """How many lines the last extraction treated as belonging to the page."""
+        return self._dropped
 
     @property
     def suffixes(self) -> frozenset[str]:
@@ -95,6 +158,7 @@ class PdfConverter(Converter):
         except OSError as error:
             raise ConversionError(f"Cannot open {path.name}: {error.strerror or error}.") from error
 
+        pages, self._dropped = without_furniture(pages)
         blocks = [
             f"{PAGE_MARKER.format(number=number)}\n\n{text.strip()}"
             for number, text in enumerate(pages, start=1)

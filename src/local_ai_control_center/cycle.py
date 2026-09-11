@@ -630,6 +630,10 @@ def run_conversion(
             "destination": str(resolved_destination),
             "destination_sha256": digest_of_file(resolved_destination),
             "characters": len(text),
+            # Ingestion now edits rather than only transcribing, so what it removed is
+            # recorded. An extraction that dropped an implausible amount should be visible
+            # afterwards, not only at the time (ADR-036).
+            "furniture_dropped": getattr(converter, "furniture_dropped", 0),
         },
     )
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})

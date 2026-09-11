@@ -419,6 +419,43 @@ connection off this machine; the notifier tests inject the transport, and the pr
 tests assert on the resolved host rather than dialling it. LACC gained the ability to reach
 out, and the suite still proves that nothing does it by accident.
 
+## Verifying the verifier
+
+The grounding check exists so that a model cannot quietly put a fabricated citation into
+published work. For three releases it was doing something else: reporting this project's own
+defects as the model's dishonesty.
+
+Running LACC against one real scientific paper, at temperature zero, and looking at every
+quotation it rejected turned up four separate faults, none of them the model's:
+
+- Words the typesetter broke across a line. Ingestion preserved `sensi- tivity`, so a
+  sentence quoted correctly could not match.
+- Typographic characters. The paper is set with en-dashes and curly quotes; a model writes
+  the ASCII a keyboard has. Sixteen of the paper's hundred and sixty sentences could not be
+  verified even when quoted perfectly.
+- An asymmetry introduced by the first fix, which rejoined `inter- reader` on one side of
+  the comparison and not the other.
+- LACC's own `<!-- page N -->` markers, which sit inside any sentence running across a page
+  break and made every such quotation impossible to verify.
+
+Plus one in ingestion: the journal's running header, extracted inside a sentence.
+
+The measured effect was that the reported rate of invention went from three fabrications in
+seven, to one, to none - each correction removing another defect here. The paper's sentences
+went from sixteen unquotable to zero.
+
+**The test suite passed throughout.** That is the part worth keeping. Every one of these
+faults was a difference between a real document and the documents the tests construct: tests
+build clean text with the artefacts left out, because the artefacts are exactly what nobody
+thinks to write down. A check that compares strings was correct on every string it was
+given, and wrong about every real paper.
+
+Two things follow for how this project works. A verification tool needs verifying, and the
+only thing that did it was real material and attention to what failed. And the useful
+discipline when a check rejects something is to look at what it rejected rather than to
+record the rate - the rate said forty-three per cent fabrication for three releases, and the
+first look at an actual rejected quotation said otherwise.
+
 ## Future direction
 
 As the project matures, the package may be organized into subpackages such as

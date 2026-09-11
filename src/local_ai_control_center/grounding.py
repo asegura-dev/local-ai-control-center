@@ -253,11 +253,17 @@ def check_claim(claim: Claim, source: str) -> CheckedClaim:
     comparison, and never reported as the answer.
     """
     needle = _normalized(claim.quote)
-    if not needle or needle not in _normalized(source):
+    # The markers are stripped before the search. They are LACC's own annotation, not the
+    # document's words, and a sentence that runs across a page break has one sitting inside
+    # it - which made every quotation spanning a page impossible to verify, in every
+    # multi-page document (ADR-035).
+    if not needle or needle not in _normalized(_MARKER.sub(" ", source)):
         return CheckedClaim(
             claim=claim, verdict="not_found", nearest=nearest_text(claim.quote, source)
         )
 
+    # Located per page against the raw source, so a quotation spanning a break belongs to
+    # no single page and is reported as such rather than attributed to one of them.
     found_on = next(
         (number for number, text in pages_in(source) if needle in _normalized(text)),
         None,

@@ -515,13 +515,23 @@ def ingest(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
 
-    _report_ingestion(result, target)
+    _report_ingestion(result, target, getattr(converter, "furniture_dropped", 0))
 
 
-def _report_ingestion(result: RunResult, destination: Path) -> None:
-    """Print the outcome of an ingestion run, naming the file it produced."""
+def _report_ingestion(result: RunResult, destination: Path, furniture: int = 0) -> None:
+    """Print the outcome of an ingestion run, naming the file it produced.
+
+    Says how many lines were dropped as page furniture. Ingestion edits rather than only
+    transcribing now, and a heuristic that quietly deletes text from a document the user
+    keeps is the wrong shape for this project (ADR-036).
+    """
     if result.outcome == "completed":
         console.print(Panel(f"Extracted text written to {destination}", title="Ingested"))
+        if furniture:
+            console.print(
+                f"[dim]{furniture} lines were dropped as page furniture - running headers, "
+                "footers and page numbers repeated across pages.[/dim]"
+            )
     elif result.outcome == "refused":
         _exit_refused()
     else:

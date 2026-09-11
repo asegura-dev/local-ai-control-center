@@ -5,6 +5,59 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.0] - 2026-09-10
+
+### Fixed
+- **A quotation spanning a page break could never verify, in any multi-page document.** The
+  `<!-- page N -->` marker is LACC's own annotation, not one of the document's words, and a
+  sentence running across a break has one sitting inside it. The markers are now stripped
+  before the search. A quotation found across a break is attributed to no single page, which
+  is true and is what it should say.
+- **Running headers, footers and page numbers are dropped at ingestion.** The journal's
+  header was extracted *inside* a sentence, so a model quoting it correctly could not match
+  and a person reading the Markdown would also have been confused.
+
+  They are hard to spot because they are never literally identical: the page number is glued
+  to the front, so `3413European Journal...` and `3417European Journal...` are different
+  strings. A line whose *shape* - digits replaced - repeats across at least half the pages is
+  furniture. On the paper this was found with that identified exactly three forms and removed
+  thirteen lines of five hundred and fifty-eight, all of them furniture.
+
+### Changed
+- **Ingestion now edits rather than only transcribing**, which is a change in what that step
+  claims to do. How many lines it dropped is printed and recorded in the audit: a heuristic
+  that quietly deletes text from a document the user keeps is the wrong shape for this.
+
+### Measured
+- **Every sentence in the test paper is now verifiable when quoted faithfully.** The audit
+  that began in v0.29.0 finishes here:
+
+  | After | Sentences that could not be verified |
+  |---|---|
+  | v0.28.0 | 16 of 160 |
+  | typographic characters and hyphens (v0.29.0) | 2 of 160 |
+  | page furniture | 2 of 159 |
+  | **page markers** | **0 of 159** |
+
+- Both models, three runs each on the re-ingested paper. **These numbers cannot be compared
+  with v0.29.0's**: the document itself changed, so the model was given different text.
+
+  | Model | Quotations | Verified | Rate |
+  |---|---|---|---|
+  | qwen2.5:7b | 4 | 3 | 75%, identical every run |
+  | qwen2.5:14b | 5-6 | 5 | 83-100% |
+
+- **Temperature zero is not full determinism on the larger model.** The 14B varied 17 points
+  across three runs where the 7B did not vary at all. Sampling is no longer the source, so
+  the remainder is the engine - floating-point order on the GPU, or batching. Worth knowing
+  before reading too much into any single 14B number.
+
+### Notes
+- Four of LACC's own defects were found by running it against one real paper and looking at
+  what failed. None was found by the test suite, which passed throughout, because every one
+  of them was a difference between a real document and the documents the tests construct.
+
+
 ## [0.29.0] - 2026-09-10
 
 ### Added

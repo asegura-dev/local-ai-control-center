@@ -110,6 +110,15 @@ carries no dates.
   so through a notifier you host yourself. PRINCIPLES changes its network rule to match
   what VISION already said, and the rule that replaces it is narrower than "network
   access": every destination is written down in a file the user wrote.
+- **v0.29.0 and v0.30.0 - The fabrications were ours.** An audit against a real paper found
+  five defects in LACC that were making faithful quotations fail: words the typesetter broke,
+  typographic characters, an asymmetry the first fix created, LACC's own page markers inside
+  sentences, and a journal header extracted mid-sentence. The reported rate of invention went
+  from three in seven to none, and the paper's unquotable sentences from sixteen to zero. The
+  test suite passed throughout.
+- **v0.28.0 - Measured, not declared.** The preview names where documents are going, a skill
+  declares its temperature and it is zero, and `lacc measure` reports the spread across
+  repeated runs - after a model comparison written here turned out to be sampling noise.
 - **v0.27.0 - Adoption.** Guides written from what the tool does, a citation file, and a
   README that tells someone how to run it. Completes the v1 feature list, and records why
   v1.0 still does not follow: two paths have never been executed and the premise behind
