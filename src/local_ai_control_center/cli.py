@@ -27,7 +27,7 @@ from local_ai_control_center.config import (
     load_config,
     load_dotenv,
 )
-from local_ai_control_center.converter import ConversionError, converter_for
+from local_ai_control_center.converter import ConversionError, HiddenText, converter_for
 from local_ai_control_center.cycle import (
     WINDOW_TOLERANCE,
     PromptTooLargeError,
@@ -545,10 +545,50 @@ def ingest(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
 
-    _report_ingestion(result, target, getattr(converter, "furniture_dropped", 0))
+    _report_ingestion(
+        result,
+        target,
+        getattr(converter, "furniture_dropped", 0),
+        getattr(converter, "hidden", ()),
+    )
 
 
-def _report_ingestion(result: RunResult, destination: Path, furniture: int = 0) -> None:
+def _report_hidden_text(hidden: tuple[HiddenText, ...]) -> None:
+    """Show text a reader could not have seen, without judging what it is.
+
+    A scanned document is entirely an invisible layer over the image a person reads, and
+    that is correct. An ordinary paper with three invisible lines is not. LACC cannot tell
+    them apart and the user can, so this reports and does not decide (ADR-040).
+
+    It matters because the grounding check is no help here: a quotation of hidden text
+    verifies, since the text genuinely is in the document.
+    """
+    if not hidden:
+        return
+    console.print(
+        f"[yellow]{len(hidden)} pieces of text in this document are not visible to a "
+        "reader.[/yellow] A scanned page is entirely an invisible layer and that is normal; "
+        "a few hidden lines in a typeset paper are not."
+    )
+    for item in hidden[:8]:
+        where = f"p. {item.page}, {item.reason}"
+        console.print(
+            f"  [dim]{where}[/dim] {item.text[:90]}" if item.text else f"  [dim]{where}[/dim]"
+        )
+    if len(hidden) > 8:
+        console.print(f"  [dim]and {len(hidden) - 8} more[/dim]")
+    console.print(
+        "[dim]Checking quotations is no defence against this: text hidden in the document "
+        "is in the document, so a quotation of it verifies.[/dim]"
+    )
+
+
+def _report_ingestion(
+    result: RunResult,
+    destination: Path,
+    furniture: int = 0,
+    hidden: tuple[HiddenText, ...] = (),
+) -> None:
     """Print the outcome of an ingestion run, naming the file it produced.
 
     Says how many lines were dropped as page furniture. Ingestion edits rather than only
@@ -562,6 +602,7 @@ def _report_ingestion(result: RunResult, destination: Path, furniture: int = 0) 
                 f"[dim]{furniture} lines were dropped as page furniture - running headers, "
                 "footers and page numbers repeated across pages.[/dim]"
             )
+        _report_hidden_text(hidden)
     elif result.outcome == "refused":
         _exit_refused()
     else:

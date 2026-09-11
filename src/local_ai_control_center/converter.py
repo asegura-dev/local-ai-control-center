@@ -22,6 +22,7 @@ from docx import Document
 from docx.opc.exceptions import OpcError, PackageNotFoundError
 from docx.table import Table
 from docx.text.paragraph import Paragraph
+from pydantic import BaseModel, ConfigDict
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
@@ -121,6 +122,87 @@ def without_furniture(pages: list[str]) -> tuple[list[str], int]:
     return kept, dropped
 
 
+_UNREADABLE_SIZE = 4.0
+"""Below this a font is not being read by anyone, whatever it is for."""
+
+_INVISIBLE_MODES = (b"3 Tr", b"7 Tr")
+"""Rendering modes that draw nothing.
+
+Mode 3 is also what a scanned document's OCR layer uses, over the image a person actually
+reads, and that is entirely correct. Which is why this is reported and never judged: the
+same operator is proper in a scan and hostile in a typeset paper (ADR-040).
+"""
+
+
+class HiddenText(BaseModel):
+    """Text extracted from a document that a reader would not have seen."""
+
+    model_config = ConfigDict(frozen=True)
+
+    reason: str
+    page: int
+    text: str = ""
+
+
+def hidden_text_in(reader: PdfReader) -> tuple[HiddenText, ...]:
+    """Report the text in a PDF that a reader cannot see, by reason.
+
+    Three signals, each cheap: an invisible rendering mode, a font too small to read, and a
+    position outside the page. White-on-white is **not** detected - it needs colour state
+    tracked through the content stream - and saying so is part of the decision, because a
+    control whose gaps are unlisted is worse than one whose gaps are known (ADR-040).
+
+    All three were tested against PDFs built to hide text, and all three ended up in what
+    the extractor returns. That is the point: hidden text reaches the model, and a quotation
+    of it passes the grounding check, because it genuinely is in the document.
+    """
+    found: list[HiddenText] = []
+    for number, page in enumerate(reader.pages, start=1):
+        try:
+            box = page.mediabox
+            left, bottom, right, top = (
+                float(box.left),
+                float(box.bottom),
+                float(box.right),
+                float(box.top),
+            )
+        except (AttributeError, TypeError, ValueError):
+            left = bottom = 0.0
+            right = top = 0.0
+
+        def note(
+            text: str,
+            cm: object,
+            tm: list[float],
+            font: object,
+            size: float,
+            number: int = number,
+            bounds: tuple[float, float, float, float] = (left, bottom, right, top),
+        ) -> None:
+            stripped = text.strip()
+            if not stripped:
+                return
+            if size is not None and 0 <= float(size) < _UNREADABLE_SIZE:
+                found.append(HiddenText(reason="too small to read", page=number, text=stripped))
+                return
+            x0, y0, x1, y1 = bounds
+            if x1 > x0 and not (x0 <= tm[4] <= x1 and y0 <= tm[5] <= y1):
+                found.append(
+                    HiddenText(reason="positioned off the page", page=number, text=stripped)
+                )
+
+        try:
+            page.extract_text(visitor_text=note)
+            contents = page.get_contents()
+            raw = contents.get_data() if contents is not None else b""
+        except Exception:  # noqa: BLE001 - a malformed page must not stop the report
+            continue
+
+        if any(mode in raw for mode in _INVISIBLE_MODES):
+            found.append(HiddenText(reason="drawn in an invisible rendering mode", page=number))
+    return tuple(found)
+
+
 class PdfConverter(Converter):
     """Extracts text from a PDF, one page at a time, marking page boundaries.
 
@@ -130,8 +212,9 @@ class PdfConverter(Converter):
     """
 
     def __init__(self) -> None:
-        """Start with nothing dropped."""
+        """Start with nothing dropped and nothing hidden."""
         self._dropped = 0
+        self._hidden: tuple[HiddenText, ...] = ()
 
     @property
     def name(self) -> str:
@@ -144,6 +227,11 @@ class PdfConverter(Converter):
         return self._dropped
 
     @property
+    def hidden(self) -> tuple[HiddenText, ...]:
+        """Text in the last document that a reader would not have seen (ADR-040)."""
+        return self._hidden
+
+    @property
     def suffixes(self) -> frozenset[str]:
         """PDFs, and nothing else."""
         return frozenset({".pdf"})
@@ -153,6 +241,7 @@ class PdfConverter(Converter):
         try:
             reader = PdfReader(path)
             pages = [page.extract_text(extraction_mode="plain") for page in reader.pages]
+            self._hidden = hidden_text_in(reader)
         except PyPdfError as error:
             raise ConversionError(f"Cannot read {path.name} as a PDF: {error}") from error
         except OSError as error:

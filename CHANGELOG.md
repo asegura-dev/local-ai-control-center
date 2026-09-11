@@ -5,6 +5,43 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.34.0] - 2026-09-10
+
+### Security
+- **LACC reports text a reader cannot see.** This closes the hole ADR-038 named and could
+  not close: the grounding check verifies that a quotation is *in the document*, and text
+  hidden in a PDF is in the document. A reader never sees it, extraction captures it, a
+  model quotes it, and the check reports **verified** - correctly, and uselessly.
+
+  Four ways to hide text were tested against PDFs built for the purpose, and **all four
+  ended up in the text LACC feeds a model**. Three are now detected: an invisible rendering
+  mode, a font too small to read, and a position outside the page. White-on-white is **not**
+  detected - it needs colour tracked through the content stream - and that gap is written
+  down, because a control whose gaps are unlisted is worse than one whose gaps are known.
+
+  It is reported at ingestion, with the hidden words, the page and the reason, while the
+  person still has the PDF open.
+
+- **It reports a proportion and never a verdict**, because rendering mode 3 is also what a
+  scanned document's OCR layer uses - every word of a scan is drawn invisibly over the image
+  a person reads, and that is entirely correct. A detector that called it an attack would
+  cry wolf on every scan and be switched off within a week. A scan is a hundred per cent
+  invisible and fine; an ordinary paper with three hidden lines is not. That difference is
+  obvious to a person and unavailable to a rule.
+
+- Nothing is refused and nothing is stripped: stripping would destroy a scan, and LACC
+  cannot tell a scan from an attack. The user can, once told.
+
+### Notes
+- The report ends by saying that checking quotations is no defence against this, because it
+  is exactly where someone would otherwise assume they were covered.
+- Showing hidden text puts an instruction meant for a model in front of a person. It is
+  displayed as a finding rather than fed to anything, and a hidden instruction nobody is
+  shown is the situation being fixed.
+- This closes three of four known techniques and an unknown number of unknown ones. LACC now
+  notices the crude attempts; it is a detector, not a barrier.
+
+
 ## [0.33.0] - 2026-09-10
 
 ### Added

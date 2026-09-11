@@ -8,15 +8,19 @@ from pathlib import Path
 
 import docx
 import pytest
+from conftest import pdf_with_streams
+from pypdf import PdfReader
 
 from local_ai_control_center.converter import (
     PAGE_MARKER,
     ConversionError,
     Converter,
     DocxConverter,
+    HiddenText,
     PdfConverter,
     converter_for,
     furniture_in,
+    hidden_text_in,
     supported_suffixes,
     without_furniture,
 )
@@ -225,3 +229,49 @@ def test_furniture_removal_reports_how_many_lines_went() -> None:
     assert dropped == 3
     assert all("1 3" not in page for page in cleaned)
     assert "real text here" in cleaned[0]
+
+
+def _hidden_in(tmp_path: Path, stream: str) -> tuple[HiddenText, ...]:
+    """Build a one-page PDF with that content stream and report what is hidden in it."""
+    path = tmp_path / "hidden.pdf"
+    path.write_bytes(pdf_with_streams([stream]))
+    return hidden_text_in(PdfReader(path))
+
+
+def test_an_ordinary_page_hides_nothing(tmp_path: Path) -> None:
+    """A detector that fires on normal documents is one people switch off."""
+    assert _hidden_in(tmp_path, "BT /F1 12 Tf 20 200 Td (Perfectly ordinary text) Tj ET") == ()
+
+
+def test_text_drawn_in_an_invisible_mode_is_reported(tmp_path: Path) -> None:
+    """Mode 3 draws nothing. It is also what a scan's OCR layer uses, which is why this is
+    reported and never judged (ADR-040)."""
+    found = _hidden_in(tmp_path, "BT /F1 12 Tf 20 200 Td (Visible) Tj 3 Tr 20 190 Td (HIDE) Tj ET")
+    assert any("invisible rendering mode" in item.reason for item in found)
+
+
+def test_text_too_small_to_read_is_reported_with_its_words(tmp_path: Path) -> None:
+    """The words matter: they are what the person needs to see, since the model saw them."""
+    found = _hidden_in(
+        tmp_path, "BT /F1 12 Tf 20 200 Td (Visible) Tj /F1 0 Tf 20 190 Td (HIDDEN TEXT) Tj ET"
+    )
+    assert any(item.reason == "too small to read" and "HIDDEN TEXT" in item.text for item in found)
+
+
+def test_text_positioned_off_the_page_is_reported(tmp_path: Path) -> None:
+    """Outside the MediaBox is outside what anyone saw, and inside what the model read."""
+    found = _hidden_in(tmp_path, "BT /F1 12 Tf 20 200 Td (Visible) Tj 20 -5000 Td (OFF PAGE) Tj ET")
+    assert any(item.reason == "positioned off the page" for item in found)
+
+
+def test_hidden_text_still_reaches_the_extracted_document(tmp_path: Path) -> None:
+    """The reason any of this matters, stated as a test.
+
+    Hidden text ends up in what the model is given, and a quotation of it passes the
+    grounding check because it genuinely is in the document (ADR-038, ADR-040).
+    """
+    path = tmp_path / "hidden.pdf"
+    path.write_bytes(
+        pdf_with_streams(["BT /F1 12 Tf 20 200 Td (Visible) Tj 3 Tr 20 190 Td (PLANTED) Tj ET"])
+    )
+    assert "PLANTED" in PdfConverter().extract_text(path)

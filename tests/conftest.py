@@ -125,3 +125,43 @@ def make_docx(tmp_path: Path) -> Callable[..., Path]:
         return path
 
     return build
+
+
+def pdf_with_streams(streams: list[str]) -> bytes:
+    """Build a PDF whose page content streams are given verbatim.
+
+    Lets a test hide text the way a hostile document would - an invisible rendering mode,
+    a font too small to read, a position off the page - rather than describing it (ADR-040).
+    """
+    objects: list[bytes] = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    page_numbers: list[int] = []
+    for stream in streams:
+        page_numbers.append(len(objects) + 1)
+        body = stream.encode()
+        objects.append(
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Resources "
+            b"<< /Font << /F1 3 0 R >> >> /Contents " + str(len(objects) + 2).encode() + b" 0 R >>"
+        )
+        objects.append(
+            b"<< /Length " + str(len(body)).encode() + b" >>\nstream\n" + body + b"\nendstream"
+        )
+    kids = " ".join(f"{number} 0 R" for number in page_numbers)
+    objects[1] = f"<< /Type /Pages /Kids [{kids}] /Count {len(streams)} >>".encode()
+
+    out = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n".encode() + body + b"\nendobj\n"
+    table_start = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode() + b"0000000000 65535 f \n"
+    for offset in offsets:
+        out += f"{offset:010d} 00000 n \n".encode()
+    out += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{table_start}\n"
+    ).encode() + b"%%EOF\n"
+    return bytes(out)

@@ -178,6 +178,11 @@ an image - *is* in the source: you never see it reading the paper, extraction ca
 model quotes it, and this reports **found**, correctly and uselessly. If a run warns that
 the document contains text shaped like an instruction, open the extracted Markdown and look.
 
+`lacc ingest` now reports text a reader could not have seen - an invisible rendering mode, a
+font too small to read, a position off the page - with the hidden words themselves. A
+scanned page is entirely an invisible layer and that is normal; a few hidden lines in a
+typeset paper are not. White-on-white text is still not detected.
+
 ## Using it to compare models
 
 The verified-versus-not-found counts are a number, which makes "is a bigger model worth
