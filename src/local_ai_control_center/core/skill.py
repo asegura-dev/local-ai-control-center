@@ -20,6 +20,7 @@ from local_ai_control_center.core.fence import (
     DOCUMENT_CLOSE,
     DOCUMENT_OPEN,
     content_slot,
+    fenced_context,
 )
 from local_ai_control_center.core.permissions import Capability, Permissions, grant
 from local_ai_control_center.core.preview import IntendedAction
@@ -80,6 +81,15 @@ class SkillPlan(BaseModel):
 
     verify_quotes: bool = False
     """Whether the answer's quotations should be checked against the source (ADR-026)."""
+
+    uses_context: bool = False
+    """Whether the standing context file belongs in this skill's prompt.
+
+    Off by default and argued for per skill. `extract_claims` must never set it: telling a
+    model what a thesis argues before asking what a paper asserts invites it to find that
+    argument, and the grounding check cannot catch it because the quotations would all be
+    real (ADR-041).
+    """
 
     temperature: float = 0.0
     """How much the engine may sample rather than take the most likely token.
@@ -278,6 +288,86 @@ class ExtractClaimsSkill(Skill):
             + "PAGE: ..."
         )
         return SkillPlan(action=action, prompt_template=prompt_template, verify_quotes=True)
+
+
+class AssessSourceSkill(Skill):
+    """Report what a document offers the work it is being read for.
+
+    Answers two questions that turn out to be one: "summarise this paper for my thesis" and
+    "is this new reference useful". Both are "what does this document give me", and both are
+    meaningless without knowing what the work is - which is why this is the skill that uses
+    standing context and `extract_claims` is the skill that must not (ADR-041).
+
+    Deliberately separate from `summarize_file`. A reading scoped to a thesis is not a
+    summary of the paper, and conflating them is how somebody cites a paper for something it
+    barely mentions. The name is what says the reading is partial on purpose.
+
+    The judgement is prose and cannot be checked - whether something is relevant has nothing
+    to compare against. The evidence beneath it is asked for in the format the checker parses,
+    because a skill that declared `verify_quotes` while asking for quotations in prose would
+    verify nothing and report that it had: a control that looks present and is not.
+    """
+
+    @property
+    def name(self) -> str:
+        """Identify this skill."""
+        return "assess_source"
+
+    @property
+    def required(self) -> frozenset[Capability]:
+        """Assessing a document needs to read it, and nothing else."""
+        return frozenset({"read_files"})
+
+    def plan(self, requests: tuple[str, ...], config: Config) -> SkillPlan:
+        """Plan to weigh the document at ``request`` against the standing context."""
+        action = IntendedAction(
+            name=self.name,
+            summary=f"Assess {chr(44).join(requests)} against the standing context",
+            required=self.required,
+            targets=tuple(Path(item) for item in requests),
+        )
+        line = chr(10)
+        prompt_template = (
+            "You are telling someone whether a document is worth their time, and why."
+            + line * 2
+            + f"Write in {config.output_language}."
+            + line
+            + "Report three things, under those headings and nothing else:"
+            + line * 2
+            + "NEW: what this document establishes that the standing context does not "
+            "already contain."
+            + line
+            + "OVERLAPS: what it covers that is already known, and therefore adds little."
+            + line
+            + "CONTRADICTS: where it disagrees with the standing context, if anywhere."
+            + line * 2
+            + "If the document has nothing to offer this work, say so plainly in one line. "
+            "A document talked up costs more to read than one honestly dismissed."
+            + line
+            * 2
+            + "Then, under the heading EVIDENCE, support what you said with blocks in "
+            "exactly this format and nothing else:"
+            + line * 2
+            + "CLAIM: what you asserted about the document"
+            + line
+            + "QUOTE: the exact words from the document that establish it"
+            + line
+            + "PAGE: the page number"
+            + line * 2
+            + "One block per point, separated by a blank line. Copied character for "
+            "character: a quotation you adjust is no longer a quotation, and every one is "
+            "checked against the document."
+            + line * 2
+            + fenced_context()
+            + line * 2
+            + fenced_documents(requests)
+        )
+        return SkillPlan(
+            action=action,
+            prompt_template=prompt_template,
+            uses_context=True,
+            verify_quotes=True,
+        )
 
 
 class ReviseFileSkill(Skill):

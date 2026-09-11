@@ -29,6 +29,7 @@ from local_ai_control_center.core.permissions import grant
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.core.run import new_run_id
 from local_ai_control_center.core.skill import (
+    AssessSourceSkill,
     CritiqueFileSkill,
     ExtractClaimsSkill,
     ReviseFileSkill,
@@ -75,6 +76,7 @@ _SKILLS: dict[str, Skill] = {
     "critique_file": CritiqueFileSkill(),
     "revise_file": ReviseFileSkill(),
     "extract_claims": ExtractClaimsSkill(),
+    "assess_source": AssessSourceSkill(),
 }
 
 app = typer.Typer(
@@ -297,11 +299,20 @@ def _show_checked_quotations(result: RunResult) -> None:
 
     _offer_the_nearest_text(result)
 
-    unverified = sum(1 for checked in result.checked_claims if not checked.holds)
-    if unverified:
+    # Counted by whether the quotation is in the document, not by whether a page could be
+    # named. Tallying an unplaceable quotation beside a fabricated one reports the tool's
+    # limit as the model's dishonesty (ADR-042).
+    missing = sum(1 for checked in result.checked_claims if not checked.found)
+    unplaced = sum(1 for checked in result.checked_claims if checked.found and not checked.holds)
+    if missing:
         console.print(
-            f"[red]{unverified} of {len(result.checked_claims)} quotations did not check "
-            "out.[/red] Do not cite those without opening the document yourself."
+            f"[red]{missing} of {len(result.checked_claims)} quotations are not in the "
+            "document.[/red] Do not cite those without opening it yourself."
+        )
+    if unplaced:
+        console.print(
+            f"[dim]{unplaced} are in the document but could not be placed on a page - the "
+            "source has no page markers, or the passage runs across a break.[/dim]"
         )
 
 
@@ -732,7 +743,11 @@ def measure(
             if attempt == 0:
                 continue
             checked = result.checked_claims
-            rows.append((attempt, len(checked), sum(1 for c in checked if c.holds)))
+            # Counted by whether the quotation is in the document. `holds` also requires a
+            # page, which measures LACC's ability to place it rather than the model's
+            # fidelity - and mixing the two is what made a corpus of real quotations look
+            # like a third fabricated (ADR-042).
+            rows.append((attempt, len(checked), sum(1 for c in checked if c.found)))
 
     _report_the_spread(resolved.name, config.model, rows)
 
@@ -742,7 +757,7 @@ def _report_the_spread(skill_name: str, model: str, rows: list[tuple[int, int, i
     table = Table(title=f"{skill_name} against {model or 'the mock provider'}", expand=False)
     table.add_column("Run", justify="right")
     table.add_column("Quotations", justify="right")
-    table.add_column("Verified", justify="right")
+    table.add_column("In the document", justify="right")
     table.add_column("Rate", justify="right")
     for attempt, total, held in rows:
         rate = f"{held * 100 // total}%" if total else "-"
@@ -753,7 +768,7 @@ def _report_the_spread(skill_name: str, model: str, rows: list[tuple[int, int, i
     verified = [held for _, _, held in rows]
     rates = [held * 100 // total for _, total, held in rows if total]
     console.print(f"  quotations  {_spread(totals)}")
-    console.print(f"  verified    {_spread(verified)}")
+    console.print(f"  in the document  {_spread(verified)}")
     console.print(f"  rate        {_spread(rates)}")
 
     if rates and max(rates) - min(rates) >= 10:
@@ -889,7 +904,7 @@ def collect(
 
     failed = [name for name, outcome in gathered if isinstance(outcome, str)]
     verified = sum(
-        sum(1 for c in outcome.checked_claims if c.holds)
+        sum(1 for c in outcome.checked_claims if c.found)
         for _, outcome in gathered
         if not isinstance(outcome, str)
     )
@@ -897,7 +912,10 @@ def collect(
         len(outcome.checked_claims) for _, outcome in gathered if not isinstance(outcome, str)
     )
     console.print(
-        Panel(f"{verified} of {total} quotations verified, written to {into}", title="Collected")
+        Panel(
+            f"{verified} of {total} quotations are in their document, written to {into}",
+            title="Collected",
+        )
     )
     if failed:
         console.print(

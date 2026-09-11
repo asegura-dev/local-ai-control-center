@@ -5,6 +5,50 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.37.0] - 2026-09-11
+
+### Fixed
+- **"Unverified" was counting quotations that were in the document.** A check has three
+  outcomes and LACC reported two: `verified`, `not_found`, and `page_unknown` - which means
+  the quotation **is** there and no single page could be named. Every tally counted only the
+  first, so the third was reported as a failure.
+
+  The corpus from a real bibliography says how much that mattered: **237 quotations, 165
+  verified, 72 found with no determinable page, and zero not in their document.** The "third
+  of quotations that don't verify" named in three releases was a third LACC could not place
+  on a page. Every one was real.
+
+- **A quotation spanning a page break is now placed on the page it starts on.** Adjacent
+  pages are searched as a pair when no single page holds it. On the paper this was measured
+  against it removed the unplaceable category entirely, leaving 14 quotations, 13 verified
+  and **one genuine fabrication** - a rate of 7%, against the 30% previously reported.
+
+- Fabrications and unplaceable quotations are reported separately, and only the first
+  carries "do not cite without opening the document". `lacc measure` counts whether the
+  quotation is in the document rather than whether LACC could place it, because comparing
+  models should measure the model.
+
+### Added
+- **`assess_source`**: given a document and standing context, what it offers the work - what
+  is new, what overlaps, what contradicts. It answers "summarise this for my thesis" and "is
+  this reference useful", which turn out to be the same question. Separate from
+  `summarize_file` on purpose: a reading scoped to a thesis is not a summary of the paper,
+  and conflating them is how somebody cites a paper for something it barely mentions.
+- **Standing context**, a file the user writes, named by `context_file` and used only by
+  skills that declare `uses_context`. **`extract_claims` must never declare it**: telling a
+  model what a thesis argues before asking what a paper asserts invites it to find that
+  argument, and the grounding check cannot catch it because the quotations would all be real.
+- `parse_claims` tolerates Markdown emphasis. A model asked for `CLAIM:` writes `**CLAIM:**`,
+  which made the new skill verify nothing while reporting that it had - a control that looks
+  present and is not, found before it shipped.
+
+### Notes
+- **This is the fourth time in one session that a limit of this project was reported as the
+  model's dishonesty**, and every time the error flattered the tool. That is not chance: a
+  check that fails closed reports its own limits as the thing it was built to catch, and
+  nothing inside it can tell the difference. Only looking at what it rejected could.
+
+
 ## [0.36.0] - 2026-09-10
 
 ### Added

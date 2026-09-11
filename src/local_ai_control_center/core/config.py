@@ -165,6 +165,18 @@ class Config(BaseModel):
             "what each installed model supports. A larger window costs memory."
         ),
     )
+    context_file: str = Field(
+        default="",
+        description="Standing context about the project, inside the workspace.",
+    )
+    """A file the user writes saying what the code cannot know.
+
+    Named here rather than discovered, so it is something chosen rather than something that
+    accumulated. Empty by default, and an absent file is not an error: a project without
+    standing context is the ordinary case. Only skills that declare `uses_context` receive
+    it, and `extract_claims` never does (ADR-041).
+    """
+
     engine_host: str = Field(
         default="",
         description=(

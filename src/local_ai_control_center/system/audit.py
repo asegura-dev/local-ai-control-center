@@ -40,6 +40,7 @@ EventKind = Literal[
     "answer_truncated",
     "fence_markers_removed",
     "instruction_shapes_seen",
+    "standing_context_used",
     "notification_sent",
     "notification_failed",
 ]

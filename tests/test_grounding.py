@@ -256,8 +256,13 @@ def test_a_quotation_spanning_a_page_break_still_verifies() -> None:
     assert check_claim(claim, source).verdict != "not_found"
 
 
-def test_a_quotation_spanning_a_break_is_attributed_to_no_single_page() -> None:
-    """It is on two, so naming one would be a citation error of the kind ADR-031 removed."""
+def test_a_quotation_spanning_a_break_is_placed_on_the_page_it_starts_on() -> None:
+    """It is on two pages, and the one a reader turns to is the first.
+
+    Reporting it as unplaceable was worse than it looked: 72 of a real corpus's 237
+    quotations landed there, and were being tallied beside fabrications. There were no
+    fabrications (ADR-042).
+    """
     source = (
         "<!-- page 3 -->"
         + chr(10) * 2
@@ -269,5 +274,26 @@ def test_a_quotation_spanning_a_break_is_attributed_to_no_single_page() -> None:
     )
     claim = Claim(claim="c", quote="three channels, which encode the prostate and bladder")
     checked = check_claim(claim, source)
+    assert checked.verdict == "verified"
+    assert checked.found_on_page == 3
+
+
+def test_a_quotation_in_the_document_is_found_even_without_a_page() -> None:
+    """`found` answers the question that decides whether something can be cited.
+
+    A source with no page markers yields no page and a real quotation. Counting that beside
+    a fabrication reports the tool's limit as the model's dishonesty (ADR-042).
+    """
+    plain = "The study analysed 240 cases across three hospitals."
+    checked = check_claim(Claim(claim="c", quote="three hospitals"), plain)
     assert checked.verdict == "page_unknown"
-    assert checked.found_on_page is None
+    assert checked.found is True
+    assert checked.holds is False
+
+
+def test_a_fabricated_quotation_is_neither_found_nor_held() -> None:
+    """The distinction has to survive in the direction that matters."""
+    invented = Claim(claim="c", quote="the reactor was shut down", page=1)
+    checked = check_claim(invented, _SOURCE)
+    assert checked.found is False
+    assert checked.holds is False

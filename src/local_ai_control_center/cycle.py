@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict
 
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.fence import (
+    CONTEXT_SLOT,
     content_slot,
     instruction_shapes_in,
     without_markers,
@@ -349,6 +350,25 @@ def write_new_file(path: Path, text: str) -> None:
         raise ConversionError(f"Cannot write {path.name}: {error.strerror or error}.") from error
 
 
+def _standing_context(config: Config, workspace: Workspace) -> tuple[str, bool]:
+    """Read the file the configuration names, or report that there was none.
+
+    An absent file is not an error: a project without standing context is the ordinary
+    case, and a missing one should not stop work. Read through the workspace boundary like
+    anything else, and the markers are stripped from it for the same reason they are
+    stripped from a document (ADR-038, ADR-041).
+    """
+    named = config.context_file.strip()
+    if not named:
+        return "", False
+    try:
+        text = workspace.resolve_within(Path(named)).read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return "", False
+    cleaned, _ = without_markers(text)
+    return cleaned.strip(), bool(cleaned.strip())
+
+
 def run_action(
     action: IntendedAction,
     prompt_template: str,
@@ -363,6 +383,7 @@ def run_action(
     approve: ApprovalFn | None = None,
     verify_quotes: bool = False,
     temperature: float = 0.0,
+    uses_context: bool = False,
 ) -> RunResult:
     """Run ``action`` through the whole system, in order, and ask a provider.
 
@@ -388,6 +409,18 @@ def run_action(
         raise
 
     prompt, files_read, contents = read.prompt, read.paths, read.contents
+
+    # Only when the plan asked for it. A file that reached every prompt because it exists
+    # would be the failure ADR-041 exists to prevent, applied by accident.
+    context, had_context = _standing_context(config, workspace) if uses_context else ("", False)
+    prompt = prompt.replace(CONTEXT_SLOT, context)
+    if had_context:
+        audit.record(
+            run_id,
+            "standing_context_used",
+            f"{action.name} was given the standing context",
+            {"action": action.name, "file": config.context_file},
+        )
 
     # Recorded whether or not anything was found, because "nothing was found" is the claim
     # a reader of the trail needs, and an absent field cannot make it (ADR-038).
@@ -488,7 +521,8 @@ def run_action(
                 "action": action.name,
                 "quotations": len(checked),
                 "verified": held,
-                "unverified": len(checked) - held,
+                "found_but_unplaced": sum(1 for c in checked if c.found and not c.holds),
+                "not_in_the_document": sum(1 for c in checked if not c.found),
                 "pages_the_model_got_wrong": misplaced,
             },
         )
@@ -733,4 +767,5 @@ def run_skill(
         approve,
         plan.verify_quotes,
         plan.temperature,
+        plan.uses_context,
     )

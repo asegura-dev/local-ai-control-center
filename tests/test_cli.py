@@ -582,7 +582,7 @@ def test_a_measurement_shows_every_run(tmp_path: Path) -> None:
         input="y\n",
     )
     assert "quotations" in result.stdout
-    assert "verified" in result.stdout
+    assert "in the document" in result.stdout
 
 
 def _hostile_config(tmp_path: Path) -> Path:

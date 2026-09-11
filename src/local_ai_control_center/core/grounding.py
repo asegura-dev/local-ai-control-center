@@ -109,8 +109,19 @@ class CheckedClaim(BaseModel):
     searching the text, not from a model recalling where it read something (ADR-031)."""
 
     @property
+    def found(self) -> bool:
+        """Whether the quotation is in the document at all.
+
+        The question that decides whether something can be cited. A quotation spanning a
+        page break is real and has no single page, and counting it beside a fabrication
+        reports the tool's limit as the model's dishonesty - which is what a corpus of 237
+        quotations showed: 72 unplaceable, and **zero** not in their document (ADR-042).
+        """
+        return self.verdict in ("verified", "page_unknown")
+
+    @property
     def holds(self) -> bool:
-        """Whether the quotation was found in the source."""
+        """Whether the quotation was found and its page could be named."""
         return self.verdict == "verified"
 
     @property
@@ -151,13 +162,17 @@ def parse_claims(text: str) -> tuple[Claim, ...]:
         current.clear()
 
     for line in text.splitlines():
-        stripped = line.strip()
+        # Emphasis is stripped before matching. A model asked for `CLAIM:` may write
+        # `**CLAIM:**`, and it does - which made a skill that declared it verified
+        # quotations verify none of them, and report that it had.
+        stripped = line.strip().lstrip("*_#- ")
         lowered = stripped.lower()
         for field in ("claim", "quote", "page"):
-            if lowered.startswith(f"{field}:"):
+            if lowered.startswith(f"{field}:") or lowered.startswith(f"{field}**:"):
+                _, _, value = stripped.partition(":")
                 if field == "claim":
                     flush()
-                current[field] = stripped[len(field) + 1 :].strip()
+                current[field] = value.strip().lstrip("*_ ").strip()
                 break
     flush()
     return tuple(claims)
@@ -264,10 +279,20 @@ def check_claim(claim: Claim, source: str) -> CheckedClaim:
 
     # Located per page against the raw source, so a quotation spanning a break belongs to
     # no single page and is reported as such rather than attributed to one of them.
-    found_on = next(
-        (number for number, text in pages_in(source) if needle in _normalized(text)),
-        None,
-    )
+    pages = pages_in(source)
+    found_on = next((number for number, text in pages if needle in _normalized(text)), None)
+    if found_on is None:
+        # A sentence that runs across a break belongs to no single page, which is not the
+        # same as belonging to none. Adjacent pairs are searched and the page it *starts*
+        # on is reported - the one a reader would turn to.
+        found_on = next(
+            (
+                pages[index][0]
+                for index in range(len(pages) - 1)
+                if needle in _normalized(pages[index][1] + " " + pages[index + 1][1])
+            ),
+            None,
+        )
     if found_on is None:
         return CheckedClaim(claim=claim, verdict="page_unknown")
     return CheckedClaim(claim=claim, verdict="verified", found_on_page=found_on)
