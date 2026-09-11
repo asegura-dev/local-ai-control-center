@@ -8,13 +8,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from local_ai_control_center.config import (
-    Config,
-    load_config,
-    load_dotenv,
-    parse_dotenv,
-)
-from local_ai_control_center.provider import ProviderError, resolve_engine_host
+from local_ai_control_center.adapters.ollama import resolve_engine_host
+from local_ai_control_center.core.config import Config, load_config, load_dotenv, parse_dotenv
+from local_ai_control_center.ports.provider import ProviderError
 
 
 @pytest.fixture

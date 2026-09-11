@@ -12,9 +12,9 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from local_ai_control_center.config import Config
-from local_ai_control_center.permissions import Capability, Permissions, check
-from local_ai_control_center.workspace import Workspace
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.permissions import Capability, Permissions, check
+from local_ai_control_center.core.workspace import Workspace
 
 
 class IntendedAction(BaseModel):

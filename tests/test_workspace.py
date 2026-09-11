@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from local_ai_control_center.config import Config
-from local_ai_control_center.workspace import (
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.workspace import (
     Workspace,
     WorkspaceExposed,
     repository_above,

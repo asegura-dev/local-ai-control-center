@@ -20,19 +20,20 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from local_ai_control_center.audit import AuditLog, digest_of, digest_of_file
-from local_ai_control_center.config import Config
-from local_ai_control_center.converter import ConversionError, Converter
-from local_ai_control_center.fence import instruction_shapes_in, without_markers
-from local_ai_control_center.grounding import CheckedClaim, check_answer
-from local_ai_control_center.permissions import Capability, PermissionDenied, Permissions
-from local_ai_control_center.preview import (
-    ExecutionPreview,
-    IntendedAction,
-    preview_action,
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.fence import (
+    content_slot,
+    instruction_shapes_in,
+    without_markers,
 )
-from local_ai_control_center.provider import Completion, Provider
-from local_ai_control_center.workspace import Workspace
+from local_ai_control_center.core.grounding import CheckedClaim, check_answer
+from local_ai_control_center.core.permissions import Capability, PermissionDenied, Permissions
+from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
+from local_ai_control_center.core.skill import Skill
+from local_ai_control_center.core.workspace import Workspace
+from local_ai_control_center.ports.converter import ConversionError, Converter
+from local_ai_control_center.ports.provider import Completion, Provider
+from local_ai_control_center.system.audit import AuditLog, digest_of, digest_of_file
 
 Outcome = Literal["completed", "refused", "declined"]
 """How a run ended: it ran, it was not allowed, or the human said no."""
@@ -42,24 +43,6 @@ ConfirmationFn = Callable[[ExecutionPreview], bool]
 
 ApprovalFn = Callable[[str], bool]
 """Given a diff, decide whether the result is worth keeping on disk (ADR-025)."""
-
-
-def content_slot(index: int) -> str:
-    """The marker a skill leaves for the document at ``index``.
-
-    One per document, so several can be fenced separately and the model can tell them
-    apart. The plan holds the holes; the cycle fills them with what it read.
-    """
-    return f"<<file_content:{index}>>"
-
-
-CONTENT_PLACEHOLDER = content_slot(0)
-"""Marker a prompt template leaves for the cycle to replace with file contents.
-
-A skill's plan is pure, so it can only leave the hole; filling it is a side
-effect's product and belongs to the cycle (ADR-014). A literal marker is replaced,
-not formatted, so braces in a path or a file never break the substitution.
-"""
 
 
 _CONVERSION_CAPABILITIES: frozenset[Capability] = frozenset({"read_files", "write_files"})
@@ -716,3 +699,38 @@ def run_conversion(
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})
 
     return RunResult(preview=preview, outcome="completed")
+
+
+def run_skill(
+    skill: Skill,
+    requests: tuple[str, ...],
+    permissions: Permissions,
+    config: Config,
+    workspace: Workspace,
+    provider: Provider,
+    audit: AuditLog,
+    run_id: str,
+    confirm: ConfirmationFn,
+    approve: ApprovalFn | None = None,
+) -> RunResult:
+    """Plan the skill, then run its plan through the execution cycle.
+
+    Wires a skill to the cycle so callers do not repeat the wiring. The skill only
+    describes; the cycle previews, checks, confirms, executes, and records.
+    """
+    plan = skill.plan(requests, config)
+    return run_action(
+        plan.action,
+        plan.prompt_template,
+        permissions,
+        config,
+        workspace,
+        provider,
+        audit,
+        run_id,
+        confirm,
+        plan.destination,
+        approve,
+        plan.verify_quotes,
+        plan.temperature,
+    )

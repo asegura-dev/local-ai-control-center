@@ -7,15 +7,9 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from local_ai_control_center.provider import (
-    Completion,
-    MockProvider,
-    OllamaProvider,
-    Provider,
-    ProviderError,
-    ollama_host,
-    resolve_engine_host,
-)
+from local_ai_control_center.adapters.mock import MockProvider
+from local_ai_control_center.adapters.ollama import OllamaProvider, ollama_host, resolve_engine_host
+from local_ai_control_center.ports.provider import Completion, Provider, ProviderError
 
 
 def test_mock_is_a_provider() -> None:

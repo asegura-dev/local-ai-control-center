@@ -15,8 +15,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from local_ai_control_center.config import Config
-from local_ai_control_center.workspace import Workspace
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.workspace import Workspace
 
 EventKind = Literal[
     "run_started",

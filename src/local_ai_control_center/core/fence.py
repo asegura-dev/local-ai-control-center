@@ -84,3 +84,21 @@ def instruction_shapes_in(content: str) -> tuple[str, ...]:
     return tuple(
         description for description, pattern in _INSTRUCTION_SHAPES if pattern.search(content)
     )
+
+
+def content_slot(index: int) -> str:
+    """The marker a skill leaves for the document at ``index``.
+
+    One per document, so several can be fenced separately and the model can tell them
+    apart. The plan holds the holes; the cycle fills them with what it read.
+    """
+    return f"<<file_content:{index}>>"
+
+
+CONTENT_PLACEHOLDER = content_slot(0)
+"""Marker a prompt template leaves for the cycle to replace with file contents.
+
+A skill's plan is pure, so it can only leave the hole; filling it is a side
+effect's product and belongs to the cycle (ADR-014). A literal marker is replaced,
+not formatted, so braces in a path or a file never break the substitution.
+"""

@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from local_ai_control_center.config import Config
-from local_ai_control_center.permissions import Permissions
-from local_ai_control_center.preview import IntendedAction, preview_action
-from local_ai_control_center.workspace import Workspace
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.permissions import Permissions
+from local_ai_control_center.core.preview import IntendedAction, preview_action
+from local_ai_control_center.core.workspace import Workspace
 
 
 def _setup(tmp_path: Path, **config_kwargs: object) -> tuple[Config, Workspace]:

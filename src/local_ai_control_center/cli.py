@@ -20,40 +20,15 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from local_ai_control_center.audit import AuditLog, verify_chain
-from local_ai_control_center.config import (
-    DOTENV_FILENAME,
-    Config,
-    load_config,
-    load_dotenv,
-)
-from local_ai_control_center.converter import ConversionError, HiddenText, converter_for
-from local_ai_control_center.cycle import (
-    WINDOW_TOLERANCE,
-    PromptTooLargeError,
-    ReadError,
-    RunResult,
-    answer_reserve,
-    run_conversion,
-    write_new_file,
-)
-from local_ai_control_center.notifier import (
-    Notification,
-    NotifierMisconfigured,
-    notifier_from_config,
-)
-from local_ai_control_center.permissions import grant
-from local_ai_control_center.preview import ExecutionPreview, IntendedAction, preview_action
-from local_ai_control_center.profiler import SystemProfile, profile_system
-from local_ai_control_center.provider import (
-    MockProvider,
-    OllamaProvider,
-    Provider,
-    ProviderError,
-    resolve_engine_host,
-)
-from local_ai_control_center.run import new_run_id
-from local_ai_control_center.skill import (
+from local_ai_control_center.adapters.documents import HiddenText, converter_for
+from local_ai_control_center.adapters.mock import MockProvider
+from local_ai_control_center.adapters.ntfy import notifier_from_config
+from local_ai_control_center.adapters.ollama import OllamaProvider, resolve_engine_host
+from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
+from local_ai_control_center.core.permissions import grant
+from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
+from local_ai_control_center.core.run import new_run_id
+from local_ai_control_center.core.skill import (
     CritiqueFileSkill,
     ExtractClaimsSkill,
     ReviseFileSkill,
@@ -61,14 +36,28 @@ from local_ai_control_center.skill import (
     SkillPlan,
     SummarizeFileSkill,
     grant_for,
-    run_skill,
 )
-from local_ai_control_center.workspace import (
+from local_ai_control_center.core.workspace import (
     Workspace,
     WorkspaceExposed,
     sync_folder_suspicion,
     workspace_from_config,
 )
+from local_ai_control_center.cycle import (
+    WINDOW_TOLERANCE,
+    PromptTooLargeError,
+    ReadError,
+    RunResult,
+    answer_reserve,
+    run_conversion,
+    run_skill,
+    write_new_file,
+)
+from local_ai_control_center.ports.converter import ConversionError
+from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
+from local_ai_control_center.ports.provider import Provider, ProviderError
+from local_ai_control_center.system.audit import AuditLog, verify_chain
+from local_ai_control_center.system.profiler import SystemProfile, profile_system
 
 DEFAULT_CONFIG_PATH = Path("configs/config.yaml")
 """Where LACC looks when no --config is given.

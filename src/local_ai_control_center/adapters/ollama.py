@@ -8,114 +8,18 @@ engine installed.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import urllib.error
 import urllib.parse
 import urllib.request
-from abc import ABC, abstractmethod
-from collections.abc import Mapping
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-
-from local_ai_control_center.config import is_loopback, normalized_host
-
-
-class Completion(BaseModel):
-    """The result of a provider call.
-
-    Carries the producing provider's name alongside the text, so an audit record
-    can attribute a result rather than only storing it.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    text: str
-    provider: str
-    prompt_tokens: int | None = None
-    """Tokens the engine counted in the prompt, when it says. The only way LACC's own
-    estimate can be checked against reality (ADR-020)."""
-
-    answer_tokens: int | None = None
-    """Tokens the engine produced, when it says."""
-
-    finish_reason: str | None = None
-    """Why generation stopped, when the engine says. An answer that stopped because it
-    ran out of room ends mid-thought and looks like an answer."""
-
-
-class Provider(ABC):
-    """Abstract port for anything that turns a prompt into a completion.
-
-    Implementations are free to call a local engine, a remote service, or nothing
-    at all. The core only knows this interface.
-    """
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Short identifier recorded on completions this provider produces."""
-
-    @abstractmethod
-    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
-        """Return a completion for ``prompt``.
-
-        ``temperature`` is per request because it is a property of the task, not of the
-        engine: a skill copying words out of a document needs a different setting from one
-        rewriting prose, and the skill is what knows which it is (ADR-033).
-        """
-
-
-class MockProvider(Provider):
-    """A deterministic provider that touches nothing outside this process.
-
-    The same prompt always yields the same completion. Responses come from one of
-    two paths: a scripted answer supplied by the caller, or a predictable answer
-    derived from the prompt itself.
-    """
-
-    def __init__(self, responses: Mapping[str, str] | None = None) -> None:
-        """Create the provider, optionally scripting prompt-to-response pairs."""
-        self._responses = dict(responses or {})
-
-    @property
-    def name(self) -> str:
-        """Identify completions produced by this provider."""
-        return "mock"
-
-    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
-        """Return the scripted answer for ``prompt``, or a derived one.
-
-        ``temperature`` is accepted and ignored: this provider is already deterministic,
-        which is precisely why the suite never noticed the engine was not.
-        """
-        scripted = self._responses.get(prompt)
-        text = scripted if scripted is not None else self._derive(prompt)
-        return Completion(text=text, provider=self.name)
-
-    @staticmethod
-    def _derive(prompt: str) -> str:
-        """Derive a stable, readable answer from the prompt.
-
-        Deterministic by construction: the same prompt yields the same digest, so
-        tests can assert on it without scripting every case.
-        """
-        digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
-        return f"mock completion for prompt {digest}"
-
+from local_ai_control_center.core.config import is_loopback, normalized_host
+from local_ai_control_center.ports.provider import Completion, Provider, ProviderError
 
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
 _GENERATE_TIMEOUT_SECONDS = 300
-
-
-class ProviderError(Exception):
-    """Raised when a real provider cannot produce a completion.
-
-    Carries a message already translated into something a person can act on.
-    """
-
 
 _NOT_LOOPBACK = (
     "OLLAMA_HOST points at {host}, which is not this machine. LACC talks to an engine "
@@ -126,7 +30,6 @@ _NOT_LOOPBACK = (
     "decision record - authentication, authorization, where the audit trail lives - "
     "before it exists. Until then, unset OLLAMA_HOST or point it at 127.0.0.1."
 )
-
 
 _NOT_NAMED = (
     "The engine host {host} is not this machine, and network_access is off. A host that "

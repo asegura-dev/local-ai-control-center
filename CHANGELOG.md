@@ -5,6 +5,54 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.35.0] - 2026-09-10
+
+### Changed
+- **Five directories that mean something, instead of fifteen modules flat.** LACC was
+  already built as ports and adapters; none of it was visible in the layout, and the seam
+  the design is organised around had to be inferred by reading imports.
+
+  | Directory | What may live there |
+  |---|---|
+  | `core/` | The rules. Depends on nothing outside itself. |
+  | `ports/` | An abstract class and the contracts crossing it. Nothing else. |
+  | `adapters/` | Implementations of those ports. |
+  | `system/` | Machine-facing code not behind a port. |
+  | top level | `cycle.py` and `cli.py`. |
+
+  `adapters` and `system` are separate because a port is not free: an abstraction earns its
+  place when there are two real implementations. Audit and profiling have one each, so they
+  stay concrete rather than implying a port that does not exist.
+
+- **The inversion this existed to fix needed two moves, not one.** `run_skill` orchestrated
+  from inside `core.skill`, so the module holding the pure planning logic dragged in
+  everything the cycle touched. Moving it out was the obvious fix and was **not sufficient**:
+  `core.skill` still imported `content_slot` from the cycle to leave a hole for each
+  document. That slot is part of a prompt's shape, so it moved to `core.fence`, and only
+  then did `core` stop reaching downward.
+
+  Measuring the import graph again after each move is what found the second one. The
+  dependency an ADR names is not always the only one holding two modules together.
+
+- The package is now importable by layer: `local_ai_control_center.core.config`,
+  `.ports.provider`, `.adapters.ollama`. Doing this before v1.0 was the point - after it,
+  those paths are public API and moving them is a breaking change.
+
+### Added
+- **A test enforces the layering.** Five directories whose names carry meaning are five
+  directories somebody will eventually break, and a layout in a document is a wish. It
+  checks that core reaches for nothing outside itself, that a port imports no adapter, that
+  an adapter knows nothing of the cycle, and that the only files at the top level are the
+  two that belong there.
+
+### Notes
+- Two deviations from what ADR-029 proposed are recorded in the ADR rather than quietly
+  absorbed: `config` stays whole in `core` instead of splitting into a contract and a
+  loader, and `content_slot` moved somewhere the proposal did not anticipate.
+- No behaviour changed. The 364 tests that passed before pass after, plus five new ones
+  about the structure itself.
+
+
 ## [0.34.0] - 2026-09-10
 
 ### Security

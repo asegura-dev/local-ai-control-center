@@ -11,10 +11,8 @@ import pytest
 from conftest import pdf_with_streams
 from pypdf import PdfReader
 
-from local_ai_control_center.converter import (
+from local_ai_control_center.adapters.documents import (
     PAGE_MARKER,
-    ConversionError,
-    Converter,
     DocxConverter,
     HiddenText,
     PdfConverter,
@@ -24,6 +22,7 @@ from local_ai_control_center.converter import (
     supported_suffixes,
     without_furniture,
 )
+from local_ai_control_center.ports.converter import ConversionError, Converter
 
 
 def test_converter_cannot_be_instantiated() -> None:

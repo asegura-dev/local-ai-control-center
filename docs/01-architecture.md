@@ -38,29 +38,42 @@ The reverse is not allowed: the core must not depend on the CLI or the
 dashboard. This is intended to keep the core testable in isolation and to let
 interfaces change without touching business logic.
 
-## Module strategy
+## Five directories that mean something
 
-Early versions use a small set of flat modules rather than many subpackages.
-Subpackages are introduced only when a module grows large enough to justify the
-split. This avoids empty folders and premature abstraction.
+Until v0.35.0 the package was fifteen modules flat, and the seam the design is organised
+around - what the core decides, and what the world does - had to be inferred by reading
+imports. It is now visible:
 
-The package currently exposes its version, a validated configuration contract
-(`config`), run identity (`run`), a workspace with boundary enforcement
-(`workspace`), a restrictive-by-default permission system (`permissions`), a
-provider port with a deterministic offline mock and a real Ollama-backed
-implementation (`provider`), an append-only audit
-log (`audit`), a side-effect-free execution preview (`preview`), the execution
-cycle that runs an action through all of them (`cycle`), skills that produce those
-actions (`skill`), a converter port that turns documents into text LACC can read
-(`converter`), the quotation checking that verifies an answer against its source
-(`grounding`), a notifier port that says when a run finished (`notifier`), and a
-command-line interface that ties everything into a usable tool (`cli`). Interface code (Typer, Rich) lives only in the CLI; the core stays
-free of it. A profiler (`profiler`) detects and reports what the machine offers -
-the local engine, installed models, hardware, and rough capacity guidance - without
-acting; it is Ollama-specific for now, while the provider port stays engine-agnostic.
-With the real provider in place, the loop now runs end to end against a live local
-model: a skill's prompt reaches Ollama and its completion returns through the cycle,
-audited like any other run. The CLI chooses between the mock and Ollama per run.
+| Directory | What may live there |
+|---|---|
+| `core/` | The rules: configuration contracts, permissions, previews, plans, the fence, quotation checking, the workspace boundary. Depends on nothing outside itself. |
+| `ports/` | An abstract class and the contracts that cross it. Nothing else. |
+| `adapters/` | Implementations of those ports: Ollama, a mock, PDF and Word, ntfy. |
+| `system/` | Machine-facing code that is not behind a port: the audit trail, the profiler. |
+| top level | `cycle.py`, the application service, and `cli.py`, the driving adapter. |
+
+**`adapters` and `system` are separate because a port is not free.** An abstraction earns
+its place when there are two real implementations: Provider has Ollama and a mock, Converter
+has PDF and Word, Notifier has ntfy and its test double. An audit trail and a hardware
+profile have one each, so they stay concrete. Putting them under `adapters` would imply a
+port that does not exist and invite someone to add one for symmetry.
+
+`core/workspace.py` calls `Path.resolve`, so it is not free of the filesystem. That is a
+deliberate exception: "nothing outside the workspace is touched" is a rule in PRINCIPLES
+rather than a service the core consumes, and resolving a path is how the rule is checked.
+Naming the exception is better than a layering that quietly launders it.
+
+**The restructure fixed a real inversion, and needed two moves rather than one.** `run_skill`
+orchestrated from inside `core.skill`, so the module holding the pure planning logic dragged
+in everything the cycle touched; moving it out was the obvious fix and was not sufficient,
+because `core.skill` still imported `content_slot` from the cycle to leave a hole for each
+document. The slot is part of a prompt's shape, so it moved to `core.fence`, and only then
+did `core` stop reaching downward. Measuring the import graph again after each move is what
+found the second one.
+
+The layering is enforced by a test rather than described in this chapter. Five directories
+whose names carry meaning are five directories somebody will eventually break, and a layout
+in a document is a wish.
 
 ## Where a side effect lives: reading files
 

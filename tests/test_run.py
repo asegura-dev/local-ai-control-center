@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from local_ai_control_center.run import new_run_id
+from local_ai_control_center.core.run import new_run_id
 
 _RUN_ID_PATTERN = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{4}$")
 

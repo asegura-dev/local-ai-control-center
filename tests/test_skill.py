@@ -7,13 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from local_ai_control_center.audit import AuditLog
-from local_ai_control_center.config import Config
-from local_ai_control_center.cycle import CONTENT_PLACEHOLDER, content_slot
-from local_ai_control_center.permissions import Capability, Permissions
-from local_ai_control_center.preview import ExecutionPreview, IntendedAction
-from local_ai_control_center.provider import MockProvider
-from local_ai_control_center.skill import (
+from local_ai_control_center.adapters.mock import MockProvider
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.fence import CONTENT_PLACEHOLDER, content_slot
+from local_ai_control_center.core.permissions import Capability, Permissions
+from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction
+from local_ai_control_center.core.skill import (
     DOCUMENT_CLOSE,
     DOCUMENT_OPEN,
     CritiqueFileSkill,
@@ -24,9 +23,10 @@ from local_ai_control_center.skill import (
     SummarizeFileSkill,
     fenced_document,
     grant_for,
-    run_skill,
 )
-from local_ai_control_center.workspace import Workspace
+from local_ai_control_center.core.workspace import Workspace
+from local_ai_control_center.cycle import run_skill
+from local_ai_control_center.system.audit import AuditLog
 
 
 def _accept(_preview: ExecutionPreview) -> bool:

@@ -19,7 +19,8 @@ import urllib.request
 import psutil
 from pydantic import BaseModel, ConfigDict, Field
 
-from local_ai_control_center.provider import ProviderError, ollama_host
+from local_ai_control_center.adapters.ollama import ollama_host
+from local_ai_control_center.ports.provider import ProviderError
 
 _PROBE_TIMEOUT_SECONDS = 0.5
 _QUANTIZATION_BITS: tuple[int, ...] = (3, 4, 8)

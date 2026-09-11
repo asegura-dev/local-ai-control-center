@@ -12,11 +12,14 @@ from pathlib import Path
 
 import pytest
 
-from local_ai_control_center.audit import AuditLog
-from local_ai_control_center.config import Config
-from local_ai_control_center.converter import ConversionError, converter_for
+from local_ai_control_center.adapters.documents import converter_for
+from local_ai_control_center.adapters.mock import MockProvider
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.fence import CONTENT_PLACEHOLDER
+from local_ai_control_center.core.permissions import PermissionDenied, Permissions
+from local_ai_control_center.core.preview import IntendedAction
+from local_ai_control_center.core.workspace import Workspace
 from local_ai_control_center.cycle import (
-    CONTENT_PLACEHOLDER,
     ExecutionPreview,
     PromptTooLargeError,
     ReadError,
@@ -26,10 +29,9 @@ from local_ai_control_center.cycle import (
     run_action,
     run_conversion,
 )
-from local_ai_control_center.permissions import PermissionDenied, Permissions
-from local_ai_control_center.preview import IntendedAction
-from local_ai_control_center.provider import Completion, MockProvider
-from local_ai_control_center.workspace import Workspace
+from local_ai_control_center.ports.converter import ConversionError
+from local_ai_control_center.ports.provider import Completion
+from local_ai_control_center.system.audit import AuditLog
 
 
 def _accept(_preview: ExecutionPreview) -> bool:

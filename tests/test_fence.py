@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from local_ai_control_center.fence import (
+from local_ai_control_center.core.fence import (
     DOCUMENT_CLOSE,
     DOCUMENT_OPEN,
     instruction_shapes_in,

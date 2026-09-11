@@ -16,7 +16,7 @@ import pytest
 from typer.testing import CliRunner
 
 from local_ai_control_center.cli import app
-from local_ai_control_center.notifier import Delivery, Notification, Notifier
+from local_ai_control_center.ports.notifier import Delivery, Notification, Notifier
 
 runner = CliRunner()
 

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from local_ai_control_center.config import Config
+from local_ai_control_center.core.config import Config
 
 _RESERVED_NAMES = frozenset(
     {"CON", "PRN", "AUX", "NUL"}

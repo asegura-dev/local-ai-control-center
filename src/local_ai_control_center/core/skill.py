@@ -15,20 +15,14 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from local_ai_control_center.audit import AuditLog
-from local_ai_control_center.config import Config
-from local_ai_control_center.cycle import (
-    ApprovalFn,
-    ConfirmationFn,
-    RunResult,
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.fence import (
+    DOCUMENT_CLOSE,
+    DOCUMENT_OPEN,
     content_slot,
-    run_action,
 )
-from local_ai_control_center.fence import DOCUMENT_CLOSE, DOCUMENT_OPEN
-from local_ai_control_center.permissions import Capability, Permissions, grant
-from local_ai_control_center.preview import IntendedAction
-from local_ai_control_center.provider import Provider
-from local_ai_control_center.workspace import Workspace
+from local_ai_control_center.core.permissions import Capability, Permissions, grant
+from local_ai_control_center.core.preview import IntendedAction
 
 
 def fenced_document(name: str, index: int = 0) -> str:
@@ -341,41 +335,6 @@ class ReviseFileSkill(Skill):
             + fenced_documents(requests)
         )
         return SkillPlan(action=action, prompt_template=prompt_template, destination=destination)
-
-
-def run_skill(
-    skill: Skill,
-    requests: tuple[str, ...],
-    permissions: Permissions,
-    config: Config,
-    workspace: Workspace,
-    provider: Provider,
-    audit: AuditLog,
-    run_id: str,
-    confirm: ConfirmationFn,
-    approve: ApprovalFn | None = None,
-) -> RunResult:
-    """Plan the skill, then run its plan through the execution cycle.
-
-    Wires a skill to the cycle so callers do not repeat the wiring. The skill only
-    describes; the cycle previews, checks, confirms, executes, and records.
-    """
-    plan = skill.plan(requests, config)
-    return run_action(
-        plan.action,
-        plan.prompt_template,
-        permissions,
-        config,
-        workspace,
-        provider,
-        audit,
-        run_id,
-        confirm,
-        plan.destination,
-        approve,
-        plan.verify_quotes,
-        plan.temperature,
-    )
 
 
 def grant_for(skill: Skill, config: Config) -> Permissions:

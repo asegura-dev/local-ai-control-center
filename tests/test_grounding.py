@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from local_ai_control_center.grounding import (
+from local_ai_control_center.core.grounding import (
     Claim,
     _normalized,
     check_answer,

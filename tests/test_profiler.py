@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from local_ai_control_center.profiler import (
+from local_ai_control_center.system.profiler import (
     InstalledModel,
     SystemProfile,
     _cache_bytes_per_token,

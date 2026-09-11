@@ -21,12 +21,15 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
-from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 
-from pydantic import BaseModel, ConfigDict
-
-from local_ai_control_center.config import Config
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.ports.notifier import (
+    Delivery,
+    Notification,
+    Notifier,
+    NotifierMisconfigured,
+)
 
 Post = Callable[[str, bytes, Mapping[str, str], float], int]
 """Send a body to a URL with headers and return the status code."""
@@ -37,47 +40,6 @@ _MAX_BODY_BYTES = 3900
 
 _ALLOWED_SCHEMES = frozenset({"http", "https"})
 _CONTROL_CHARACTERS = frozenset(chr(code) for code in range(32)) | {chr(127)}
-
-
-class NotifierMisconfigured(ValueError):
-    """The notifier settings do not describe a destination LACC will post to."""
-
-
-class Notification(BaseModel):
-    """What LACC has to say about a run that finished.
-
-    Frozen, and deliberately narrow: a title, a line of body, and tags. There is no field
-    for content because there is no case where a notification should carry any (ADR-027).
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    title: str
-    body: str
-    tags: tuple[str, ...] = ()
-
-
-class Delivery(BaseModel):
-    """What happened when a notification was sent."""
-
-    model_config = ConfigDict(frozen=True)
-
-    transport: str
-    delivered: bool
-    detail: str = ""
-
-
-class Notifier(ABC):
-    """Abstract port for anything that can tell a person a run has finished."""
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Short identifier of the transport, for audit records."""
-
-    @abstractmethod
-    def send(self, notification: Notification) -> Delivery:
-        """Deliver ``notification``, reporting what happened rather than raising."""
 
 
 def header_safe(value: str) -> str:

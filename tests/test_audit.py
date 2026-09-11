@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from local_ai_control_center.audit import (
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.workspace import Workspace
+from local_ai_control_center.system.audit import (
     AUDIT_FILENAME,
     GENESIS_DIGEST,
     AuditLog,
@@ -17,8 +19,6 @@ from local_ai_control_center.audit import (
     digest_of_file,
     verify_chain,
 )
-from local_ai_control_center.config import Config
-from local_ai_control_center.workspace import Workspace
 
 
 def _log(tmp_path: Path, **config_kwargs: object) -> AuditLog:

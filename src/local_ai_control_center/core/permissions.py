@@ -12,7 +12,7 @@ from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict
 
-from local_ai_control_center.config import Config
+from local_ai_control_center.core.config import Config
 
 Capability = Literal["read_files", "write_files", "network", "run_commands"]
 """The closed set of things a skill can ask for. Unknown values fail validation."""
