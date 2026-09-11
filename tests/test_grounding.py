@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from local_ai_control_center.grounding import (
     Claim,
+    _normalized,
     check_answer,
     check_claim,
     pages_in,
     parse_claims,
 )
+
+_PAGE_ONE = "<!-- page 1 -->" + chr(10) * 2
 
 _SOURCE = """<!-- page 1 -->
 
@@ -148,3 +151,87 @@ def test_an_answer_is_checked_claim_by_claim() -> None:
     )
     checked = check_answer(answer, _SOURCE)
     assert [item.verdict for item in checked] == ["verified", "not_found"]
+
+
+def test_a_word_the_typesetter_broke_still_matches() -> None:
+    """A real paper produced two "fabrications" that were nothing of the kind.
+
+    The model quoted faithfully; the PDF held the word split across a line break and LACC's
+    own ingestion preserved it, so the check reported a defect in this project as
+    dishonesty in the model. Fixing it took the verification rate on that paper from 57% to
+    85% (ADR-034).
+    """
+    source = "<!-- page 1 -->\n\nThe corresponding sensi- tivity for the human readers was 77%."
+    claim = Claim(claim="c", quote="the corresponding sensitivity for the human readers", page=1)
+    assert check_claim(claim, source).verdict == "verified"
+
+
+def test_a_break_with_spaces_on_both_sides_of_the_hyphen_still_matches() -> None:
+    """`avail - able` is the same artefact with the whitespace fallen differently."""
+    source = "<!-- page 1 -->\n\nThe tool has been made freely avail - able for researchers."
+    claim = Claim(claim="c", quote="made freely available for researchers", page=1)
+    assert check_claim(claim, source).verdict == "verified"
+
+
+def test_a_compound_split_at_its_own_hyphen_still_matches() -> None:
+    """The case the first rule got wrong, and the reason both sides are treated alike.
+
+    `inter-reader` is a real compound the typesetter split at its own hyphen. Requiring
+    whitespace after the hyphen normalised the document to `interreader` while a model
+    writing `inter-reader` was left alone - an asymmetry the check itself created, reported
+    as a fabrication (ADR-035).
+    """
+    source = _PAGE_ONE + "The sensitivity was well in the inter- reader range here."
+    claim = Claim(claim="c", quote="well in the inter-reader range", page=1)
+    assert check_claim(claim, source).verdict == "verified"
+
+
+def test_a_hyphen_between_letters_is_representation_either_way() -> None:
+    """It cannot be told from the text whether a typesetter put it there, so both fold."""
+    assert _normalized("an AI-based tool") == _normalized("an AI- based tool")
+    assert _normalized("well-known") == _normalized("wellknown")
+
+
+def test_numbers_around_a_dash_are_left_alone() -> None:
+    """Without this, `the 5 - 10 range` became `the 50 range` - worse than the bug fixed."""
+    assert _normalized("the 5 - 10 range") == "the 5 - 10 range"
+    assert _normalized("76-90%") == "76-90%"
+
+
+def test_a_quotation_that_was_not_found_says_what_the_document_does_contain() -> None:
+    """The failure this exists for: a real sentence with the figure changed.
+
+    Right topic, right wording, false number - which is the part that ends up in a table.
+    """
+    source = "<!-- page 1 -->\n\nThe sensitivity of the AI method for detecting metastases was 82%."
+    invented = Claim(
+        claim="c",
+        quote="The sensitivity of the AI method for detecting metastases was 76-90%",
+        page=1,
+    )
+    checked = check_claim(invented, source)
+    assert checked.verdict == "not_found"
+    assert "82%" in checked.nearest
+
+
+def test_the_refusal_is_not_softened_by_finding_something_near() -> None:
+    """Nothing fuzzy is ever accepted as verified. ADR-026 stands; this sits beside it."""
+    source = "<!-- page 1 -->\n\nThe sensitivity of the AI method for detecting metastases was 82%."
+    invented = Claim(claim="c", quote="the sensitivity of the AI method was 76-90%", page=1)
+    checked = check_claim(invented, source)
+    assert checked.holds is False
+
+
+def test_nothing_is_offered_when_nothing_is_close() -> None:
+    """A weak suggestion is worse than silence: it carries an implication someone acts on."""
+    source = "<!-- page 1 -->\n\nThe study analysed 240 cases across three hospitals in 2019."
+    unrelated = Claim(claim="c", quote="the reactor was shut down for maintenance", page=1)
+    checked = check_claim(unrelated, source)
+    assert checked.verdict == "not_found"
+    assert checked.nearest == ""
+
+
+def test_a_verified_quotation_carries_no_suggestion() -> None:
+    """There is nothing to repair, so there is nothing to say."""
+    checked = check_claim(Claim(claim="c", quote="across three hospitals", page=1), _SOURCE)
+    assert checked.nearest == ""

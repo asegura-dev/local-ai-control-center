@@ -276,12 +276,38 @@ def _show_checked_quotations(result: RunResult) -> None:
         )
     console.print(table)
 
+    _offer_the_nearest_text(result)
+
     unverified = sum(1 for checked in result.checked_claims if not checked.holds)
     if unverified:
         console.print(
             f"[red]{unverified} of {len(result.checked_claims)} quotations did not check "
             "out.[/red] Do not cite those without opening the document yourself."
         )
+
+
+def _offer_the_nearest_text(result: RunResult) -> None:
+    """For a quotation that was not found, show what the document does contain.
+
+    The failure this exists for is a real sentence with the number changed: right topic,
+    right wording, false figure. Reporting only "not found" leaves someone hunting through
+    a PDF for a sentence they have just been told is wrong (ADR-034).
+    """
+    corrections = [
+        checked
+        for checked in result.checked_claims
+        if checked.verdict == "not_found" and checked.nearest
+    ]
+    if not corrections:
+        return
+
+    console.print()
+    for checked in corrections:
+        console.print("[red]Not in the document:[/red]")
+        console.print(f"  [dim]the model wrote  [/dim] {checked.claim.quote[:150]}")
+        # "Closest text", never "what it meant": this is a string match, and LACC does not
+        # know what the model was reaching for.
+        console.print(f"  [green]closest in source[/green] {checked.nearest[:150]}")
 
 
 def _warn_about_the_answer(result: RunResult, config: Config) -> None:

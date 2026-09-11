@@ -10,6 +10,7 @@ Everything in this module is a pure function over text.
 
 from __future__ import annotations
 
+import difflib
 import re
 from typing import Literal
 
@@ -20,6 +21,58 @@ Verdict = Literal["verified", "not_found", "page_unknown"]
 
 _PAGE_MARKER = re.compile(r"<!--\s*page\s+(\d+)\s*-->", re.IGNORECASE)
 _WHITESPACE = re.compile(r"\s+")
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+_MARKER = re.compile(r"<!--.*?-->", re.DOTALL)
+_HYPHEN_BETWEEN_LETTERS = re.compile(r"([^\W\d_])\s*-\s*([^\W\d_])")
+"""A hyphen between two letters, with or without space around it, is removed.
+
+Requiring whitespace after it was the obvious rule and it was wrong. It fixed
+`sensi- tivity`, and it broke `inter- reader`: that is a real compound the typesetter
+happened to split at its own hyphen, so the document normalised to `interreader` while a
+model writing `inter-reader` did not - an asymmetry this function created, reported as a
+fabrication.
+
+The two cases cannot be told apart from the text, so both sides are treated the same. A
+hyphen between letters is representation: a typesetter can insert one at a line break or
+leave one out, and a reader sees the same word either way. Numbers keep theirs, because
+`the 5 - 10 range` is a range and joining it would be a worse error than the one fixed.
+"""
+
+_LOOK_ALIKES = str.maketrans(
+    {
+        "‐": "-",
+        "‑": "-",
+        "‒": "-",
+        "–": "-",
+        "—": "-",
+        "―": "-",
+        "−": "-",
+        "‘": "'",
+        "’": "'",
+        "‛": "'",
+        "“": '"',
+        "”": '"',
+        "‟": '"',
+        "′": "'",
+        "″": '"',
+    }
+)
+"""Typographic characters folded to the ASCII a model writes when it reproduces them.
+
+A paper is typeset with en-dashes, curly quotes and non-breaking hyphens; a model reading
+`76–90%` writes `76-90%`, because that is what the range means and what a keyboard has.
+The two are the same text to any reader and different to a substring search, and that
+difference was being reported as fabrication. Measured on one paper: sixteen of its
+hundred and sixty sentences could not be verified even when quoted perfectly (ADR-035).
+"""
+
+_SHORTEST_CANDIDATE = 40
+"""Below this a sentence is a heading, a caption or a stray line, not something a
+quotation was drawn from."""
+
+_CLOSE_ENOUGH = 0.6
+"""`difflib`'s own default. A published number rather than one tuned until the examples
+looked right, and a weak suggestion is worse than none (ADR-034)."""
 
 
 class Claim(BaseModel):
@@ -43,6 +96,14 @@ class CheckedClaim(BaseModel):
 
     claim: Claim
     verdict: Verdict
+    nearest: str = ""
+    """The closest text actually in the source, when the quotation was not found.
+
+    Empty unless something was close enough to be worth showing. It reports a match, not a
+    reconstruction: LACC has compared strings and does not know what the model was reaching
+    for (ADR-034).
+    """
+
     found_on_page: int | None = None
     """The page LACC located the quotation on. Correct by construction: it comes from
     searching the text, not from a model recalling where it read something (ADR-031)."""
@@ -103,8 +164,22 @@ def parse_claims(text: str) -> tuple[Claim, ...]:
 
 
 def _normalized(text: str) -> str:
-    """Collapse whitespace and fold case, so layout differences do not hide a match."""
-    return _WHITESPACE.sub(" ", text).casefold().strip()
+    """Reduce text to what a reader sees, so representation cannot hide a real quotation.
+
+    Four transformations, and every one of them removes a difference nobody can see: curly
+    quotes and typographic dashes fold to the ASCII a model writes, words the typesetter
+    broke across a line are rejoined, whitespace collapses, and case folds. None of them
+    touches content - a changed word or a changed number survives all four and still fails,
+    which is the whole point (ADR-035).
+
+    Rejoining was added after a real paper produced two "fabrications" that were nothing of
+    the kind. The model had quoted faithfully; the PDF held `sensi- tivity` and
+    `avail - able` across line breaks, and LACC's own ingestion preserved them. The check
+    was reporting a defect in this project as dishonesty in the model (ADR-034).
+    """
+    folded = text.translate(_LOOK_ALIKES)
+    joined = _HYPHEN_BETWEEN_LETTERS.sub(lambda m: m.group(1) + m.group(2), folded)
+    return _WHITESPACE.sub(" ", joined).casefold().strip()
 
 
 def pages_in(source: str) -> tuple[tuple[int, str], ...]:
@@ -125,6 +200,45 @@ def pages_in(source: str) -> tuple[tuple[int, str], ...]:
     return tuple(pages)
 
 
+def nearest_text(quote: str, source: str) -> str:
+    """Return the sentence in ``source`` most like ``quote``, or empty when none is close.
+
+    For the failure that matters most: a model that takes a real sentence and changes the
+    number in it. The structure, the wording and the topic are right, and only the figure -
+    the part that would be copied into a table - is false. Verifying already means searching
+    the document, so when the search fails the tool has what it needs to say what the
+    document does contain, instead of leaving someone to hunt through a PDF for a sentence
+    they have just been told is wrong.
+
+    This never softens the refusal. The quotation is still not found; this sits beside that
+    verdict as a lead (ADR-026, ADR-034).
+    """
+    needle = _normalized(quote)
+    if not needle:
+        return ""
+    plain = _MARKER.sub(" ", source)
+    candidates = [
+        sentence.strip()
+        for sentence in _SENTENCE_END.split(plain)
+        if len(sentence.strip()) >= _SHORTEST_CANDIDATE
+    ]
+    if not candidates:
+        return ""
+
+    matcher = difflib.SequenceMatcher()
+    matcher.set_seq2(needle)
+    best, best_ratio = "", _CLOSE_ENOUGH
+    for candidate in candidates:
+        matcher.set_seq1(_normalized(candidate))
+        # quick_ratio is an upper bound and much cheaper; skip anything that cannot win.
+        if matcher.quick_ratio() < best_ratio:
+            continue
+        ratio = matcher.ratio()
+        if ratio >= best_ratio:
+            best, best_ratio = candidate, ratio
+    return _WHITESPACE.sub(" ", best)
+
+
 def check_claim(claim: Claim, source: str) -> CheckedClaim:
     """Look for ``claim``'s quotation in ``source`` and report what was found.
 
@@ -140,7 +254,9 @@ def check_claim(claim: Claim, source: str) -> CheckedClaim:
     """
     needle = _normalized(claim.quote)
     if not needle or needle not in _normalized(source):
-        return CheckedClaim(claim=claim, verdict="not_found")
+        return CheckedClaim(
+            claim=claim, verdict="not_found", nearest=nearest_text(claim.quote, source)
+        )
 
     found_on = next(
         (number for number, text in pages_in(source) if needle in _normalized(text)),

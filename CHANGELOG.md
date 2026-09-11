@@ -5,6 +5,81 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.29.0] - 2026-09-10
+
+### Added
+- **A quotation that is not found now comes with the closest text that is actually in the
+  document.** The verdict does not change - nothing fuzzy is ever accepted as verified -
+  but the refusal stops being a dead end:
+
+  ```
+  Not in the document:
+    the model wrote    ...metastases was 76-90%
+    closest in source  Results The sensitivity of the AI method for detecting
+                       pelvic lymph node metastases was 82%
+  ```
+
+  Built for the worst kind of fabrication: a real sentence with the figure changed. Right
+  topic, right wording, false number - the part that would be copied into a table, and the
+  part nobody skimming catches.
+
+### Fixed
+- **Words the typesetter broke across a line no longer fail verification.** A real paper
+  produced two quotations reported as fabrications that were nothing of the kind: the model
+  had quoted faithfully, and the PDF held `sensi- tivity` and `avail - able` across line
+  breaks, which LACC's own ingestion preserved. **The check was reporting a defect in this
+  project as dishonesty in the model.**
+
+- **Typographic characters no longer fail verification either.** The paper is set with
+  en-dashes, non-breaking hyphens and curly quotes; a model reading `76-90%` writes the
+  ASCII a keyboard has. Sixteen of that paper's hundred and sixty sentences could not be
+  verified even when quoted perfectly.
+- **And the first hyphen fix created an asymmetry, now removed.** Rejoining only when
+  whitespace followed the hyphen fixed `sensi- tivity` and broke `inter- reader` - a real
+  compound the typesetter split at its own hyphen, so the document normalised one way and
+  a model writing `inter-reader` normalised the other. A hyphen between letters is now
+  removed on both sides, with or without space; numbers keep theirs, since `the 5 - 10
+  range` must not become `the 50 range`.
+
+  **On that paper the 14B model went from four verified quotations out of seven to seven
+  out of seven**, at temperature zero, repeatedly. Every apparent fabrication was this
+  project's own defect.
+
+  This number has now been wrong three times in two releases, and each correction moved it
+  down as another LACC defect was found: three fabrications in seven, then one, then none.
+  The check that exists to catch a model deceiving you was reporting this project's
+  defects as the model's dishonesty. A feature built for something else found it, on a real
+  document - see [ADR-035](docs/adr/ADR-035-what-counts-as-the-same-text.md).
+
+### Measured
+- **The 32B model is not worth its cost on a 16 GB card, and more parameters did not help.**
+  All three models against the same paper at temperature zero:
+
+  | Model | Quotations | Verified | Rate | Seconds |
+  |---|---|---|---|---|
+  | qwen2.5:7b | 3 | 2 | 66% | 2 |
+  | **qwen2.5:14b** | 7 | **4** | 57% | **11** |
+  | qwen2.5:32b | 7 | 3 | 42% | **186** |
+
+  The 32B loaded as 26.83 GB - 13.63 in VRAM and 13.20 in system memory - because 18.5 GB
+  of weights do not fit a 15.9 GB card at any cache setting. It delivered fewer verified
+  quotations than the 14B and took seventeen times longer. Scaling stopped at 14B for this
+  task on this hardware, which is not the obvious result.
+
+  (These rates predate the de-hyphenation fix above; the 14B now measures 85% on the same
+  paper.)
+
+### Notes
+- **The feature that found the bug was built for something else.** Showing the nearest text
+  was meant to make a fabrication correctable. The first time it ran on a real paper it
+  showed that two of the three fabrications were the project's own ingestion, which is a
+  better argument for the feature than the one it was written for.
+- The suggestion makes an unverified claim more comfortable to work with, and comfort is
+  not automatically a virtue here: the point of marking a claim is that someone opens the
+  document. It is drawn from the document itself, so acting on it is acting on the source -
+  but it makes the failure easier to live with, which is not the same as making it rarer.
+
+
 ## [0.28.0] - 2026-09-10
 
 ### Added
