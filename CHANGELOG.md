@@ -5,6 +5,44 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.31.0] - 2026-09-10
+
+### Changed
+- **`extract_claims` restates its format after the document, and yields about three times
+  as many verified claims.** Every prompt LACC builds put its instructions first and the
+  document second, so for a seven-page paper the format was nine thousand tokens behind the
+  model by the time it started writing. That explained an unexplained result: three to nine
+  claims from seven pages, with `finish_reason: stop` and nothing truncated. The models
+  simply stopped.
+
+  | Prompt | Claims | Verified |
+  |---|---|---|
+  | Instructions before the document only | 8, 9, 9 | 7, 9, 9 |
+  | **The format repeated after it** | **15** | **14**, identical every run |
+
+  Removing the request for a page - which LACC computes for itself and discards the model's
+  answer to - was measured at the same time and did **not** help. Recorded because it was
+  the more obvious suspect, so that nobody tries it again believing it was never checked.
+
+### Fixed
+- **`lacc measure` discards a warm-up run.** The first run after an engine loads a model
+  differs from the ones after it, reliably. This was published in v0.30.0 as "temperature
+  zero is not full determinism on the larger model", which was wrong: with the model already
+  warm the 14B repeats exactly, four runs out of four. That entry is corrected in place.
+
+  A measurement with a known contaminant should remove it, so the command now runs once more
+  than asked and ignores the first. The confirmation says so, and the warm-up is still
+  audited - it happened, and hiding it would be hiding a document being sent to an engine.
+
+### Notes
+- **This audit looked at what LACC asks for, after three releases of auditing what it does
+  with the answer.** The suspicion was the same and so was the method: assume the fault is
+  here until measured otherwise. It was here.
+- Only `extract_claims` is changed. `summarize_file`, `critique_file` and `revise_file` have
+  the same prompt shape and the same probable weakness, and are left alone until someone
+  measures them rather than assuming the result transfers.
+
+
 ## [0.30.0] - 2026-09-10
 
 ### Fixed
@@ -48,9 +86,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | qwen2.5:14b | 5-6 | 5 | 83-100% |
 
 - **Temperature zero is not full determinism on the larger model.** The 14B varied 17 points
-  across three runs where the 7B did not vary at all. Sampling is no longer the source, so
-  the remainder is the engine - floating-point order on the GPU, or batching. Worth knowing
-  before reading too much into any single 14B number.
+  across three runs where the 7B did not vary at all.
+
+  *Corrected in v0.31.0: this was the first run after the engine loaded the model, not the
+  engine being non-deterministic. With the model already warm the 14B repeats exactly. The
+  measurement was contaminated, and `lacc measure` now discards a warm-up run.*
 
 ### Notes
 - Four of LACC's own defects were found by running it against one real paper and looking at

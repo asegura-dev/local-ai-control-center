@@ -604,21 +604,28 @@ def measure(
         _exit_refused()
     # The confirmation is for the repetition, not for one action with a multiplier hidden
     # behind it: the person is told how many times before being asked.
-    if not typer.confirm(f"Run this {runs} times?", default=False):
+    if not typer.confirm(f"Run this {runs} times, plus one warm-up?", default=False):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 
     rows: list[tuple[int, int, int]] = []
+    # The first run after an engine loads a model differs from the ones after it, reliably
+    # enough that it was once read as the model being non-deterministic at temperature
+    # zero. It is discarded rather than annotated: a measurement with a known contaminant
+    # should remove it (ADR-037).
     with console.status(f"Measuring {resolved.name}...") as status:
-        for attempt in range(1, runs + 1):
-            status.update(f"Run {attempt} of {runs}...")
+        for attempt in range(0, runs + 1):
+            status.update("Warming up..." if attempt == 0 else f"Run {attempt} of {runs}...")
             try:
                 result = _do_run(
                     resolved, tuple(requests), config, workspace, provider, audit, new_run_id()
                 )
             except (ProviderError, ReadError, PromptTooLargeError) as error:
-                console.print(f"[red]Run {attempt} failed:[/red] {error}")
+                where = "The warm-up run" if attempt == 0 else f"Run {attempt}"
+                console.print(f"[red]{where} failed:[/red] {error}")
                 raise typer.Exit(code=1) from error
+            if attempt == 0:
+                continue
             checked = result.checked_claims
             rows.append((attempt, len(checked), sum(1 for c in checked if c.holds)))
 

@@ -276,7 +276,22 @@ class ExtractClaimsSkill(Skill):
             + chr(10)
             + "If the document does not support a claim, do not make it. Every quotation "
             "is checked against the document, and one that cannot be found is reported as "
-            "unsupported." + chr(10) + chr(10) + fenced_documents(requests)
+            "unsupported."
+            + chr(10)
+            + chr(10)
+            + fenced_documents(requests)
+            # The format is restated here because by this point it is thousands of tokens
+            # behind. Measured on a real paper: a third again as many claims, all verified,
+            # and identical across runs where the original varied (ADR-037).
+            + chr(10)
+            + chr(10)
+            + "Now list every claim the document makes, in the format above:"
+            + chr(10)
+            + "CLAIM: ..."
+            + chr(10)
+            + "QUOTE: ..."
+            + chr(10)
+            + "PAGE: ..."
         )
         return SkillPlan(action=action, prompt_template=prompt_template, verify_quotes=True)
 

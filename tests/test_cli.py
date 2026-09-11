@@ -517,7 +517,7 @@ def test_measure_says_how_many_times_before_asking(tmp_path: Path) -> None:
         ],
         input="\n",
     )
-    assert "Run this 3 times?" in result.stdout
+    assert "Run this 3 times, plus one warm-up?" in result.stdout
     assert "Declined" in result.stdout
 
 
@@ -533,9 +533,11 @@ def test_declining_a_measurement_runs_nothing(tmp_path: Path) -> None:
 
 
 def test_every_repetition_is_audited_separately(tmp_path: Path) -> None:
-    """A trail recording five executions as one would lie about what happened.
+    """A trail recording several executions as one would lie about what happened.
 
-    The count is also the thing being measured, so collapsing them would destroy it.
+    Five records for four measured runs: the warm-up is discarded from the measurement and
+    still happened, so it is recorded like anything else. An audit that hid it would be
+    hiding a document being sent to an engine (ADR-032, ADR-037).
     """
     config = _config_file(tmp_path)
     result = runner.invoke(
@@ -556,8 +558,8 @@ def test_every_repetition_is_audited_separately(tmp_path: Path) -> None:
     assert result.exit_code == 0
     log = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
     started = [json.loads(line) for line in log if json.loads(line)["kind"] == "run_started"]
-    assert len(started) == 4
-    assert len({event["run_id"] for event in started}) == 4
+    assert len(started) == 5
+    assert len({event["run_id"] for event in started}) == 5
 
 
 def test_a_measurement_shows_every_run(tmp_path: Path) -> None:
