@@ -24,21 +24,11 @@ from local_ai_control_center.cycle import (
     content_slot,
     run_action,
 )
+from local_ai_control_center.fence import DOCUMENT_CLOSE, DOCUMENT_OPEN
 from local_ai_control_center.permissions import Capability, Permissions, grant
 from local_ai_control_center.preview import IntendedAction
 from local_ai_control_center.provider import Provider
 from local_ai_control_center.workspace import Workspace
-
-DOCUMENT_OPEN = "<<<BEGIN DOCUMENT>>>"
-"""Marker that opens the fenced document inside a prompt (ADR-015)."""
-
-DOCUMENT_CLOSE = "<<<END DOCUMENT>>>"
-"""Marker that closes it.
-
-Both are fixed strings holding no user-supplied text, so nothing read from a path or
-from a file can forge a fence. What sits between them is material to work on, never
-instructions to obey.
-"""
 
 
 def fenced_document(name: str, index: int = 0) -> str:

@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict
 from local_ai_control_center.audit import AuditLog, digest_of, digest_of_file
 from local_ai_control_center.config import Config
 from local_ai_control_center.converter import ConversionError, Converter
+from local_ai_control_center.fence import instruction_shapes_in, without_markers
 from local_ai_control_center.grounding import CheckedClaim, check_answer
 from local_ai_control_center.permissions import Capability, PermissionDenied, Permissions
 from local_ai_control_center.preview import (
@@ -176,6 +177,17 @@ class RunResult(BaseModel):
     Empty unless the skill asked for its output to be checked (ADR-026).
     """
 
+    markers_removed: int = 0
+    """Fence markers taken out of the document before it entered the prompt (ADR-038)."""
+
+    instruction_shapes: tuple[str, ...] = ()
+    """Ways the document read like an instruction rather than like a document.
+
+    Carried out to the caller so it can be shown beside the answer, which is when a person
+    is deciding whether to trust it. Detection only: a model can obey something no pattern
+    catches (ADR-038).
+    """
+
     @property
     def executed(self) -> bool:
         """Whether the action actually ran."""
@@ -251,24 +263,64 @@ def _read_file(path: Path, max_bytes: int) -> str:
         raise ReadError(f"Cannot read {path}: {error.strerror or error}.") from error
 
 
+class ContentsRead(BaseModel):
+    """What the cycle read, and what it noticed while reading it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    prompt: str
+    paths: tuple[Path, ...] = ()
+    contents: str = ""
+    markers_removed: int = 0
+    """Fence markers found inside a document and taken out before it entered the prompt.
+
+    A document carrying one could end its own fence, after which the rest of it read to
+    the model as LACC's instructions. Removing them is the one control here rather than a
+    request; the count is kept because it is worth telling someone about (ADR-038).
+    """
+
+    instruction_shapes: tuple[str, ...] = ()
+    """Ways the document read like an instruction. Detection only - a model can obey
+    something no pattern catches, and treating this as prevention would repeat the claim
+    ADR-038 exists to correct."""
+
+
 def _fill_template(
     template: str, action: IntendedAction, workspace: Workspace, max_bytes: int
-) -> tuple[str, tuple[Path, ...], str]:
+) -> ContentsRead:
     """Return the prompt with the action's file contents in place, and what was read.
 
     Reads only when the action declared `read_files`: the preview has already checked
     that declaration against the permissions and every target against the workspace
     boundary, so the read trusts what was verified and only translates failures
     (ADR-014). An action that declared no read gets its template back untouched.
+
+    Fence markers are removed from what was read before it goes anywhere near the prompt.
+    That is the order that matters: a document cannot end its own fence if the string that
+    would do it is gone by the time the fence is assembled (ADR-038).
     """
     if "read_files" not in action.required or not action.targets:
-        return template, (), ""
+        return ContentsRead(prompt=template)
     paths = tuple(workspace.resolve_within(target) for target in action.targets)
-    pieces = [_read_file(path, max_bytes) for path in paths]
+    raw = [_read_file(path, max_bytes) for path in paths]
+
+    pieces, removed = [], 0
+    for piece in raw:
+        cleaned, count = without_markers(piece)
+        pieces.append(cleaned)
+        removed += count
+
     filled = template
     for index, piece in enumerate(pieces):
         filled = filled.replace(content_slot(index), piece)
-    return filled, paths, chr(10).join(pieces)
+    contents = chr(10).join(pieces)
+    return ContentsRead(
+        prompt=filled,
+        paths=paths,
+        contents=contents,
+        markers_removed=removed,
+        instruction_shapes=instruction_shapes_in(contents),
+    )
 
 
 def diff_between(before: str, after: str, after_name: str) -> str:
@@ -339,9 +391,7 @@ def run_action(
         return stopped
 
     try:
-        prompt, files_read, contents = _fill_template(
-            prompt_template, action, workspace, config.max_input_bytes
-        )
+        read = _fill_template(prompt_template, action, workspace, config.max_input_bytes)
     except ReadError as error:
         audit.record(
             run_id,
@@ -350,6 +400,25 @@ def run_action(
             {"action": action.name, "error": str(error)},
         )
         raise
+
+    prompt, files_read, contents = read.prompt, read.paths, read.contents
+
+    # Recorded whether or not anything was found, because "nothing was found" is the claim
+    # a reader of the trail needs, and an absent field cannot make it (ADR-038).
+    if read.markers_removed:
+        audit.record(
+            run_id,
+            "fence_markers_removed",
+            f"Removed {read.markers_removed} fence markers from what {action.name} read",
+            {"action": action.name, "markers": read.markers_removed},
+        )
+    if read.instruction_shapes:
+        audit.record(
+            run_id,
+            "instruction_shapes_seen",
+            f"The document read for {action.name} contains text shaped like an instruction",
+            {"action": action.name, "shapes": list(read.instruction_shapes)},
+        )
 
     if files_read:
         audit.record(
@@ -444,7 +513,12 @@ def run_action(
         )
 
     return RunResult(
-        preview=preview, outcome="completed", completion=completion, checked_claims=checked
+        preview=preview,
+        outcome="completed",
+        completion=completion,
+        checked_claims=checked,
+        markers_removed=read.markers_removed,
+        instruction_shapes=read.instruction_shapes,
     )
 
 

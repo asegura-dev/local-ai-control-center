@@ -238,10 +238,39 @@ def run(
 
     _announce(resolved.name, result.outcome, time.monotonic() - started, config, audit, run_id)
     _report(result)
+    _warn_about_the_document(result)
     _show_checked_quotations(result)
     _warn_about_the_answer(result, config)
     if config.context_tokens is None:
         _warn_no_context_ceiling()
+
+
+def _warn_about_the_document(result: RunResult) -> None:
+    """Say when the document tried to be an instruction, beside the answer it produced.
+
+    Placed here rather than before the run because it is only knowable after reading, and
+    because next to the answer is when a person is deciding whether to trust it.
+
+    Detection, never a verdict: a model can obey something no pattern catches, so this
+    reports what was seen and leaves the judgement where it belongs (ADR-038).
+    """
+    if result.markers_removed:
+        console.print(
+            f"[yellow]{result.markers_removed} fence markers were removed from the "
+            "document[/yellow] before it was sent. A document carrying one could otherwise "
+            "end its own fence and have the rest read as instructions."
+        )
+    if result.instruction_shapes:
+        console.print(
+            "[yellow]The document contains text shaped like an instruction:[/yellow] "
+            + ", ".join(result.instruction_shapes)
+            + "."
+        )
+        console.print(
+            "[dim]LACC cannot stop a model from being influenced by what it reads. Nothing "
+            "was run, opened or sent because of it - but read the answer above knowing "
+            "the document was trying something.[/dim]"
+        )
 
 
 def _show_checked_quotations(result: RunResult) -> None:

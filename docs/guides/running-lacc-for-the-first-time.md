@@ -172,6 +172,12 @@ false "verified" is the failure the whole check exists to prevent.
 does not mean the claim built on them is sound. A model can quote accurately and reason
 badly, and only the first is caught here.
 
+**And it is no defence against text planted in the document.** The check asks whether a
+quotation is in the source. Text hidden in a PDF - white on white, set at zero size, behind
+an image - *is* in the source: you never see it reading the paper, extraction captures it, a
+model quotes it, and this reports **found**, correctly and uselessly. If a run warns that
+the document contains text shaped like an instruction, open the extracted Markdown and look.
+
 ## Using it to compare models
 
 The verified-versus-not-found counts are a number, which makes "is a bigger model worth

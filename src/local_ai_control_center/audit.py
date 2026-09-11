@@ -38,6 +38,8 @@ EventKind = Literal[
     "prompt_was_truncated",
     "ceiling_underestimated",
     "answer_truncated",
+    "fence_markers_removed",
+    "instruction_shapes_seen",
     "notification_sent",
     "notification_failed",
 ]
