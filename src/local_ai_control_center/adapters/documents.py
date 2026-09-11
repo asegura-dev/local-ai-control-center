@@ -88,8 +88,18 @@ def without_furniture(pages: list[str]) -> tuple[list[str], int]:
     return kept, dropped
 
 
-_UNREADABLE_SIZE = 4.0
-"""Below this a font is not being read by anyone, whatever it is for."""
+_UNREADABLE_SIZE = 2.0
+"""Below this, in points as rendered, nobody is reading the text.
+
+Compared against the size *after* both matrices scale it. A document may declare `Tf 1.0`
+and scale by seventeen, and judging the declaration alone calls every word of it hidden.
+
+The number comes from measuring a real bibliography rather than from taste. Across four
+thousand fragments the distribution is bimodal: a cluster at exactly 1.00 pt, then nothing
+until 5.18, with the median at 9.46. Any threshold in that gap selects the same fragments,
+so it sits at the bottom of it. Five-point disclosure text and author superscripts are small
+and legible; one-point text is not there to be read (ADR-040).
+"""
 
 _INVISIBLE_MODES = (b"3 Tr", b"7 Tr")
 """Rendering modes that draw nothing.
@@ -110,7 +120,25 @@ class HiddenText(BaseModel):
     text: str = ""
 
 
-def hidden_text_in(reader: PdfReader) -> tuple[HiddenText, ...]:
+def _placed(cm: list[float], tm: list[float]) -> tuple[float, float, float]:
+    """Compose the two matrices and return where the text lands and how tall it renders.
+
+    A PDF positions text through `tm` inside a space `cm` has already transformed, so
+    neither alone says anything. Reading `tm` by itself called a paper set at `Tf 1.0` with
+    a `cm` scale of 13.45 invisible in all of its fragments, and put text at x=-34 outside
+    a page it sits comfortably inside (ADR-040).
+    """
+    a = float(tm[0]) * float(cm[0]) + float(tm[1]) * float(cm[2])
+    b = float(tm[0]) * float(cm[1]) + float(tm[1]) * float(cm[3])
+    c = float(tm[2]) * float(cm[0]) + float(tm[3]) * float(cm[2])
+    d = float(tm[2]) * float(cm[1]) + float(tm[3]) * float(cm[3])
+    x = float(tm[4]) * float(cm[0]) + float(tm[5]) * float(cm[2]) + float(cm[4])
+    y = float(tm[4]) * float(cm[1]) + float(tm[5]) * float(cm[3]) + float(cm[5])
+    del a, b
+    return x, y, (c * c + d * d) ** 0.5
+
+
+def hidden_text_in(reader: PdfReader) -> tuple[tuple[HiddenText, ...], int]:
     """Report the text in a PDF that a reader cannot see, by reason.
 
     Three signals, each cheap: an invisible rendering mode, a font too small to read, and a
@@ -123,6 +151,7 @@ def hidden_text_in(reader: PdfReader) -> tuple[HiddenText, ...]:
     of it passes the grounding check, because it genuinely is in the document.
     """
     found: list[HiddenText] = []
+    seen = 0
     for number, page in enumerate(reader.pages, start=1):
         try:
             box = page.mediabox
@@ -138,21 +167,25 @@ def hidden_text_in(reader: PdfReader) -> tuple[HiddenText, ...]:
 
         def note(
             text: str,
-            cm: object,
+            cm: list[float],
             tm: list[float],
             font: object,
             size: float,
             number: int = number,
             bounds: tuple[float, float, float, float] = (left, bottom, right, top),
         ) -> None:
+            nonlocal seen
             stripped = text.strip()
             if not stripped:
                 return
-            if size is not None and 0 <= float(size) < _UNREADABLE_SIZE:
+            seen += 1
+            x, y, scale = _placed(cm, tm)
+            rendered = float(size) * scale if size is not None else None
+            if rendered is not None and 0 <= rendered < _UNREADABLE_SIZE:
                 found.append(HiddenText(reason="too small to read", page=number, text=stripped))
                 return
             x0, y0, x1, y1 = bounds
-            if x1 > x0 and not (x0 <= tm[4] <= x1 and y0 <= tm[5] <= y1):
+            if x1 > x0 and not (x0 <= x <= x1 and y0 <= y <= y1):
                 found.append(
                     HiddenText(reason="positioned off the page", page=number, text=stripped)
                 )
@@ -166,7 +199,7 @@ def hidden_text_in(reader: PdfReader) -> tuple[HiddenText, ...]:
 
         if any(mode in raw for mode in _INVISIBLE_MODES):
             found.append(HiddenText(reason="drawn in an invisible rendering mode", page=number))
-    return tuple(found)
+    return tuple(found), seen
 
 
 class PdfConverter(Converter):
@@ -181,6 +214,7 @@ class PdfConverter(Converter):
         """Start with nothing dropped and nothing hidden."""
         self._dropped = 0
         self._hidden: tuple[HiddenText, ...] = ()
+        self._fragments = 0
 
     @property
     def name(self) -> str:
@@ -191,6 +225,16 @@ class PdfConverter(Converter):
     def furniture_dropped(self) -> int:
         """How many lines the last extraction treated as belonging to the page."""
         return self._dropped
+
+    @property
+    def fragments(self) -> int:
+        """How many pieces of text the last extraction saw in total.
+
+        The denominator. A document where most fragments sit off the page is telling you
+        about its layout; one where two of five hundred are hidden is telling you something
+        else, and only the proportion separates them (ADR-040).
+        """
+        return self._fragments
 
     @property
     def hidden(self) -> tuple[HiddenText, ...]:
@@ -207,7 +251,7 @@ class PdfConverter(Converter):
         try:
             reader = PdfReader(path)
             pages = [page.extract_text(extraction_mode="plain") for page in reader.pages]
-            self._hidden = hidden_text_in(reader)
+            self._hidden, self._fragments = hidden_text_in(reader)
         except PyPdfError as error:
             raise ConversionError(f"Cannot read {path.name} as a PDF: {error}") from error
         except OSError as error:

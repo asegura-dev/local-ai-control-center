@@ -163,7 +163,7 @@ def test_ingest_accepts_an_explicit_destination(
     shutil.copy(make_pdf("Some text"), workspace / "paper.pdf")
 
     result = runner.invoke(
-        app, ["ingest", "paper.pdf", "sources.md", "-c", str(config)], input="y\n"
+        app, ["ingest", "paper.pdf", "--into", "sources.md", "-c", str(config)], input="y\n"
     )
     assert result.exit_code == 0
     assert (workspace / "sources.md").exists()
@@ -199,7 +199,7 @@ def test_refused_run_exits_non_zero(tmp_path: Path, make_pdf: Callable[..., Path
     shutil.copy(make_pdf("Some text"), workspace / "paper.pdf")
 
     result = runner.invoke(
-        app, ["ingest", "paper.pdf", "../escaped.md", "-c", str(config)], input="y\n"
+        app, ["ingest", "paper.pdf", "--into", "../escaped.md", "-c", str(config)], input="y\n"
     )
     assert result.exit_code == 1
     assert "Refused" in result.stdout

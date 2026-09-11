@@ -53,7 +53,7 @@ from local_ai_control_center.cycle import (
     run_skill,
     write_new_file,
 )
-from local_ai_control_center.ports.converter import ConversionError
+from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
 from local_ai_control_center.ports.provider import Provider, ProviderError
 from local_ai_control_center.system.audit import AuditLog, verify_chain
@@ -485,64 +485,107 @@ def preview(
 
 @app.command()
 def ingest(
-    source: Annotated[
-        Path,
-        typer.Argument(help="Document to convert (PDF or .docx), inside the workspace."),
+    sources: Annotated[
+        list[Path],
+        typer.Argument(help="Documents to convert (PDF or .docx), inside the workspace."),
     ],
     destination: Annotated[
         Path | None,
-        typer.Argument(help="Where to write the text. Defaults to the source with a .md suffix."),
+        typer.Option("--into", help="Where to write the text. Only valid for one document."),
     ] = None,
     config_path: Annotated[
         Path,
         typer.Option("--config", "-c", help="Path to the configuration file."),
     ] = DEFAULT_CONFIG_PATH,
 ) -> None:
-    """Extract a document's text into a file LACC can read, after preview and confirmation."""
+    """Extract documents' text into files LACC can read, after preview and confirmation.
+
+    Several documents at once, because a bibliography is not read one confirmation at a
+    time: collecting across twenty-three papers began with twenty-three prompts before any
+    work started. One preview names every document and every file it would write.
+
+    Each conversion is still its own run in the audit, and one that fails costs that
+    document rather than the batch.
+    """
+    if destination is not None and len(sources) != 1:
+        console.print(
+            "[red]--into names one file, so it works with one document.[/red] Without it "
+            "each document is written beside itself with a .md suffix."
+        )
+        raise typer.Exit(code=1)
+
     config, workspace = _load(config_path)
     audit = AuditLog(workspace, config)
-    target = destination if destination is not None else source.with_suffix(".md")
 
-    try:
-        converter = converter_for(source)
-    except ConversionError as error:
-        console.print(f"[red]{error}[/red]")
-        raise typer.Exit(code=1) from error
+    jobs: list[tuple[Path, Path, Converter]] = []
+    for source in sources:
+        target = destination if destination is not None else source.with_suffix(".md")
+        try:
+            jobs.append((source, target, converter_for(source)))
+        except ConversionError as error:
+            console.print(f"[red]{error}[/red]")
+            raise typer.Exit(code=1) from error
 
     action = IntendedAction(
         name="ingest",
-        summary=f"Extract the text of {source} into {target}",
+        summary=(
+            f"Extract the text of {sources[0]} into {jobs[0][1]}"
+            if len(jobs) == 1
+            else f"Extract the text of {len(jobs)} documents"
+        ),
         required=frozenset({"read_files", "write_files"}),
-        targets=(source,),
-        writes=(target,),
+        targets=tuple(source for source, _, _ in jobs),
+        writes=tuple(target for _, target, _ in jobs),
     )
+    preview = preview_action(action, grant(action.required, config), config, workspace)
+    _show_preview(preview)
+    if not preview.allowed:
+        _exit_refused()
+    question = "Proceed?" if len(jobs) == 1 else f"Convert {len(jobs)} documents?"
+    if not typer.confirm(question, default=False):
+        console.print("[yellow]Declined.[/yellow] Nothing was written.")
+        return
 
-    try:
-        result = run_conversion(
-            action,
-            source,
-            target,
-            converter,
-            grant(action.required, config),
-            config,
-            workspace,
-            audit,
-            new_run_id(),
-            _confirm,
-        )
-    except ConversionError as error:
-        console.print(f"[red]{error}[/red]")
-        raise typer.Exit(code=1) from error
+    done, failed = 0, []
+    for source, target, converter in jobs:
+        try:
+            result = run_conversion(
+                action.model_copy(update={"targets": (source,), "writes": (target,)}),
+                source,
+                target,
+                converter,
+                grant(action.required, config),
+                config,
+                workspace,
+                audit,
+                new_run_id(),
+                lambda _preview: True,
+            )
+        except ConversionError as error:
+            # One unreadable document costs that document, not the batch.
+            failed.append((source, str(error)))
+            continue
+        if result.outcome == "completed":
+            done += 1
+            _report_ingestion(
+                result,
+                target,
+                getattr(converter, "furniture_dropped", 0),
+                getattr(converter, "hidden", ()),
+            )
 
-    _report_ingestion(
-        result,
-        target,
-        getattr(converter, "furniture_dropped", 0),
-        getattr(converter, "hidden", ()),
-    )
+    if len(jobs) > 1:
+        console.print(Panel(f"{done} of {len(jobs)} documents converted", title="Ingested"))
+    for source, message in failed:
+        console.print(f"[yellow]{source}:[/yellow] {message}")
+
+    # A batch that converted something reports what failed and exits zero; one that
+    # converted nothing failed, and a script checking the exit code must be told (ADR-017).
+    if failed and not done:
+        raise typer.Exit(code=1)
 
 
-def _report_hidden_text(hidden: tuple[HiddenText, ...]) -> None:
+def _report_hidden_text(hidden: tuple[HiddenText, ...], fragments: int = 0) -> None:
     """Show text a reader could not have seen, without judging what it is.
 
     A scanned document is entirely an invisible layer over the image a person reads, and
@@ -555,9 +598,10 @@ def _report_hidden_text(hidden: tuple[HiddenText, ...]) -> None:
     if not hidden:
         return
     console.print(
-        f"[yellow]{len(hidden)} pieces of text in this document are not visible to a "
-        "reader.[/yellow] A scanned page is entirely an invisible layer and that is normal; "
-        "a few hidden lines in a typeset paper are not."
+        f"[yellow]{len(hidden)} of {fragments or len(hidden)} pieces of text in this "
+        "document are not visible to a reader.[/yellow] Most of a document being invisible "
+        "describes its layout - a scan, a wide infographic. A handful in a typeset paper "
+        "describes something else."
     )
     for item in hidden[:8]:
         where = f"p. {item.page}, {item.reason}"
@@ -577,6 +621,7 @@ def _report_ingestion(
     destination: Path,
     furniture: int = 0,
     hidden: tuple[HiddenText, ...] = (),
+    fragments: int = 0,
 ) -> None:
     """Print the outcome of an ingestion run, naming the file it produced.
 
@@ -591,7 +636,7 @@ def _report_ingestion(
                 f"[dim]{furniture} lines were dropped as page furniture - running headers, "
                 "footers and page numbers repeated across pages.[/dim]"
             )
-        _report_hidden_text(hidden)
+        _report_hidden_text(hidden, fragments)
     elif result.outcome == "refused":
         _exit_refused()
     else:

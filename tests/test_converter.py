@@ -234,7 +234,8 @@ def _hidden_in(tmp_path: Path, stream: str) -> tuple[HiddenText, ...]:
     """Build a one-page PDF with that content stream and report what is hidden in it."""
     path = tmp_path / "hidden.pdf"
     path.write_bytes(pdf_with_streams([stream]))
-    return hidden_text_in(PdfReader(path))
+    found, _fragments = hidden_text_in(PdfReader(path))
+    return found
 
 
 def test_an_ordinary_page_hides_nothing(tmp_path: Path) -> None:
@@ -252,7 +253,7 @@ def test_text_drawn_in_an_invisible_mode_is_reported(tmp_path: Path) -> None:
 def test_text_too_small_to_read_is_reported_with_its_words(tmp_path: Path) -> None:
     """The words matter: they are what the person needs to see, since the model saw them."""
     found = _hidden_in(
-        tmp_path, "BT /F1 12 Tf 20 200 Td (Visible) Tj /F1 0 Tf 20 190 Td (HIDDEN TEXT) Tj ET"
+        tmp_path, "BT /F1 12 Tf 20 200 Td (Visible) Tj /F1 0.5 Tf 20 190 Td (HIDDEN TEXT) Tj ET"
     )
     assert any(item.reason == "too small to read" and "HIDDEN TEXT" in item.text for item in found)
 
@@ -274,3 +275,35 @@ def test_hidden_text_still_reaches_the_extracted_document(tmp_path: Path) -> Non
         pdf_with_streams(["BT /F1 12 Tf 20 200 Td (Visible) Tj 3 Tr 20 190 Td (PLANTED) Tj ET"])
     )
     assert "PLANTED" in PdfConverter().extract_text(path)
+
+
+def test_the_proportion_is_reported_alongside_what_was_found(tmp_path: Path) -> None:
+    """The denominator is what separates a layout from an attack.
+
+    A document where most fragments sit off the page is telling you about its typesetting;
+    one where two of five hundred are hidden is telling you something else, and a bare count
+    cannot distinguish them (ADR-040).
+    """
+    path = tmp_path / "hidden.pdf"
+    path.write_bytes(
+        pdf_with_streams(
+            ["BT /F1 12 Tf 20 200 Td (One) Tj 20 -30 Td (Two) Tj /F1 0.5 Tf 20 -30 Td (Hid) Tj ET"]
+        )
+    )
+    found, fragments = hidden_text_in(PdfReader(path))
+    assert len(found) == 1
+    assert fragments == 3
+
+
+def test_the_rendered_size_is_judged_not_the_declared_one(tmp_path: Path) -> None:
+    """A real paper set `Tf 1.0` and scaled by 17 in the matrix.
+
+    Reading the declaration alone marked all 123 of its fragments invisible - the false
+    positive that gets a detector switched off within a week (ADR-040).
+    """
+    path = tmp_path / "scaled.pdf"
+    path.write_bytes(
+        pdf_with_streams(["BT /F1 1 Tf 12 0 0 12 20 200 Tm (Normal sized after scaling) Tj ET"])
+    )
+    found, _ = hidden_text_in(PdfReader(path))
+    assert found == ()

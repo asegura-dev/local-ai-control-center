@@ -5,6 +5,49 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.36.0] - 2026-09-10
+
+### Added
+- **`lacc ingest` takes several documents.** A bibliography is not read one confirmation at
+  a time: collecting across twenty-three papers began with twenty-three prompts before any
+  work started. One preview names every document and every file it would write; each
+  conversion is still its own run in the audit, and one that fails costs that document
+  rather than the batch. The destination moved from a positional argument to `--into`,
+  which only makes sense with one document.
+
+### Fixed
+- **The hidden-text detector shipped in v0.34.0 was wrong three times over**, and running it
+  against twenty-three real papers is what showed it. It reported **24,541 hidden fragments**
+  in one document whose text was entirely ordinary.
+
+  **It read the declared font size rather than the rendered one.** A paper set `Tf 1.0` and
+  scaled by 17.36 in the text matrix: seventeen-point text, judged as one-point, all 123
+  fragments called invisible.
+
+  **It ignored the `cm` matrix entirely.** A PDF positions text through `tm` inside a space
+  `cm` has already transformed, so neither alone says anything. Another paper set `Tf 1.0`
+  with a `cm` scale of 13.45, and placed text at `tm` x=-34 that `cm` puts comfortably
+  inside the page. Both matrices are now composed.
+
+  **The threshold was picked by taste.** It is now measured: across four thousand fragments
+  of a real bibliography the distribution is bimodal - a cluster at exactly 1.00 pt, then
+  nothing until 5.18, with the median at 9.46. Any threshold inside that gap selects the
+  same fragments, so it sits at the bottom of it. Five-point disclosure text and author
+  superscripts are small and legible; one-point text is not there to be read.
+
+- **The report gives a proportion, not a count.** A bare number could not separate a wide
+  infographic from an attack. Across the bibliography: most documents 0.1-0.7%, one at 8.3%,
+  and one at 46.9% - which reads as a layout the moment the denominator is there.
+
+### Notes
+- Every one of these was found by running against real material, not by the suite, which
+  passed throughout. The fixture PDFs are built with an identity matrix and a plain `Tf`,
+  because that is what someone writing a fixture writes - and the matrices are exactly what
+  a typesetter uses.
+- This is the third pass over the same detector. The honest description has not changed:
+  it notices crude attempts, and white-on-white still passes.
+
+
 ## [0.35.0] - 2026-09-10
 
 ### Changed
