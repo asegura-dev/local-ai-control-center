@@ -5,6 +5,54 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-09-13
+
+v1.0 does not mean the model does the work, and the measurement in this release is the reason
+to say so plainly. Across 24 papers of a real bibliography a 14B model produced 237
+quotations, and 48 of them are not in the document they cite.
+
+What v1.0 means is the promise the roadmap has carried since v0.28.0: **you can work from
+your own sources without being deceived.** Every quotation is checked against the document it
+came from, what cannot be found is reported as unsupported rather than presented as fact, a
+document too large to fit is refused rather than silently truncated and says so in the
+corpus, and the whole run leaves a hash-chained record - whose one known gap, records removed
+from the end, `lacc verify` now states.
+
+It arrives with its headline number revised **downward**, which is the point. The figure
+v0.38.0 published was wrong and flattering; this one can be re-run.
+
+
+### Fixed
+- **Letter-spaced extraction made real quotations look fabricated.** A PDF that spaces glyphs
+  rather than words is extracted as `A c c o r d i n gt o`, and every quotation taken from
+  such a page returned `not_found` - which this project defines as a fabrication. Containment
+  now folds spacing away, in a function kept separate from `_normalized` so that similarity
+  matching, which needs the gaps, is unchanged. On a real bibliography this recovered **22 of
+  237 quotations**, and 231 quotations mutated by one word or one digit still failed, before
+  and after.
+
+### Changed
+- **The corpus figures published in v0.38.0 were wrong, and are corrected in ADR-042.** That
+  release stated 237 quotations with **zero** not in their document. Re-running the shipped
+  code over the same corpus gives **48 absent of 237 - about one in five** - of which 44 are
+  absent in any form tried. The "every one of them real" claim does not hold.
+
+  The previous six mis-measurements in this project all flattered the tool by making the
+  model look worse. This one was the correction to that pattern and overshot the other way.
+  Having learned of a bias in one direction does not make the next number unbiased.
+
+- **How a published figure was produced is now part of publishing it.** The v0.38.0 number
+  could not be re-derived from the record. The corrected figures name the corpus, the source
+  documents and the function, so anyone can re-run them.
+
+### Added
+- [ADR-044](docs/adr/ADR-044-an-answer-we-already-know.md): every rate this project has
+  published was measured where the correct answer was unknown, which is the condition that
+  produced the errors above. Decides a fixture corpus whose ground truth the project controls,
+  asserted exactly in both directions.
+- Three regression tests covering letter-spaced extraction, the folding refusing a changed
+  word, and the separation between containment and similarity. 381 tests.
+
 ## [0.38.0] - 2026-09-11
 
 ### Security

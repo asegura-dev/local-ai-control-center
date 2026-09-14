@@ -185,6 +185,17 @@ for a window. Each is real. None is needed to write a paper with sources you cho
 A smaller v1 that is true beats a larger one that is late, and there is no shame in the
 whole shape of the project arriving at v20.
 
+**All four are delivered, and v1.0 is tagged.** The evidence it waited on was never another
+test: it was the tool meeting real sources. That happened - a bibliography of 24 papers, 237
+quotations, every one checked - and what it showed is in this document, including the parts
+that were unflattering.
+
+v1.0 is a floor, not a finish. It says the tool does not deceive you about its own work: a
+quotation that cannot be found is reported, a document that will not fit is refused and named
+rather than truncated, and the audit states the one gap it cannot close. It does not say the
+model is reliable. One quotation in five was invented, and that is the measurement v1.0
+ships with rather than the one it hides.
+
 ## Decided, and deliberately after v1.0
 
 One direction is settled enough to record and deliberately out of v1.0. It is written here
@@ -272,18 +283,57 @@ list implied, and it is one the numbers support.
 It does not mean every feature exists. It means nothing it produces has to be taken on
 faith, and that the parts which cannot be verified say so.
 
-## What the run left open
+## What the run left open, and how it closed
 
-Two findings, both from the real paper, neither of them the model being small:
+Two findings, both from the real paper, neither of them the model being small. Both are now
+fixed, and are kept here because the route from symptom to cause is the useful part:
 
 **Very few claims are extracted** - three and four from seven pages. The audit shows
 `finish_reason: stop` and answers of 260 and 214 tokens, so nothing was truncated: the
 models simply stopped. That points at the prompt rather than at capacity.
 
+*Closed in v0.35.0.* The format was stated once, before a document that then ran for
+thousands of tokens. Restating it after the document tripled the claims extracted
+(ADR-037).
+
 **Page attribution fails systematically.** Page 4 for something on page 1; page 3 for
 something on page 5. The quotations were real and the pages were not, which in a citation
 is its own kind of wrong. Worth noting that LACC already locates the quotation itself while
 checking it - so this is a question the tool can answer without asking the model at all.
+
+*Closed in v0.31.0.* It does. The page is now found by searching, and what the model said
+is kept for comparison and never reported as the answer (ADR-031).
+
+## What a whole bibliography showed
+
+The seven-page run above was one paper. Running `extract_claims` across 24 documents of a
+real bibliography produced 237 quotations, and that corpus is now the project's measuring
+stick because it is large enough to be re-run and disagreed with.
+
+| | v0.38.0 published | Re-measured | v0.39.0 |
+|---|---|---|---|
+| quotation found in its document | 237 | 167 | **189** |
+| **not in the document** | **0** | **70** | **48** |
+
+The published figure was wrong, and the correction is recorded in ADR-042. Two things came
+out of re-running it that the first measurement could not have shown.
+
+**Twenty-two of those "fabrications" were real quotations.** Some PDFs are extracted with
+spacing between glyphs rather than words - `A c c o r d i n gt o` - and every quotation
+taken from such a page was rejected. Fixed in v0.39.0, with the folding kept out of the
+similarity path and a mutation test confirming a changed word or digit still fails.
+
+**Forty-four are absent in any form tried.** Not stitched from separate sentences, not
+reworded: not there. About one quotation in five, on a real bibliography, with a 14B model.
+That is the number this project should be quoted on, and it is the reason the check exists.
+
+**Eight of 24 documents never entered the window at all.** They were refused for size, which
+is correct, and `collect` said so: each one occupies its own section of the corpus naming the
+token count, the budget and what to do about it. Nothing was hidden. What remains true is the
+consequence - the corpus covers 16 of 24 papers, and the eight missing are the largest and
+most central, nnU-Net and the EAU and NCCN guidelines among them. The library-scale work
+deferred to v2 below is not a nicety: without it a bibliography is read only in the parts
+that happen to fit.
 
 ## What this roadmap is not
 

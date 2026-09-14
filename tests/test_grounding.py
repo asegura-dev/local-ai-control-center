@@ -5,6 +5,7 @@ from __future__ import annotations
 from local_ai_control_center.core.grounding import (
     Claim,
     _normalized,
+    _unspaced,
     check_answer,
     check_claim,
     pages_in,
@@ -190,6 +191,33 @@ def test_a_hyphen_between_letters_is_representation_either_way() -> None:
     """It cannot be told from the text whether a typesetter put it there, so both fold."""
     assert _normalized("an AI-based tool") == _normalized("an AI- based tool")
     assert _normalized("well-known") == _normalized("wellknown")
+
+
+def test_letter_spaced_extraction_does_not_make_a_real_quotation_a_fabrication() -> None:
+    """The shape a PDF produces when it spaces glyphs instead of words.
+
+    Taken verbatim from a paper in a real bibliography, where extraction wrote
+    `A c c o r d i n gt o`. The model had quoted faithfully and the check returned
+    `not_found` - which this module defines as a fabrication. Twenty-two of 237 quotations
+    in that corpus failed for this reason alone (ADR-044).
+    """
+    source = _PAGE_ONE + "2b and c .A c c o r d i n gt o the average of three volunteers."
+    claim = Claim(claim="c", quote="According to the average of three volunteers", page=1)
+    assert check_claim(claim, source).verdict == "verified"
+
+
+def test_folding_spacing_away_still_refuses_a_changed_word() -> None:
+    """The folding must not become a way through. A changed word fails as it always did."""
+    source = _PAGE_ONE + "The s e n s i t i v i t y was 94.7 percent in that cohort."
+    assert check_claim(Claim(claim="c", quote="The sensitivity was 94.7 percent"), source).found
+    assert not check_claim(Claim(claim="c", quote="The sensitivity was 84.7 percent"), source).found
+    assert not check_claim(Claim(claim="c", quote="The specificity was 94.7 percent"), source).found
+
+
+def test_similarity_keeps_the_spaces_that_containment_drops() -> None:
+    """`_normalized` answers a different question and is left as it was."""
+    assert _normalized("the 5 - 10 range") == "the 5 - 10 range"
+    assert _unspaced("the 5 - 10 range") == "the5-10range"
 
 
 def test_numbers_around_a_dash_are_left_alone() -> None:

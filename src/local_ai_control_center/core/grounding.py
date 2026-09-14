@@ -197,6 +197,27 @@ def _normalized(text: str) -> str:
     return _WHITESPACE.sub(" ", joined).casefold().strip()
 
 
+def _unspaced(text: str) -> str:
+    """Normalize, then drop spacing entirely, to decide whether a quotation is present.
+
+    Kept apart from `_normalized` because it answers a different question. Containment asks
+    whether the words are in the document; similarity asks how close two sentences are, and
+    difflib needs the gaps to answer that. Only the first uses this.
+
+    Extraction sometimes emits a word as `A c c o r d i n gt o`, spacing driven by glyph
+    positions rather than by the text. Under `_normalized` alone such a page defeats every
+    quotation taken from it, and a faithful quotation returns `not_found` - which this module
+    defines as a fabrication, the thing the check exists for. Measured over the 237
+    quotations of a real bibliography: 22 were real and reported as fabrications for this
+    reason alone, and 231 quotations mutated by one word or one digit still failed, under
+    this folding and the previous one alike (ADR-044).
+
+    Word boundaries go with the spaces, so a short enough quotation could match across one.
+    The mutation test does not probe that, and it is the known cost of the change.
+    """
+    return _WHITESPACE.sub("", _normalized(text))
+
+
 def pages_in(source: str) -> tuple[tuple[int, str], ...]:
     """Split ``source`` into its pages, using the markers ingestion preserved.
 
@@ -257,7 +278,7 @@ def nearest_text(quote: str, source: str) -> str:
 def check_claim(claim: Claim, source: str) -> CheckedClaim:
     """Look for ``claim``'s quotation in ``source`` and report what was found.
 
-    Exact substring after normalizing whitespace and case. Deliberately not fuzzy: a
+    Exact substring after folding case and spacing away. Deliberately not fuzzy: a
     quotation that only nearly appears is not a quotation, and accepting near-misses would
     defeat the check (ADR-026).
 
@@ -267,12 +288,12 @@ def check_claim(claim: Claim, source: str) -> CheckedClaim:
     bad citation into a thesis (ADR-031). What the model said is kept on the claim, for
     comparison, and never reported as the answer.
     """
-    needle = _normalized(claim.quote)
+    needle = _unspaced(claim.quote)
     # The markers are stripped before the search. They are LACC's own annotation, not the
     # document's words, and a sentence that runs across a page break has one sitting inside
     # it - which made every quotation spanning a page impossible to verify, in every
     # multi-page document (ADR-035).
-    if not needle or needle not in _normalized(_MARKER.sub(" ", source)):
+    if not needle or needle not in _unspaced(_MARKER.sub(" ", source)):
         return CheckedClaim(
             claim=claim, verdict="not_found", nearest=nearest_text(claim.quote, source)
         )
@@ -280,7 +301,7 @@ def check_claim(claim: Claim, source: str) -> CheckedClaim:
     # Located per page against the raw source, so a quotation spanning a break belongs to
     # no single page and is reported as such rather than attributed to one of them.
     pages = pages_in(source)
-    found_on = next((number for number, text in pages if needle in _normalized(text)), None)
+    found_on = next((number for number, text in pages if needle in _unspaced(text)), None)
     if found_on is None:
         # A sentence that runs across a break belongs to no single page, which is not the
         # same as belonging to none. Adjacent pairs are searched and the page it *starts*
@@ -289,7 +310,7 @@ def check_claim(claim: Claim, source: str) -> CheckedClaim:
             (
                 pages[index][0]
                 for index in range(len(pages) - 1)
-                if needle in _normalized(pages[index][1] + " " + pages[index + 1][1])
+                if needle in _unspaced(pages[index][1] + " " + pages[index + 1][1])
             ),
             None,
         )

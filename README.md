@@ -90,7 +90,8 @@ in [`docs/adr/`](docs/adr/) with its context, its trade-off and the alternative 
 
 ## Status
 
-Early development, but working end to end against a real local model.
+v1.0, working end to end against a real local model and measured against a real
+bibliography rather than against documents written for the test.
 
 Every run takes the same shape: LACC plans the action, shows a preview, asks for
 confirmation defaulting to no, reads what it was pointed at inside the workspace
@@ -111,6 +112,15 @@ append-only, hash-chained audit log.
 - `lacc preview` shows what would happen without doing it, `lacc profile` reports what
   the machine offers, `lacc verify` walks the audit chain, and `lacc notify test`
   checks notification settings before you rely on them.
+
+Why the checking matters, in one measured number: across 24 papers of a real bibliography,
+a 14B model produced 237 quotations and **48 of them are not in the document they cite** -
+about one in five, with 44 absent in any form tried. The check catches them. Nothing about
+the fluency of the surrounding prose distinguishes the other four.
+
+It is a check on quotations, not on claims: it can tell you the words are really there, and
+it cannot tell you the paper means what the model says it means. And it does not see text a
+PDF hides from a reader, which `lacc ingest` reports separately.
 
 The control core is in place: configuration, workspaces with boundary enforcement,
 permissions, a provider port with a deterministic mock and a real Ollama

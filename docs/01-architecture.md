@@ -439,7 +439,7 @@ published work. For three releases it was doing something else: reporting this p
 defects as the model's dishonesty.
 
 Running LACC against one real scientific paper, at temperature zero, and looking at every
-quotation it rejected turned up four separate faults, none of them the model's:
+quotation it rejected turned up five separate faults, none of them the model's:
 
 - Words the typesetter broke across a line. Ingestion preserved `sensi- tivity`, so a
   sentence quoted correctly could not match.
@@ -450,12 +450,22 @@ quotation it rejected turned up four separate faults, none of them the model's:
   the comparison and not the other.
 - LACC's own `<!-- page N -->` markers, which sit inside any sentence running across a page
   break and made every such quotation impossible to verify.
+- Spacing driven by glyph position rather than by words. Some PDFs extract a word as
+  `A c c o r d i n gt o`, and every quotation from such a page was rejected. Found by
+  re-measuring a corpus rather than by reading one paper, which is why it lasted longest.
 
 Plus one in ingestion: the journal's running header, extracted inside a sentence.
 
 The measured effect was that the reported rate of invention went from three fabrications in
-seven, to one, to none - each correction removing another defect here. The paper's sentences
-went from sixteen unquotable to zero.
+seven, to one - each correction removing another defect here. The paper's sentences went from
+sixteen unquotable to zero.
+
+**And then the correction overshot.** v0.38.0 published "zero fabrications in 237 quotations"
+across a whole bibliography. Re-running the shipped code over the same corpus gives 48 absent
+of 237 - about one in five - of which 44 are not in their document in any form tried. Having
+found six times that this project blamed the model for its own defects, the seventh
+measurement leant the other way and credited a model that had invented forty-four quotations
+(ADR-042).
 
 **The test suite passed throughout.** That is the part worth keeping. Every one of these
 faults was a difference between a real document and the documents the tests construct: tests
@@ -471,7 +481,16 @@ first look at an actual rejected quotation said otherwise.
 
 ## Future direction
 
-As the project matures, the package may be organized into subpackages such as
-configuration, workspaces, providers, audit, skills, security, and profiler.
-This is direction, not current structure. Folders are created when there is real
-code to put in them.
+The subpackage split this section used to anticipate has happened: `core/`, `ports/`,
+`adapters/` and `system/` are described above and enforced by `tests/test_layering.py`
+(ADR-029).
+
+What the structure does not yet have is a way to work at the scale of a library. A
+bibliography of two dozen papers exceeds any context window this runs against, and the
+largest and most central documents are the ones refused. That needs a selection step before
+the provider, which is a port rather than a rewrite: something that decides what to send.
+
+The other gap is factual metadata. Asked for a journal, a model supplies one from memory and
+does not say that it did - measured at twelve fabrications in twenty-four, with an explicit
+instruction not to. Author, year, journal and DOI belong to an authority reached over the
+network, behind a port like any other, not to generation.

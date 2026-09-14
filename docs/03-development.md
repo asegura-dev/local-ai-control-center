@@ -31,6 +31,29 @@ uv sync
 This creates a virtual environment and installs the linter, type checker, and
 test runner defined in the project.
 
+### If the checkout sits in a synchronised folder
+
+OneDrive, Dropbox and iCloud reach into the environment while a build is running.
+`uv sync` then fails partway with `Access is denied` removing the previous
+`dist-info`, leaving a half-removed directory that makes the next run warn about an
+incomplete environment. With files-on-demand the same synchroniser can dehydrate
+`.dll` and `.pyd` files, which surfaces much later as an import error that reads
+like a broken package.
+
+**A `.venv` junction pointing outside the folder does not fix this** - synchronisers
+traverse reparse points, so the environment is still walked and still locked. What
+fixes it is leaving nothing of the environment inside the folder at all:
+
+```powershell
+.\run.ps1 sync
+.\run.ps1 run pytest -q
+```
+
+`run.ps1` sets `UV_PROJECT_ENVIRONMENT` to `%USERPROFILE%\.venvs\lacc` and forwards
+everything to uv. On a checkout outside a synchronised folder it is unnecessary, and
+plain `uv` works as above. Setting `UV_PROJECT_ENVIRONMENT` in the shell does the same
+thing on any platform; the script only saves remembering it.
+
 ## Quality gate
 
 Before committing, the following checks are expected to pass:

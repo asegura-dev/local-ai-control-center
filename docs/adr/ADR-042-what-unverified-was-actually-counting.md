@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted - the decision stands. **Its measurements do not: see Correction, below.**
 
 ## Context
 
@@ -80,3 +80,37 @@ the same direction four times in one session, and every time the error flattered
 making the model look worse. That is not a coincidence: a check that fails closed reports
 its own limits as the thing it was built to catch, and nothing inside it can tell the
 difference. Only looking at what it rejected could.
+
+## Correction (v0.39.0)
+
+The table above does not reproduce. Re-running the shipped code over the same 237 quotations
+from the same bibliography gives different figures, and the published ones are the wrong
+ones.
+
+| | This ADR published | Re-measured, v0.38.0 | After the spacing fix |
+|---|---|---|---|
+| verified | 165 | 167 | **189** |
+| found, no page | 72 | 0 | 0 |
+| **not in the document** | **0** | **70** | **48** |
+
+Each of the 70 was then tested against the marker-stripped document directly: **none** was
+present as written, **22** were present once spacing is folded away, and **48** are absent by
+every criterion tried. The 22 are the letter-spacing defect named in ADR-044 and fixed in
+this release. The 48 are not a tool limit. Splitting each into sentences and
+looking for them individually accounts for four: one whose sentences are all present but not
+adjacent, three with some present and some not. **The remaining 44 are absent in any form
+tried** - not stitched, not reworded, not there.
+
+So the sentence "every one of them real" is false, and so is "zero of 237". The rate on this
+corpus is **48 of 237, about one in five**, and it is the model's, not the tool's.
+
+How the original figure was produced could not be determined from the record, which is its
+own finding: a number was published without a way to re-run it. The method for the figures
+above is the corpus at `corpus.md`, its source documents, and `check_claim` - re-runnable,
+which is the point of ADR-044.
+
+The direction is worth naming. Six measurements in this project had been wrong in the
+direction that flattered the tool by making the model look worse. This ADR was the correction
+to that pattern, and it overshot in the opposite direction: it reported a model with no
+fabrications at all. A project that has learned it is biased one way is not thereby unbiased.
+
