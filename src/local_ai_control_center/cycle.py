@@ -20,6 +20,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from local_ai_control_center.core.budget import answer_reserve, estimate_tokens
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.fence import (
     CONTEXT_SLOT,
@@ -27,7 +28,12 @@ from local_ai_control_center.core.fence import (
     instruction_shapes_in,
     without_markers,
 )
-from local_ai_control_center.core.grounding import CheckedClaim, check_answer
+from local_ai_control_center.core.grounding import (
+    CheckedClaim,
+    check_answer,
+    without_repeats,
+)
+from local_ai_control_center.core.passes import passes_over
 from local_ai_control_center.core.permissions import Capability, PermissionDenied, Permissions
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.core.skill import Skill
@@ -79,17 +85,6 @@ def _oversize(path: Path, limit: int) -> str | None:
     return _TOO_LARGE.format(name=path.name, size=size, limit=limit)
 
 
-CHARS_PER_TOKEN = 3
-"""How many characters LACC assumes one token holds, when estimating a prompt's size.
-
-Deliberately low. Four is the usual rule of thumb for English prose, and text with
-accents, code or unusual words tokenizes worse; assuming three estimates more tokens than
-there probably are, so LACC refuses slightly early. The two errors are not symmetric: a
-prompt refused that would have fitted is visible and costs one line of configuration,
-while a prompt truncated that should have been refused produces a plausible wrong answer
-nobody has reason to check (ADR-019).
-"""
-
 WINDOW_TOLERANCE = 8
 """How close the engine's prompt count may come to the window before LACC calls it clipped.
 
@@ -99,30 +94,15 @@ engines that reserve differently. Being wrong here costs a warning about a promp
 filled the window exactly, which is worth saying anyway (ADR-024).
 """
 
-_MINIMUM_ANSWER_RESERVE = 512
-"""Fewest tokens held back for the completion, whatever the window."""
-
 _PROMPT_TOO_LARGE = (
     "The prompt is an estimated {estimate:,} tokens, over the {budget:,} available: the "
     "context window is {window:,} tokens and {reserve:,} are held back for the answer. "
     "Nothing was sent, because an engine given more than fits does not fail - it drops "
-    "what does not fit and answers from the rest. Use a shorter document, or raise "
-    "context_tokens if the model and this machine can hold more."
+    "what does not fit and answers from the rest. Read it in passes with --in-passes, "
+    "which divides it on page boundaries and still checks every quotation against the "
+    "whole document. Or use a shorter document, or raise context_tokens if the model "
+    "and this machine can hold more."
 )
-
-
-def estimate_tokens(text: str) -> int:
-    """Estimate how many tokens ``text`` occupies, erring high.
-
-    An estimate, and called one everywhere it appears: LACC has no tokenizer and will not
-    carry one per model family for a number that only decides whether to refuse.
-    """
-    return -(-len(text) // CHARS_PER_TOKEN)
-
-
-def answer_reserve(window: int) -> int:
-    """Tokens held back from ``window`` so the model has room to answer."""
-    return max(window // 4, _MINIMUM_ANSWER_RESERVE)
 
 
 class PromptTooLargeError(Exception):
@@ -130,6 +110,16 @@ class PromptTooLargeError(Exception):
 
     Refused rather than trimmed. Truncating is what this exists to prevent, and doing it
     in LACC rather than in the engine would only move the dishonesty closer to home.
+    """
+
+
+class CannotReadInPasses(Exception):
+    """Raised when a document cannot be divided into readings that fit.
+
+    Two causes, both worth distinguishing from "it did not fit": no configured window to
+    divide against, and no page markers to divide on. Anything LACC did not ingest has no
+    pages, and inventing a boundary mid-sentence would cut the quotations this project
+    exists to find (ADR-045).
     """
 
 
@@ -163,6 +153,13 @@ class RunResult(BaseModel):
 
     markers_removed: int = 0
     """Fence markers taken out of the document before it entered the prompt (ADR-038)."""
+
+    passes: int = 1
+    """How many readings the document was divided into to fit the window.
+
+    One means it was read whole. More means the model never held all of it at once, and a
+    reader who does not know that will assume it did (ADR-045).
+    """
 
     instruction_shapes: tuple[str, ...] = ()
     """Ways the document read like an instruction rather than like a document.
@@ -369,34 +366,21 @@ def _standing_context(config: Config, workspace: Workspace) -> tuple[str, bool]:
     return cleaned.strip(), bool(cleaned.strip())
 
 
-def run_action(
-    action: IntendedAction,
+def _prepare(
     prompt_template: str,
-    permissions: Permissions,
+    action: IntendedAction,
     config: Config,
     workspace: Workspace,
-    provider: Provider,
     audit: AuditLog,
     run_id: str,
-    confirm: ConfirmationFn,
-    destination: Path | None = None,
-    approve: ApprovalFn | None = None,
-    verify_quotes: bool = False,
-    temperature: float = 0.0,
-    uses_context: bool = False,
-) -> RunResult:
-    """Run ``action`` through the whole system, in order, and ask a provider.
+    uses_context: bool,
+) -> tuple[ContentsRead, str]:
+    """Read what the action points at, assemble the prompt, and record what was noticed.
 
-    Previews, refuses or asks, and records - then, on approval, reads the declared files
-    into ``prompt_template``, calls the provider with the filled prompt, and records the
-    result. A file that cannot be read is recorded and raised as :class:`ReadError`.
+    Everything between being allowed to run and having something to send. Shared by a
+    run and a run in passes, so that reading a document in seventeen readings notices
+    the same things about it as reading it in one.
     """
-    preview, stopped = _authorize(
-        action, permissions, config, workspace, audit, run_id, confirm, config.remote_engine
-    )
-    if stopped is not None:
-        return stopped
-
     try:
         read = _fill_template(prompt_template, action, workspace, config.max_input_bytes)
     except ReadError as error:
@@ -408,7 +392,7 @@ def run_action(
         )
         raise
 
-    prompt, files_read, contents = read.prompt, read.paths, read.contents
+    prompt, files_read = read.prompt, read.paths
 
     # Only when the plan asked for it. A file that reached every prompt because it exists
     # would be the failure ADR-041 exists to prevent, applied by accident.
@@ -452,6 +436,24 @@ def run_action(
             },
         )
 
+    return read, prompt
+
+
+def _ask(
+    prompt: str,
+    action: IntendedAction,
+    config: Config,
+    provider: Provider,
+    audit: AuditLog,
+    run_id: str,
+    temperature: float,
+) -> Completion:
+    """Measure a prompt, refuse it if it will not fit, send it, and record all three.
+
+    The one place a prompt reaches an engine. A run that reads a document in passes calls
+    it once per pass, and each pass is measured and refused on its own terms - which is how
+    a page too large to fit is caught rather than quietly truncated (ADR-045).
+    """
     estimate = estimate_tokens(prompt)
     audit.record(
         run_id,
@@ -503,11 +505,45 @@ def run_action(
         },
     )
     _record_what_the_engine_reported(completion, estimate, action, config, audit, run_id)
+    return completion
+
+
+def run_action(
+    action: IntendedAction,
+    prompt_template: str,
+    permissions: Permissions,
+    config: Config,
+    workspace: Workspace,
+    provider: Provider,
+    audit: AuditLog,
+    run_id: str,
+    confirm: ConfirmationFn,
+    destination: Path | None = None,
+    approve: ApprovalFn | None = None,
+    verify_quotes: bool = False,
+    temperature: float = 0.0,
+    uses_context: bool = False,
+) -> RunResult:
+    """Run ``action`` through the whole system, in order, and ask a provider.
+
+    Previews, refuses or asks, and records - then, on approval, reads the declared files
+    into ``prompt_template``, calls the provider with the filled prompt, and records the
+    result. A file that cannot be read is recorded and raised as :class:`ReadError`.
+    """
+    preview, stopped = _authorize(
+        action, permissions, config, workspace, audit, run_id, confirm, config.remote_engine
+    )
+    if stopped is not None:
+        return stopped
+
+    read, prompt = _prepare(prompt_template, action, config, workspace, audit, run_id, uses_context)
+
+    completion = _ask(prompt, action, config, provider, audit, run_id, temperature)
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})
 
     checked: tuple[CheckedClaim, ...] = ()
     if verify_quotes:
-        checked = check_answer(completion.text, contents)
+        checked = check_answer(completion.text, read.contents)
         held = sum(1 for claim in checked if claim.holds)
         # How often the model misplaced a passage it quoted correctly. It is not shown to
         # the reader, who wants the right page rather than a note about someone else's
@@ -529,7 +565,7 @@ def run_action(
 
     if destination is not None:
         _offer_the_answer(
-            completion.text, contents, destination, action, workspace, audit, run_id, approve
+            completion.text, read.contents, destination, action, workspace, audit, run_id, approve
         )
 
     return RunResult(
@@ -735,6 +771,125 @@ def run_conversion(
     return RunResult(preview=preview, outcome="completed")
 
 
+def run_in_passes(
+    action: IntendedAction,
+    prompt_template: str,
+    permissions: Permissions,
+    config: Config,
+    workspace: Workspace,
+    provider: Provider,
+    audit: AuditLog,
+    run_id: str,
+    confirm: ConfirmationFn,
+    verify_quotes: bool = False,
+    temperature: float = 0.0,
+    uses_context: bool = False,
+) -> RunResult:
+    """Read one document in as many passes as the window needs, and answer from all of them.
+
+    The same run as :func:`run_action` up to the point of asking, then asking once per pass.
+    What comes back is the readings joined, and **every quotation is checked against the
+    whole document** rather than against the pass that produced it - the line ADR-045 draws,
+    and the reason v1.0's promise survives being divided.
+
+    One target only. Reading several documents in passes at once is a different question,
+    and guessing at it here would put one document's pages into another's prompt.
+    """
+    if len(action.targets) != 1:
+        raise CannotReadInPasses(
+            f"{action.name} points at {len(action.targets)} documents. A run in passes reads one."
+        )
+    if config.context_tokens is None:
+        raise CannotReadInPasses(
+            "No context window is configured, so there is nothing to divide against. "
+            "Set context_tokens to the window the model actually has."
+        )
+
+    preview, stopped = _authorize(
+        action, permissions, config, workspace, audit, run_id, confirm, config.remote_engine
+    )
+    if stopped is not None:
+        return stopped
+
+    read, prompt = _prepare(prompt_template, action, config, workspace, audit, run_id, uses_context)
+    if not read.contents or read.contents not in prompt:
+        raise CannotReadInPasses(f"{action.name} read nothing that could be divided.")
+
+    # What the skill wraps around the document has to come out of the budget: the wrapper
+    # is sent with every pass, so a pass sized against the raw window would overflow by it.
+    around = estimate_tokens(prompt) - estimate_tokens(read.contents)
+    budget = config.context_tokens - answer_reserve(config.context_tokens) - around
+    readings = passes_over(read.contents, budget)
+    if not readings:
+        raise CannotReadInPasses(
+            f"{action.name} points at a document with no page markers, so there is no "
+            "honest place to divide it. Ingest it with lacc ingest, which preserves them."
+        )
+
+    audit.record(
+        run_id,
+        "read_in_passes",
+        f"Divided the document for {action.name} into {len(readings)} readings",
+        {
+            "action": action.name,
+            "passes": len(readings),
+            "pages": [[r.first_page, r.last_page] for r in readings],
+            "budget_tokens": budget,
+        },
+    )
+
+    answers: list[str] = []
+    asked = 0
+    for reading in readings:
+        completion = _ask(
+            prompt.replace(read.contents, reading.text, 1),
+            action,
+            config,
+            provider,
+            audit,
+            run_id,
+            temperature,
+        )
+        answers.append(completion.text)
+        asked += completion.answer_tokens or 0
+
+    joined = Completion(
+        text=(chr(10) * 2).join(answers),
+        provider=f"{provider.name} x{len(readings)}",
+        answer_tokens=asked or None,
+        finish_reason="stop",
+    )
+    audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})
+
+    checked: tuple[CheckedClaim, ...] = ()
+    if verify_quotes:
+        checked = without_repeats(check_answer(joined.text, read.contents))
+        audit.record(
+            run_id,
+            "quotations_checked",
+            f"Checked {len(checked)} quotations for {action.name}",
+            {
+                "action": action.name,
+                "quotations": len(checked),
+                "verified": sum(1 for c in checked if c.holds),
+                "found_but_unplaced": sum(1 for c in checked if c.found and not c.holds),
+                "not_in_the_document": sum(1 for c in checked if not c.found),
+                "pages_the_model_got_wrong": sum(1 for c in checked if c.page_disagreed),
+                "passes": len(readings),
+            },
+        )
+
+    return RunResult(
+        preview=preview,
+        outcome="completed",
+        completion=joined,
+        checked_claims=checked,
+        markers_removed=read.markers_removed,
+        instruction_shapes=read.instruction_shapes,
+        passes=len(readings),
+    )
+
+
 def run_skill(
     skill: Skill,
     requests: tuple[str, ...],
@@ -746,13 +901,38 @@ def run_skill(
     run_id: str,
     confirm: ConfirmationFn,
     approve: ApprovalFn | None = None,
+    in_passes: bool = False,
 ) -> RunResult:
     """Plan the skill, then run its plan through the execution cycle.
 
     Wires a skill to the cycle so callers do not repeat the wiring. The skill only
     describes; the cycle previews, checks, confirms, executes, and records.
+
+    ``in_passes`` divides a document too large for the window into readings that fit. It is
+    asked for rather than substituted: a document of 355,000 tokens becomes ninety calls and
+    the better part of a day, which is not a thing to start on someone's behalf (ADR-045).
     """
     plan = skill.plan(requests, config)
+    if in_passes:
+        if plan.destination is not None:
+            raise CannotReadInPasses(
+                f"{plan.action.name} writes a file, and an answer assembled from several "
+                "readings is not a revision of anything. Run it whole."
+            )
+        return run_in_passes(
+            plan.action,
+            plan.prompt_template,
+            permissions,
+            config,
+            workspace,
+            provider,
+            audit,
+            run_id,
+            confirm,
+            plan.verify_quotes,
+            plan.temperature,
+            plan.uses_context,
+        )
     return run_action(
         plan.action,
         plan.prompt_template,

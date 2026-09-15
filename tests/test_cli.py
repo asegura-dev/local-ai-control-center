@@ -821,3 +821,102 @@ def test_one_unreadable_document_does_not_end_the_traverse(tmp_path: Path) -> No
     assert "## paper1.md" in written
     assert "Not collected" in written
     assert "1 documents were not collected" in result.stdout
+
+
+def _oversized_paper(tmp_path: Path, pages: int = 12) -> Path:
+    """A configuration whose workspace holds a paper no small window can hold."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir(exist_ok=True)
+    body = chr(10).join(
+        f"<!-- page {n} -->{chr(10)}{chr(10)}Page {n} states that " + "finding " * 180
+        for n in range(1, pages + 1)
+    )
+    (workspace / "paper.md").write_text(body, encoding="utf-8")
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        f"workspace_root: {workspace}{chr(10)}context_tokens: 4096{chr(10)}", encoding="utf-8"
+    )
+    return config
+
+
+def test_an_oversized_document_is_refused_and_the_refusal_names_the_way_out(
+    tmp_path: Path,
+) -> None:
+    """A refusal that does not say what to do instead sends someone to the issue tracker."""
+    config = _oversized_paper(tmp_path)
+    result = runner.invoke(
+        app,
+        ["run", "extract_claims", "paper.md", "-c", str(config), "--provider", "mock"],
+        input="y\n",
+    )
+    assert result.exit_code == 1
+    assert "--in-passes" in result.stdout
+
+
+def test_in_passes_reads_the_document_and_says_that_it_did(tmp_path: Path) -> None:
+    config = _oversized_paper(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "extract_claims",
+            "paper.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--in-passes",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "Read in" in result.stdout and "passes" in result.stdout
+
+
+def test_a_document_read_in_passes_is_marked_as_such_in_a_collected_corpus(
+    tmp_path: Path,
+) -> None:
+    config = _oversized_paper(tmp_path)
+    into = tmp_path / "ws" / "corpus.md"
+    result = runner.invoke(
+        app,
+        [
+            "collect",
+            "extract_claims",
+            "paper.md",
+            "--into",
+            str(into),
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--in-passes",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 0, result.stdout
+    corpus = into.read_text(encoding="utf-8")
+    assert "read in several passes" in corpus
+    assert "Read in" in corpus and "passes, so the model never held all of it" in corpus
+
+
+def test_the_audit_of_a_passes_run_records_how_many(tmp_path: Path) -> None:
+    config = _oversized_paper(tmp_path)
+    runner.invoke(
+        app,
+        [
+            "run",
+            "extract_claims",
+            "paper.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--in-passes",
+        ],
+        input="y\n",
+    )
+    trail = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8")
+    divided = [json.loads(line) for line in trail.splitlines() if '"read_in_passes"' in line]
+    assert len(divided) == 1
+    assert divided[0]["detail"]["passes"] > 1

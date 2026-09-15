@@ -14,6 +14,7 @@ import pytest
 
 from local_ai_control_center.adapters.documents import converter_for
 from local_ai_control_center.adapters.mock import MockProvider
+from local_ai_control_center.core.budget import answer_reserve, estimate_tokens
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.fence import CONTENT_PLACEHOLDER
 from local_ai_control_center.core.permissions import PermissionDenied, Permissions
@@ -24,8 +25,6 @@ from local_ai_control_center.cycle import (
     PromptTooLargeError,
     ReadError,
     RunResult,
-    answer_reserve,
-    estimate_tokens,
     run_action,
     run_conversion,
 )

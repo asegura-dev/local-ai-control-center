@@ -177,10 +177,8 @@ fluency but grounding.
   helps write, so that others can build on it. That makes guides, a clear install and a
   citable record part of the deliverable rather than an afterthought.
 
-Everything else waits for v2, and waits on purpose: working with a whole library rather
-than a handful of sources, holding a conversation across turns, letting the model choose
-what to do next, moving prompt wording out of the code, and splitting documents too large
-for a window. Each is real. None is needed to write a paper with sources you chose.
+Everything else waited for v2, and waited on purpose. Each is real. None was needed to
+write a paper with sources you chose.
 
 A smaller v1 that is true beats a larger one that is late, and there is no shame in the
 whole shape of the project arriving at v20.
@@ -195,6 +193,39 @@ quotation that cannot be found is reported, a document that will not fit is refu
 rather than truncated, and the audit states the one gap it cannot close. It does not say the
 model is reliable. One quotation in five was invented, and that is the measurement v1.0
 ships with rather than the one it hides.
+
+## v2: a document read in passes
+
+v2 is one thing, and the list it replaced was six phrases (ADR-045). **A document too large
+for the window is read in passes over its pages**, which is what a tool for writing from
+sources owes the sources that matter: on the bibliography this was built for, eight of
+twenty-four documents were refused, and they were the central ones.
+
+Two entries of the old list are out, and out by decision rather than by scheduling.
+**Letting the model choose what to do next** contradicts PRINCIPLES and VISION in as many
+words, and does not enter a later version without an ADR saying what "choose" may mean.
+**Conversation across turns** makes a prompt depend on earlier runs, at which point a run's
+audit record stops explaining that run's output - and the trail is what v1.0 promised.
+
+**Splitting was never a second goal beside library-scale reading. It is the mechanism.**
+Counting them apart is what made the plan look twice its size.
+
+Measured on the EAU guidelines, 251 pages and 355,000 tokens, the document this project
+could not open: **sixteen passes, every page covered, each pass overlapping the last by one
+page.** What it cost is written down beside it - sixteen calls is roughly a quarter of an
+hour, and reading in passes is asked for with `--in-passes` rather than substituted, because
+a document of that size becoming most of a day is not a thing to begin on someone's behalf.
+
+What it buys and what it spends are both in the ADR. **Every quotation is still checked
+against the whole document**, so v1.0's promise survives being divided. What is spent is the
+document's coherence: a claim resting on section 2 and section 7 together will not be found
+by a reader who saw neither with the other, and no count of passes says which claims those
+were.
+
+**This makes documents readable, not libraries.** A corpus assembled from a real
+bibliography is itself around thirty thousand tokens and exceeds the same window. Synthesis
+across sources needs selection rather than traversal, which is a different mechanism and a
+later version.
 
 ## Decided, and deliberately after v1.0
 

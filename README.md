@@ -105,6 +105,10 @@ append-only, hash-chained audit log.
 - `lacc collect extract_claims <paths> --into claims.md` runs across a whole
   bibliography, one document at a time, and assembles a body of claims whose
   quotations have each been checked against the paper they came from.
+- `--in-passes` reads a document too large for the window in several passes over
+  its pages, overlapping by one so a passage crossing a break stays whole. Every
+  quotation is still checked against the whole document, and the answer says how
+  many passes it took.
 - `lacc run revise_file <path>` proposes a clearer version *beside* the original,
   approved against a diff. Nothing LACC writes replaces a file that already existed.
 - `lacc ingest <document>` turns a PDF or Word file into Markdown you can open and

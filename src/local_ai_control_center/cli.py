@@ -24,6 +24,7 @@ from local_ai_control_center.adapters.documents import HiddenText, converter_for
 from local_ai_control_center.adapters.mock import MockProvider
 from local_ai_control_center.adapters.ntfy import notifier_from_config
 from local_ai_control_center.adapters.ollama import OllamaProvider, resolve_engine_host
+from local_ai_control_center.core.budget import answer_reserve
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
 from local_ai_control_center.core.permissions import grant
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
@@ -46,10 +47,10 @@ from local_ai_control_center.core.workspace import (
 )
 from local_ai_control_center.cycle import (
     WINDOW_TOLERANCE,
+    CannotReadInPasses,
     PromptTooLargeError,
     ReadError,
     RunResult,
-    answer_reserve,
     run_conversion,
     run_skill,
     write_new_file,
@@ -189,6 +190,13 @@ def run(
         ProviderChoice,
         typer.Option("--provider", help="Which provider to run against."),
     ] = ProviderChoice.ollama,
+    in_passes: Annotated[
+        bool,
+        typer.Option(
+            "--in-passes",
+            help="Read a document too large for the window in several passes over its pages.",
+        ),
+    ] = False,
 ) -> None:
     """Plan a skill, preview it, confirm, then execute and record it."""
     resolved = _resolve_skill(skill)
@@ -216,25 +224,45 @@ def run(
         if generating:
             with console.status("Contacting Ollama...") as status:
                 status.update(
-                    "Generating... (the first run loads the model into memory and may take longer)"
+                    "Reading in passes... (one call per pass; this takes as long as it takes)"
+                    if in_passes
+                    else "Generating... (the first run loads the model into memory and may "
+                    "take longer)"
                 )
                 result = _do_run(
-                    resolved, tuple(requests), config, workspace, provider, audit, run_id
+                    resolved, tuple(requests), config, workspace, provider, audit, run_id, in_passes
                 )
         else:
-            result = _do_run(resolved, tuple(requests), config, workspace, provider, audit, run_id)
-    except (ProviderError, ReadError, PromptTooLargeError) as error:
+            result = _do_run(
+                resolved, tuple(requests), config, workspace, provider, audit, run_id, in_passes
+            )
+    except (ProviderError, ReadError, PromptTooLargeError, CannotReadInPasses) as error:
         _announce(resolved.name, "failed", time.monotonic() - started, config, audit, run_id)
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
 
     _announce(resolved.name, result.outcome, time.monotonic() - started, config, audit, run_id)
     _report(result)
+    _say_how_it_was_read(result)
     _warn_about_the_document(result)
     _show_checked_quotations(result)
     _warn_about_the_answer(result, config)
     if config.context_tokens is None:
         _warn_no_context_ceiling()
+
+
+def _say_how_it_was_read(result: RunResult) -> None:
+    """Say when the document was read in pieces, because the answer reads as if it was not.
+
+    A model that never held the whole document cannot speak for the whole document, and a
+    reader who is not told will assume it did (ADR-045).
+    """
+    if result.passes > 1:
+        console.print(
+            f"[yellow]Read in {result.passes} passes.[/yellow] The model never saw the whole "
+            "document at once, so anything it says about the document as a whole rests on "
+            "less than it appears to. Every quotation was still checked against all of it."
+        )
 
 
 def _warn_about_the_document(result: RunResult) -> None:
@@ -407,6 +435,7 @@ def _do_run(
     provider: Provider,
     audit: AuditLog,
     run_id: str,
+    in_passes: bool = False,
 ) -> RunResult:
     """Run the skill through the cycle with confirmation already handled."""
     return run_skill(
@@ -420,6 +449,7 @@ def _do_run(
         run_id,
         lambda _preview: True,
         _approve,
+        in_passes,
     )
 
 
@@ -800,6 +830,19 @@ def _collected_markdown(
         "and the quotation beneath it is what can be cited.",
         "",
     ]
+    divided = [
+        name for name, outcome in gathered if isinstance(outcome, RunResult) and outcome.passes > 1
+    ]
+    if divided:
+        many = len(divided) > 1
+        lines += [
+            f"{len(divided)} of these {'were' if many else 'was'} too large for the window and "
+            f"{'were' if many else 'was'} read in several passes over "
+            f"{'their' if many else 'its'} pages. Every quotation was still checked against "
+            "the whole document, but no reading held all of it, so anything said about such a "
+            "document as a whole rests on less than it appears to.",
+            "",
+        ]
     for name, outcome in gathered:
         lines.append(f"## {name}")
         lines.append("")
@@ -808,7 +851,12 @@ def _collected_markdown(
             continue
         claims = outcome.checked_claims
         held = sum(1 for c in claims if c.holds)
-        lines += [f"*{held} of {len(claims)} quotations verified.*", ""]
+        how = (
+            f" Read in {outcome.passes} passes, so the model never held all of it at once."
+            if outcome.passes > 1
+            else ""
+        )
+        lines += [f"*{held} of {len(claims)} quotations verified.*{how}", ""]
         for checked in claims:
             page = f"p. {checked.found_on_page}" if checked.found_on_page else "page unknown"
             mark = "verified" if checked.holds else "**NOT IN THE DOCUMENT**"
@@ -836,6 +884,13 @@ def collect(
     provider_choice: Annotated[
         ProviderChoice, typer.Option("--provider", help="Which provider to run against.")
     ] = ProviderChoice.ollama,
+    in_passes: Annotated[
+        bool,
+        typer.Option(
+            "--in-passes",
+            help="Read documents too large for the window in several passes over their pages.",
+        ),
+    ] = False,
 ) -> None:
     """Run a skill across many documents, one at a time, and collect what it found.
 
@@ -888,11 +943,23 @@ def collect(
                     (
                         request,
                         _do_run(
-                            resolved, (request,), config, workspace, provider, audit, new_run_id()
+                            resolved,
+                            (request,),
+                            config,
+                            workspace,
+                            provider,
+                            audit,
+                            new_run_id(),
+                            in_passes,
                         ),
                     )
                 )
-            except (ProviderError, ReadError, PromptTooLargeError) as error:
+            except (
+                ProviderError,
+                ReadError,
+                PromptTooLargeError,
+                CannotReadInPasses,
+            ) as error:
                 # One unreadable file should cost one document, not the traverse (ADR-039).
                 gathered.append((request, str(error)))
 

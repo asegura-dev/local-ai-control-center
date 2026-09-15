@@ -236,6 +236,24 @@ def pages_in(source: str) -> tuple[tuple[int, str], ...]:
     return tuple(pages)
 
 
+def page_spans(source: str) -> tuple[tuple[int, int, int], ...]:
+    """Where each page begins and ends in ``source``, with its marker inside the span.
+
+    The companion to `pages_in`, which returns page *text* and drops the marker. This
+    returns offsets instead, so a caller can slice the source and get back something that
+    still looks like an ingested document - markers and all. `passes` needs that: a reading
+    of part of a document should have the same shape as a reading of all of it.
+    """
+    markers = list(_PAGE_MARKER.finditer(source))
+    if not markers:
+        return ()
+    spans = []
+    for index, marker in enumerate(markers):
+        end = markers[index + 1].start() if index + 1 < len(markers) else len(source)
+        spans.append((int(marker.group(1)), marker.start(), end))
+    return tuple(spans)
+
+
 def nearest_text(quote: str, source: str) -> str:
     """Return the sentence in ``source`` most like ``quote``, or empty when none is close.
 
@@ -317,6 +335,28 @@ def check_claim(claim: Claim, source: str) -> CheckedClaim:
     if found_on is None:
         return CheckedClaim(claim=claim, verdict="page_unknown")
     return CheckedClaim(claim=claim, verdict="verified", found_on_page=found_on)
+
+
+def without_repeats(claims: tuple[CheckedClaim, ...]) -> tuple[CheckedClaim, ...]:
+    """Drop claims whose quotation has already appeared, keeping the first.
+
+    A document read in overlapping passes offers the overlapping page twice, and the same
+    passage quoted twice is one quotation (ADR-045). Folded the way containment folds, so a
+    difference nobody can see does not become two entries.
+
+    Merged on the quotation rather than on the claim. Two different readings of one sentence
+    collapse into one, which is the cost: the quotation is what carries authority here, and
+    a corpus with the same sentence in it twice is worse than a reading lost.
+    """
+    seen: set[str] = set()
+    kept: list[CheckedClaim] = []
+    for checked in claims:
+        key = _unspaced(checked.claim.quote)
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(checked)
+    return tuple(kept)
 
 
 def check_answer(answer: str, source: str) -> tuple[CheckedClaim, ...]:

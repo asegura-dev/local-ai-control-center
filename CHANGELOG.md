@@ -5,6 +5,50 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-15
+
+### Added
+- **A document too large for the window can be read in passes**, with `--in-passes` on
+  `lacc run` and `lacc collect`. Pages are the unit and consecutive passes overlap by one,
+  so a passage running across a page break stays whole inside at least one reading - the
+  case ADR-042 exists for, which splitting on a boundary would have cut.
+
+  **A pass is what the model sees. The whole document stays what a quotation is checked
+  against.** That is the line ADR-045 draws and the reason v1.0's promise survives being
+  divided: a claim produced by a pass covering pages 200 to 220, quoting a sentence on page
+  1, still verifies and still gets the page LACC located.
+
+  Measured on the EAU guidelines - 251 pages, 355,000 tokens, the document this project
+  could not open: sixteen passes, every page covered, every pass overlapping the last.
+
+- **The answer and the corpus both say how the document was read.** A model that never held
+  the whole document cannot speak for the whole document, and a reader who is not told will
+  assume it did. The audit records the count and the page range of every pass.
+
+- [ADR-045](docs/adr/ADR-045-a-document-read-in-passes.md), which also sets the scope of v2
+  at this one thing and rules two entries of the old list out by decision: letting the model
+  choose what to do next contradicts PRINCIPLES, and conversation across turns would stop a
+  run's audit record from explaining that run's output.
+
+### Changed
+- The refusal for an oversized prompt now names `--in-passes`. A refusal that does not say
+  what to do instead sends someone to the issue tracker.
+- `estimate_tokens` and `answer_reserve` moved from `cycle` to `core.budget`. They are rules
+  rather than services - nothing in them reads a file or calls an engine - and the core may
+  not import from the cycle, so a pure decision about where to divide a document could not
+  reach them where they were.
+- The cycle's shared opening is now two functions, `_prepare` and `_ask`, so that reading a
+  document in seventeen readings notices the same things about it as reading it in one.
+
+### Known limits
+- Overlap needs room for two pages. A page that alone fills the budget is divided without
+  overlap, and a passage crossing one of *its* breaks is in no reading whole. Real pages run
+  1,400 to 2,000 tokens against a budget of 24,576, so a dozen fit; the exception is
+  documented and pinned by a test because a guarantee with an unstated exception is worse
+  than no guarantee.
+- Reading in passes makes the model's view local. A claim resting on two distant parts of a
+  paper will not be found, and nothing reports which claims those were.
+
 ## [1.0.0] - 2026-09-13
 
 v1.0 does not mean the model does the work, and the measurement in this release is the reason
