@@ -11,6 +11,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 | 01 | [01-architecture](01-architecture.md) | The core-first design: logic lives in the package and interfaces consume it; dependencies point one way. Flat modules until a split is justified. The guiding quality principles (cohesion, coupling, explicit over implicit, incremental design) and their honest tensions. |
 | 02 | [02-roadmap](02-roadmap.md) | Every release so far and what each one settled; the route to v1.0 and why it is capability rather than polish; the two directions decided and deliberately deferred past v1.0 - a model on another machine of your own, and an interface beyond the CLI. Direction, not a schedule, and corrected when the order changes. |
 | 03 | [03-development](03-development.md) | How to set up the project (uv, the requirements), the quality gate - which now also fails if anything reaches the network - where to keep a workspace and why not inside the repository, and the documentation discipline: docs are updated in the same phase as the code they describe. |
+| [04-measurements.md](04-measurements.md) | What this project measured about itself: seven published figures that were wrong and which way each leaned, the injection and hidden-text tests, the rates that currently hold, and how to read a figure from here. |
 
 ## Reading paths
 

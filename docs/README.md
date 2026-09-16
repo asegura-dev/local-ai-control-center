@@ -23,6 +23,7 @@ for decision records.
 | [01](01-architecture.md) | Architecture: core-first, flat modules, contracts at the boundary | living |
 | [02](02-roadmap.md) | Roadmap: where LACC is and where it is heading | living |
 | [03](03-development.md) | Development: setup, the quality gate, and doc discipline | living |
+| [04](04-measurements.md) | Measurements: what this project measured about itself, including the figures it got wrong | living |
 
 > Chapters are written when each phase closes, documenting what was decided and
 > why. The book grows with the code, never ahead of it.
