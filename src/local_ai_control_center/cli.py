@@ -23,7 +23,11 @@ from rich.text import Text
 from local_ai_control_center.adapters.documents import HiddenText, converter_for
 from local_ai_control_center.adapters.mock import MockProvider
 from local_ai_control_center.adapters.ntfy import notifier_from_config
-from local_ai_control_center.adapters.ollama import OllamaProvider, resolve_engine_host
+from local_ai_control_center.adapters.ollama import (
+    OllamaProvider,
+    check_engine,
+    resolve_engine_host,
+)
 from local_ai_control_center.core.budget import answer_reserve
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
 from local_ai_control_center.core.permissions import grant
@@ -1166,6 +1170,52 @@ def _exit_refused() -> None:
     """
     console.print("[red]Refused:[/red] the action would not be allowed.")
     raise typer.Exit(code=1)
+
+
+engine_app = typer.Typer(help="Check the engine LACC will actually use.", no_args_is_help=True)
+app.add_typer(engine_app, name="engine")
+
+
+@engine_app.command("test")
+def engine_test(
+    config_path: Annotated[
+        Path,
+        typer.Option("--config", "-c", help="Path to the configuration file."),
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Ask the engine the questions a run is about to assume the answers to.
+
+    `lacc profile` reports the *local* engine, because the address it uses refuses anything
+    that is not loopback by design. That makes it the wrong thing to check when the engine
+    is a machine of your own on a private network - which is what error messages used to
+    send people to. This checks the host the configuration actually names.
+
+    Exits non-zero when a run would not get an answer, so it is usable from a script.
+    """
+    config, _ = _load(config_path)
+    host = resolve_engine_host(config.engine_host, config.network_access)
+    console.print(f"Engine: [bold]{host}[/bold]  model: [bold]{config.model or '(none)'}[/bold]")
+
+    if not config.model:
+        console.print("[red]No model configured.[/red] Name one with `model:` in the config.")
+        raise typer.Exit(code=1)
+
+    check = check_engine(config.model, host, config.context_tokens)
+    if not check.reached:
+        console.print(f"[red]{check.detail}[/red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Reached it.[/green] {len(check.models)} models installed.")
+    if not check.model_installed:
+        console.print(f"[red]{check.detail}[/red]")
+        if check.models:
+            console.print("Installed there: " + ", ".join(check.models))
+        raise typer.Exit(code=1)
+
+    if not check.answered:
+        console.print(f"[red]{check.detail}[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]It answered[/green] in {check.seconds}s. A run would work.")
 
 
 notify_app = typer.Typer(help="Check and use the configured notifier.", no_args_is_help=True)

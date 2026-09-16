@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`lacc engine test`**, which asks the engine the questions a run is about to assume the
+  answers to: that it can be reached, what it holds, that the configured model is among
+  them, and that it produces a token. Each step fails on its own terms, because each is
+  fixed a different way.
+
+  `lacc profile` could not do this. The address it uses refuses anything that is not
+  loopback, by design - so it reports the *local* engine, which is the wrong machine when
+  the engine is one of your own on a private network. Error messages pointed there anyway.
+
+### Fixed
+- **An unreachable engine now says which way it was unreachable.** Every failure to connect
+  produced "Is it running? Start it with 'ollama serve'", including the case where Ollama
+  was running perfectly and bound to loopback on a machine being reached over Tailscale.
+  The guides have always distinguished a refusal from a timeout - a refusal means nothing
+  is listening, a timeout means a firewall or a loopback bind - and the tool erased the
+  distinction its own documentation taught. Four faults are now named and each carries the
+  fix for that one.
+
 ## [1.1.0] - 2026-09-15
 
 ### Added

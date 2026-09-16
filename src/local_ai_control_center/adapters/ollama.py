@@ -8,12 +8,17 @@ engine installed.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
+import socket
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict
 
 from local_ai_control_center.core.config import is_loopback, normalized_host
 from local_ai_control_center.ports.provider import Completion, Provider, ProviderError
@@ -165,10 +170,7 @@ class OllamaProvider(Provider):
         except urllib.error.HTTPError as error:
             raise self._translate_http_error(error) from error
         except (urllib.error.URLError, TimeoutError) as error:
-            raise ProviderError(
-                f"Cannot reach Ollama at {self._host}. Is it running? "
-                "Start it with 'ollama serve', or check 'lacc profile'."
-            ) from error
+            raise ProviderError(unreachable_message(self._host, error)) from error
         except (ValueError, OSError) as error:
             raise ProviderError(f"Unexpected response from Ollama: {error}") from error
 
@@ -188,3 +190,128 @@ class OllamaProvider(Provider):
                 f"'ollama pull {self._model}', or see 'lacc profile'."
             )
         return ProviderError(f"Ollama returned an error ({error.code}): {error.reason}")
+
+
+def why_unreachable(error: BaseException) -> str:
+    """Name the way an engine could not be reached, as a short key.
+
+    Refused and timed out are different faults with different fixes, and the guides say so:
+    a refusal means nothing is listening, a timeout means something is between you and it -
+    a firewall, or an engine bound to loopback on a machine you are reaching over a network.
+    Collapsing them into "is it running?" sends a person to restart a service that is
+    already running, which is what happened.
+    """
+    reason = getattr(error, "reason", error)
+    if isinstance(error, TimeoutError) or isinstance(reason, TimeoutError):
+        return "timed out"
+    if isinstance(reason, ConnectionRefusedError):
+        return "refused"
+    if isinstance(reason, socket.gaierror):
+        return "unknown host"
+    if isinstance(reason, OSError) and reason.errno in (
+        errno.EHOSTUNREACH,
+        errno.ENETUNREACH,
+    ):
+        return "no route"
+    return "unreachable"
+
+
+_ADVICE = {
+    "refused": (
+        "Nothing is listening there. Ollama is not running, or is on another port. "
+        "Start it with 'ollama serve'."
+    ),
+    "timed out": (
+        "Something answered for the address but not for the port: a firewall, or an "
+        "engine bound to loopback on a machine you are reaching over a network. On the "
+        "engine machine, set OLLAMA_HOST=0.0.0.0:11434 and allow the port."
+    ),
+    "unknown host": "The address does not resolve. Check the host name in engine_host.",
+    "no route": "No route to that address. Check the network, or Tailscale if you use it.",
+    "unreachable": "Check that the engine is running and that the address is right.",
+}
+
+
+def unreachable_message(host: str, error: BaseException) -> str:
+    """A message that says which fault it was, and what fixes that one."""
+    fault = why_unreachable(error)
+    return f"Cannot reach Ollama at {host}: {fault}. {_ADVICE[fault]}"
+
+
+_PROBE_TIMEOUT = 8
+"""Seconds to wait when only asking the engine what it holds."""
+
+
+class EngineCheck(BaseModel):
+    """What a pre-flight check of the engine found, step by step.
+
+    Each step is separate because each fails for its own reason and is fixed its own way.
+    A single "it works / it does not" would be the message this replaces.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    host: str
+    reached: bool = False
+    detail: str = ""
+    models: tuple[str, ...] = ()
+    wanted_model: str = ""
+    model_installed: bool = False
+    answered: bool = False
+    seconds: float | None = None
+
+    @property
+    def ready(self) -> bool:
+        """Whether a run would get an answer."""
+        return self.answered
+
+
+def check_engine(model: str, host: str, context_tokens: int | None = None) -> EngineCheck:
+    """Ask the engine the questions a run is about to assume the answers to.
+
+    Reaching it, listing what it holds, finding the configured model among them, and
+    getting one token out of it. Never raises: the point is to report a fault, and a check
+    that fails by raising is a check you cannot script.
+    """
+    url = f"{host}/api/tags"
+    try:
+        with urllib.request.urlopen(url, timeout=_PROBE_TIMEOUT) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError) as error:
+        return EngineCheck(host=host, detail=unreachable_message(host, error), wanted_model=model)
+    except (ValueError, OSError) as error:
+        return EngineCheck(host=host, detail=f"Unexpected response: {error}", wanted_model=model)
+
+    names = tuple(entry.get("name", "") for entry in payload.get("models", []))
+    installed = model in names
+    if not installed:
+        return EngineCheck(
+            host=host,
+            reached=True,
+            models=names,
+            wanted_model=model,
+            detail=f"'{model}' is not installed there. Pull it with 'ollama pull {model}'.",
+        )
+
+    started = time.monotonic()
+    try:
+        OllamaProvider(model, context_tokens, host).complete("Reply with the word ready.", 0.0)
+    except ProviderError as error:
+        return EngineCheck(
+            host=host,
+            reached=True,
+            models=names,
+            wanted_model=model,
+            model_installed=True,
+            detail=str(error),
+        )
+    return EngineCheck(
+        host=host,
+        reached=True,
+        models=names,
+        wanted_model=model,
+        model_installed=True,
+        answered=True,
+        seconds=round(time.monotonic() - started, 1),
+        detail="The engine answered.",
+    )
