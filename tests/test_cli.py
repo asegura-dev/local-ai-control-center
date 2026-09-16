@@ -978,3 +978,85 @@ def test_without_the_option_a_document_that_fits_is_read_whole(tmp_path: Path) -
     assert "Read in" not in result.stdout
     trail = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8")
     assert '"read_in_passes"' not in trail
+
+
+def test_a_long_document_says_what_it_will_cost_before_the_question(tmp_path: Path) -> None:
+    """ADR-045 decided this and the code did not do it, which is the failure it warns about."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    body = chr(10).join(
+        f"<!-- page {n} -->{chr(10)}{chr(10)}Page {n}. " + "word " * 900 for n in range(1, 181)
+    )
+    (workspace / "long.md").write_text(body, encoding="utf-8")
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        f"workspace_root: {workspace}{chr(10)}context_tokens: 32768{chr(10)}", encoding="utf-8"
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "extract_claims",
+            "long.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--in-passes",
+        ],
+        input="n\n",
+    )
+    assert "passes" in result.stdout
+    assert "rarely one you need in full" in result.stdout
+    assert "cannot yet cut one out" in result.stdout, "and it must not promise otherwise"
+    assert "Declined" in result.stdout
+
+
+def test_a_short_document_is_not_warned_about(tmp_path: Path) -> None:
+    """A warning that fires on everything is a warning nobody reads."""
+    config = _small_paper(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "extract_claims",
+            "paper.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--in-passes",
+        ],
+        input="y\n",
+    )
+    assert "rarely one you need in full" not in result.stdout
+
+
+def test_nothing_is_read_to_produce_the_estimate(tmp_path: Path) -> None:
+    """Preview, then confirm, then read. The estimate comes from the file's size."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "long.md").write_text("x" * 900_000, encoding="utf-8")
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        f"workspace_root: {workspace}{chr(10)}context_tokens: 32768{chr(10)}", encoding="utf-8"
+    )
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "extract_claims",
+            "long.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--in-passes",
+        ],
+        input="n\n",
+    )
+    # No page markers at all, so a run would refuse - but the estimate still appeared,
+    # which it could not have if it depended on parsing the document.
+    assert "passes" in result.stdout
+    assert "Declined" in result.stdout

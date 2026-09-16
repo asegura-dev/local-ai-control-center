@@ -28,7 +28,7 @@ from local_ai_control_center.adapters.ollama import (
     check_engine,
     resolve_engine_host,
 )
-from local_ai_control_center.core.budget import answer_reserve
+from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
 from local_ai_control_center.core.permissions import grant
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
@@ -173,6 +173,53 @@ def _show_preview(preview: ExecutionPreview) -> None:
     console.print(Panel(preview.render(), title="Execution preview", expand=False))
 
 
+def _say_what_it_will_cost(
+    action: IntendedAction,
+    config: Config,
+    workspace: Workspace,
+    in_passes: bool,
+    pages_per_pass: int | None,
+) -> None:
+    """Say how many passes a run will take, before the question that starts it.
+
+    Estimated from the file's **size**, not its contents. The discipline is preview, then
+    confirm, then read; reading a document to tell someone what reading it would cost would
+    invert that for the sake of a nicer number (ADR-045).
+
+    The warning at the end is the point. A document large enough to need many passes is
+    almost never one somebody needs in full - it is a guideline or a manual, and the part
+    they want is a chapter. Saying so before twenty minutes of engine time is cheaper than
+    saying it after.
+    """
+    if not (in_passes or pages_per_pass is not None) or config.context_tokens is None:
+        return
+    if len(action.targets) != 1:
+        return
+    try:
+        size = workspace.resolve_within(action.targets[0]).stat().st_size
+    except (OSError, ValueError):
+        return
+
+    budget = config.context_tokens - answer_reserve(config.context_tokens)
+    tokens = -(-size // CHARS_PER_TOKEN)
+    per_pass = budget if pages_per_pass is None else max(1, budget // 4)
+    passes = max(1, -(-tokens // max(1, per_pass)))
+    if passes < 2:
+        return
+
+    console.print(
+        f"[yellow]About {passes} passes[/yellow] over roughly {tokens:,} tokens of document. "
+        "Each pass is one call to the engine."
+    )
+    if passes >= _MANY_PASSES:
+        console.print(
+            "A document this long is rarely one you need in full - it is a guideline or a "
+            "manual, and the part you are citing is a chapter. Reading only that chapter "
+            "costs minutes rather than an afternoon, and every claim that comes back is "
+            "about the part you will actually cite. LACC cannot yet cut one out for you."
+        )
+
+
 def _confirm(preview: ExecutionPreview) -> bool:
     """Ask the user whether to proceed. Defaults to no."""
     _show_preview(preview)
@@ -229,7 +276,9 @@ def run(
     preview = preview_action(
         plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
     )
-    if not _confirm(preview):
+    _show_preview(preview)
+    _say_what_it_will_cost(plan.action, config, workspace, in_passes, pages_per_pass)
+    if not typer.confirm("Proceed?", default=False):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 
@@ -485,6 +534,13 @@ def _do_run(
         in_passes,
         pages_per_pass,
     )
+
+
+_MANY_PASSES = 8
+"""Passes beyond which a document is worth questioning rather than just running.
+
+Eight is about a hundred pages at a 32k window - a guideline or a manual, not a paper.
+"""
 
 
 _OUTCOME_TAGS = {
