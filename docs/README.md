@@ -10,7 +10,10 @@ for decision records.
 
 > **Looking for a specific doc?** [**INDEX.md**](INDEX.md) is the one-line-per-file
 > reference - what every chapter and ADR contains, so you can find the right one
-> without opening each.
+> without opening each. It also carries the **reading paths**: threads through the
+> decision records for someone who wants to understand one thing rather than all of
+> them. For the long form of what each record decided, see
+> [the annotated list](adr/README.md).
 
 ## Table of contents
 
@@ -34,7 +37,14 @@ The **numbered chapters (00-03)** above are the linear *book* and live flat in
 `docs/`. Decisions are recorded separately:
 
 - [`adr/`](adr/) - Architecture Decision Records: the *why* behind each decision,
-  with its context, the choice, the trade-off, and the alternative rejected.
+  with its context, the choice, the trade-off, and the alternative rejected. Its
+  [README](adr/README.md) is the annotated list; INDEX.md is the short one.
+
+  **They are numbered, not filed into folders**, and the number is the identity: it is how
+  they are cited from docstrings and chapters, several hundred times. Folders would break
+  those citations and would have to file records that cross topics - one about measurement
+  is usually also about grounding and about honesty - under one heading, hiding it from the
+  others.
 
 As the project grows, other layers will be added when there is something real to
 put in them - operational guides, status logs of what each phase produced, and a
