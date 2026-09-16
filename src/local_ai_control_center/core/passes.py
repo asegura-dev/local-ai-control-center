@@ -35,7 +35,9 @@ class Pass(BaseModel):
         return self.last_page - self.first_page + 1
 
 
-def passes_over(source: str, budget_tokens: int) -> tuple[Pass, ...]:
+def passes_over(
+    source: str, budget_tokens: int, pages_per_pass: int | None = None
+) -> tuple[Pass, ...]:
     """Divide ``source`` into readings that each fit ``budget_tokens``.
 
     ``budget_tokens`` is for the document alone. What a skill wraps around it has to be
@@ -58,6 +60,13 @@ def passes_over(source: str, budget_tokens: int) -> tuple[Pass, ...]:
     pages, so there is no honest place to divide it, and saying so is better than inventing
     a boundary mid-sentence.
 
+    **``pages_per_pass`` asks for readings of a stated size**, and is what a document that
+    already fits benefits from. Measured over three such documents, readings of about three
+    pages produced four and a half times the verified quotations of one reading of the whole,
+    for twice the wall clock - the same page gives up more when it is seen with fewer
+    neighbours (ADR-046). The budget still applies: a stated size that would not fit is cut
+    down to what does, because a pass nobody can send is not a reading.
+
     **A single page larger than the budget is returned as its own pass anyway**, over
     budget. Dropping it would be this module deciding, silently, that part of a document
     does not count. The caller measures what it is about to send and refuses; that decision
@@ -74,6 +83,8 @@ def passes_over(source: str, budget_tokens: int) -> tuple[Pass, ...]:
     while start < len(spans):
         used, stop = 0, start
         while stop < len(spans):
+            if pages_per_pass is not None and stop - start >= pages_per_pass:
+                break
             size = estimate_tokens(source[spans[stop][1] : spans[stop][2]])
             if stop > start and used + size > budget_tokens:
                 break

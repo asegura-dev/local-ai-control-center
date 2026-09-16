@@ -784,6 +784,7 @@ def run_in_passes(
     verify_quotes: bool = False,
     temperature: float = 0.0,
     uses_context: bool = False,
+    pages_per_pass: int | None = None,
 ) -> RunResult:
     """Read one document in as many passes as the window needs, and answer from all of them.
 
@@ -819,7 +820,7 @@ def run_in_passes(
     # is sent with every pass, so a pass sized against the raw window would overflow by it.
     around = estimate_tokens(prompt) - estimate_tokens(read.contents)
     budget = config.context_tokens - answer_reserve(config.context_tokens) - around
-    readings = passes_over(read.contents, budget)
+    readings = passes_over(read.contents, budget, pages_per_pass)
     if not readings:
         raise CannotReadInPasses(
             f"{action.name} points at a document with no page markers, so there is no "
@@ -835,6 +836,7 @@ def run_in_passes(
             "passes": len(readings),
             "pages": [[r.first_page, r.last_page] for r in readings],
             "budget_tokens": budget,
+            "pages_per_pass": pages_per_pass,
         },
     )
 
@@ -902,6 +904,7 @@ def run_skill(
     confirm: ConfirmationFn,
     approve: ApprovalFn | None = None,
     in_passes: bool = False,
+    pages_per_pass: int | None = None,
 ) -> RunResult:
     """Plan the skill, then run its plan through the execution cycle.
 
@@ -913,7 +916,7 @@ def run_skill(
     the better part of a day, which is not a thing to start on someone's behalf (ADR-045).
     """
     plan = skill.plan(requests, config)
-    if in_passes:
+    if in_passes or pages_per_pass is not None:
         if plan.destination is not None:
             raise CannotReadInPasses(
                 f"{plan.action.name} writes a file, and an answer assembled from several "
@@ -932,6 +935,7 @@ def run_skill(
             plan.verify_quotes,
             plan.temperature,
             plan.uses_context,
+            pages_per_pass,
         )
     return run_action(
         plan.action,

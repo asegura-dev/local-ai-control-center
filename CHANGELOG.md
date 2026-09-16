@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`--pages-per-pass N`, because reading in passes turns out to help documents that fit.**
+  ADR-045 built passes for documents too large for the window. Three documents that fit
+  comfortably, read twice against the same engine, model, window and temperature - once
+  whole, once in passes of about three pages:
+
+  | | whole | in small passes |
+  |---|---|---|
+  | quotations | 59 | 232 |
+  | **verified quotations** | **45** | **207** |
+  | wall clock | 6.9 min | 13.2 min |
+
+  **Four and a half times the verified quotations for twice the time.** The confound matters
+  and is written down: seventeen calls against three, so more passes are more generation
+  budget. Per *call* the whole document does as well or better. The effect is only real in
+  the right unit - **per page examined, a three-page reading yields about 2.8 times what a
+  twelve-page reading does.** The same page gives up more when seen with fewer neighbours.
+
+  Fidelity moved both ways across the three: 53% → 88%, 91% → 97%, 100% → 85%. More output
+  carries more fabrication in absolute terms; the check is what separates them.
+
+  It is opt-in and the default is unchanged. Quadrupling the calls a run makes is something
+  to ask for.
+
 - **`lacc engine test`**, which asks the engine the questions a run is about to assume the
   answers to: that it can be reached, what it holds, that the configured model is among
   them, and that it produces a token. Each step fails on its own terms, because each is
@@ -18,6 +41,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the engine is one of your own on a private network. Error messages pointed there anyway.
 
 ### Fixed
+- **A slow generation was reported as an engine that could not be reached.** The generation
+  timeout was a fixed 300 seconds; passes on ordinary documents were measured taking 252,
+  and one that crossed the line produced `Cannot reach Ollama` for an engine that was
+  reachable and busy. Two runs of a real bibliography were lost to it.
+
+  The timeout now derives from the window: `answer_reserve` bounds the answer, and the
+  slowest rate this project has measured - 2.7 tokens per second, from a model that did not
+  fit the card - turns that bound into a time. A timeout on `/api/generate` also no longer
+  says what a timeout on `/api/tags` says: one follows a prompt the engine is still working
+  on, the other a question about which models exist. Merging them is what produced the wrong
+  message, and the fault classification added just before would have made it a **precise**
+  wrong message, sending someone to check a firewall.
+
 - **An unreachable engine now says which way it was unreachable.** Every failure to connect
   produced "Is it running? Start it with 'ollama serve'", including the case where Ollama
   was running perfectly and bound to loopback on a machine being reached over Tailscale.

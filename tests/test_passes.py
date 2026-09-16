@@ -87,3 +87,27 @@ def test_without_room_for_two_pages_there_is_no_overlap_and_the_guarantee_is_gon
     claim = Claim(claim="c", quote="The sensitivity was ninety four per cent in that cohort.")
     assert not any(check_claim(claim, r.text).found for r in readings)
     assert check_claim(claim, source).found, "and it is there, in the whole document"
+
+
+def test_a_stated_size_is_honoured() -> None:
+    """What a document that already fits benefits from: readings of a size you chose."""
+    source = _document([f"page {n} " + "word " * 40 for n in range(1, 13)])
+    readings = passes_over(source, budget_tokens=100_000, pages_per_pass=3)
+    assert all(r.pages == 3 for r in readings[:-1])
+    for earlier, later in zip(readings, readings[1:], strict=False):
+        assert later.first_page == earlier.last_page
+
+
+def test_a_stated_size_is_still_cut_down_to_what_fits() -> None:
+    """A pass nobody can send is not a reading, whatever size was asked for."""
+    source = _document([f"page {n} " + "word " * 300 for n in range(1, 11)])
+    asked = passes_over(source, budget_tokens=1200, pages_per_pass=8)
+    assert asked, "some division must still happen"
+    assert max(r.pages for r in asked) < 8
+
+
+def test_no_page_is_lost_when_a_size_is_stated() -> None:
+    source = _document([f"page {n} " + "word " * 40 for n in range(1, 13)])
+    readings = passes_over(source, budget_tokens=100_000, pages_per_pass=3)
+    covered = {n for r in readings for n in range(r.first_page, r.last_page + 1)}
+    assert covered == set(range(1, 13))

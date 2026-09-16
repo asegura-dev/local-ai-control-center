@@ -257,3 +257,47 @@ were asked and said no, which is the system working.
   long enough that you walk away.
 - [Choosing hardware for local models](choosing-hardware-for-local-models.md), if you are
   buying or building that machine.
+
+## Getting more out of a paper
+
+By default LACC shows the model the whole document at once. It does not have to.
+
+```
+lacc run extract_claims paper.md --pages-per-pass 3
+```
+
+Measured over three papers that fit the window comfortably, read both ways against the same
+engine, model and window:
+
+| | whole | three pages at a time |
+|---|---|---|
+| verified quotations | 45 | **207** |
+| wall clock | 6.9 min | 13.2 min |
+
+**Four and a half times the verified quotations for twice the time.** The reason is not that
+the model is cleverer on a short prompt - per call it does as well or better on the whole
+document. It is that the same page gives up more when it is seen with fewer neighbours:
+about 2.8 times more per page examined. The extra pages come from asking again, so the cost
+is real calls and real minutes.
+
+Two things to know before turning it on everywhere. More output carries more fabrication in
+absolute terms - on one of the three papers the verified share fell from 100% to 85%, which
+was ten real quotations becoming forty-two real ones and seven that are not in the paper.
+The check marks them, and a reader who skims past the marks is worse off than before.
+
+And three papers are a direction, not a rate. Try it on one of yours before running it
+across a bibliography, where it turns half an hour into an afternoon.
+
+## Checking the engine before you rely on it
+
+```
+lacc engine test
+```
+
+It asks the engine what a run is about to assume: that it can be reached, what it holds,
+that your configured model is among them, and that it produces a token. Each step fails on
+its own terms, because each is fixed a different way.
+
+`lacc profile` is not the same check. The address it uses refuses anything that is not
+loopback, by design - so it reports the engine on **this** machine, which is the wrong one
+whenever the engine is a machine of your own on a private network.

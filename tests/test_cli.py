@@ -920,3 +920,61 @@ def test_the_audit_of_a_passes_run_records_how_many(tmp_path: Path) -> None:
     divided = [json.loads(line) for line in trail.splitlines() if '"read_in_passes"' in line]
     assert len(divided) == 1
     assert divided[0]["detail"]["passes"] > 1
+
+
+def _small_paper(tmp_path: Path, pages: int = 8) -> Path:
+    """A paper that fits the window comfortably, which is the case --pages-per-pass is for."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir(exist_ok=True)
+    body = chr(10).join(
+        f"<!-- page {n} -->{chr(10)}{chr(10)}Page {n} states a finding."
+        for n in range(1, pages + 1)
+    )
+    (workspace / "paper.md").write_text(body, encoding="utf-8")
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        f"workspace_root: {workspace}{chr(10)}context_tokens: 32768{chr(10)}", encoding="utf-8"
+    )
+    return config
+
+
+def test_pages_per_pass_divides_a_document_that_would_have_fitted(tmp_path: Path) -> None:
+    """The measured case: a document that fits still yields more when shown in pieces."""
+    config = _small_paper(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "extract_claims",
+            "paper.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--pages-per-pass",
+            "2",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "Read in" in result.stdout
+
+    trail = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8")
+    divided = [json.loads(line) for line in trail.splitlines() if '"read_in_passes"' in line]
+    assert len(divided) == 1
+    assert divided[0]["detail"]["pages_per_pass"] == 2
+    assert divided[0]["detail"]["passes"] > 3, "eight pages, two at a time, overlapping"
+
+
+def test_without_the_option_a_document_that_fits_is_read_whole(tmp_path: Path) -> None:
+    """The default does not change. Quadrupling someone's calls is asked for, not assumed."""
+    config = _small_paper(tmp_path)
+    result = runner.invoke(
+        app,
+        ["run", "extract_claims", "paper.md", "-c", str(config), "--provider", "mock"],
+        input="y\n",
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "Read in" not in result.stdout
+    trail = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8")
+    assert '"read_in_passes"' not in trail

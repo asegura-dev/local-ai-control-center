@@ -20,11 +20,40 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from local_ai_control_center.core.budget import answer_reserve
 from local_ai_control_center.core.config import is_loopback, normalized_host
 from local_ai_control_center.ports.provider import Completion, Provider, ProviderError
 
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
-_GENERATE_TIMEOUT_SECONDS = 300
+_SLOWEST_TOKENS_PER_SECOND = 3
+"""The slowest generation this project has measured, rounded down.
+
+A 32B model that did not fit the card produced 2.7 tokens per second against 29 for one
+that did. A timeout has to survive that case or it refuses correct work on the hardware
+most likely to need patience (ADR-046).
+"""
+
+_MINIMUM_GENERATE_TIMEOUT = 300
+"""Floor, for windows small enough that the derivation would be shorter than a model load."""
+
+
+def generation_timeout(context_tokens: int | None) -> int:
+    """How long one generation may legitimately take, from the window it was given.
+
+    The window bounds the answer through `answer_reserve`; the slowest measured rate turns
+    that bound into a time. A fixed number is unrelated to the work asked for and was wrong
+    in both directions: 300 seconds refused passes that were still being generated at 252,
+    and reported them as an engine that could not be reached (ADR-046).
+
+    A hung engine therefore costs this long before it is given up on. That is the price of
+    not abandoning work that is merely slow.
+    """
+    if context_tokens is None:
+        return _MINIMUM_GENERATE_TIMEOUT
+    return max(
+        _MINIMUM_GENERATE_TIMEOUT, answer_reserve(context_tokens) // _SLOWEST_TOKENS_PER_SECOND
+    )
+
 
 _NOT_LOOPBACK = (
     "OLLAMA_HOST points at {host}, which is not this machine. LACC talks to an engine "
@@ -165,11 +194,23 @@ class OllamaProvider(Provider):
         )
 
         try:
-            with urllib.request.urlopen(request, timeout=_GENERATE_TIMEOUT_SECONDS) as response:
+            limit = generation_timeout(self._context_tokens)
+            with urllib.request.urlopen(request, timeout=limit) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             raise self._translate_http_error(error) from error
         except (urllib.error.URLError, TimeoutError) as error:
+            # A timeout here is not the timeout `check_engine` sees. This one follows a
+            # prompt the engine is still working on; that one follows a question about
+            # which models exist. Reporting both as "cannot reach" is what made a busy
+            # engine look like an unreachable one (ADR-046).
+            if why_unreachable(error) == "timed out":
+                raise ProviderError(
+                    f"Ollama at {self._host} did not answer within {limit}s. The prompt was "
+                    f"about {len(prompt) // 3:,} tokens; a large pass on a busy engine can "
+                    "take longer. Nothing was lost - the request simply was not waited for. "
+                    "If the engine is idle and this repeats, the network is worth checking."
+                ) from error
             raise ProviderError(unreachable_message(self._host, error)) from error
         except (ValueError, OSError) as error:
             raise ProviderError(f"Unexpected response from Ollama: {error}") from error
