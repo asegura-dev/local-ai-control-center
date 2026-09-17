@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`lacc ask`: a question answered from passages already checked against their documents.**
+  The retriever chooses, the selection is reported *before* anything is sent, and the
+  answer's own quotations are checked against **the passages it was given** rather than
+  against a document - because what is in doubt there is not whether the passage is real but
+  whether the model quoted what it was shown or what it remembers.
+
+- **`lacc measure --from` measures the synthesis path**, so the question that decides a
+  hardware purchase can be answered with repeats rather than with one run. The passages are
+  selected once and reused across every run, so what varies between them is the model.
+
 - **A port for choosing which passages go into a prompt**, with a first implementation that
   uses no model and no network (ADR-050). A corpus from a real bibliography is 654
   quotations and about thirty thousand tokens; the window is 24,576. The thing this project

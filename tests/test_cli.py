@@ -1217,3 +1217,89 @@ def test_an_unknown_skill_names_the_declared_ones_too(tmp_path: Path) -> None:
     flowed = " ".join(result.stdout.split())
     assert "Built in:" in flowed
     assert "Declared: (none)" in flowed
+
+
+def _corpus_file(tmp_path: Path) -> Path:
+    """A configuration whose workspace holds a small collected corpus."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir(exist_ok=True)
+    (workspace / "corpus.md").write_text(
+        "## paper.md"
+        + chr(10) * 2
+        + "*2 of 3 quotations are in the document.*"
+        + chr(10) * 2
+        + "> The sensitivity for pelvic lymph nodes was 82 per cent."
+        + chr(10) * 2
+        + "p. 4 - detection sensitivity"
+        + chr(10) * 2
+        + "> Radiation dosimetry showed an effective dose."
+        + chr(10) * 2
+        + "p. 2 - dosimetry"
+        + chr(10) * 2
+        + "> A sentence the model invented."
+        + chr(10) * 2
+        + "page unknown - **NOT IN THE DOCUMENT**"
+        + chr(10) * 2
+        + "invented"
+        + chr(10),
+        encoding="utf-8",
+    )
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        f"workspace_root: {workspace}{chr(10)}context_tokens: 32768{chr(10)}", encoding="utf-8"
+    )
+    return config
+
+
+def test_ask_says_what_it_set_aside_before_it_asks_anything(tmp_path: Path) -> None:
+    config = _corpus_file(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "ask",
+            "pelvic lymph node sensitivity",
+            "--from",
+            "corpus.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+        input="n\n",
+    )
+    flowed = " ".join(result.stdout.split())
+    assert "passages selected" in flowed
+    assert "set aside" in flowed
+    assert "Declined" in flowed
+
+
+def test_ask_will_not_use_a_quotation_that_was_never_in_its_document(tmp_path: Path) -> None:
+    """Retrieving over unverified text would verify what the model echoed, not what it saw."""
+    config = _corpus_file(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "ask",
+            "invented sentence model",
+            "--from",
+            "corpus.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+        input="n\n",
+    )
+    flowed = " ".join(result.stdout.split())
+    assert "Nothing in those 2 passages" in flowed or "of 2" in flowed
+
+
+def test_ask_needs_a_window_to_select_against(tmp_path: Path) -> None:
+    config = _corpus_file(tmp_path)
+    config.write_text(f"workspace_root: {config.parent / 'ws'}{chr(10)}", encoding="utf-8")
+    result = runner.invoke(
+        app,
+        ["ask", "anything", "--from", "corpus.md", "-c", str(config), "--provider", "mock"],
+    )
+    assert result.exit_code == 1
+    assert "No context window is configured" in " ".join(result.stdout.split())

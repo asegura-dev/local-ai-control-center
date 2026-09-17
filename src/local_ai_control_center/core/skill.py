@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict
 
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.fence import (
+    CONTENT_PLACEHOLDER,
     DOCUMENT_CLOSE,
     DOCUMENT_OPEN,
     content_slot,
@@ -453,3 +454,76 @@ def grant_for(skill: Skill, config: Config) -> Permissions:
     capabilities directly without a second copy of the rule.
     """
     return grant(skill.required, config)
+
+
+class AskCorpusSkill(Skill):
+    """Answer a question from passages already checked against the documents they came from.
+
+    The only skill whose material is **not** a document. Its input is a selection made by a
+    retriever, so every passage in the prompt has already been found in the source it names
+    (ADR-050). That ordering matters: retrieving from raw text and checking afterwards would
+    put unverified passages in front of a model and verify only what it echoed back.
+
+    It does not take the standing context, for the reason `extract_claims` does not. A
+    question shaped by what a thesis argues would draw the passages that agree with it, and
+    every one of them would verify.
+    """
+
+    @property
+    def name(self) -> str:
+        """Identify this skill."""
+        return "ask_corpus"
+
+    @property
+    def required(self) -> frozenset[Capability]:
+        """Nothing. The passages are handed to it; it opens no files of its own."""
+        return frozenset()
+
+    def plan(self, requests: tuple[str, ...], config: Config) -> SkillPlan:
+        """Plan to answer ``requests[0]`` from passages the caller will supply.
+
+        The question arrives as the request, and the passages fill the content slot - the
+        same hole a document would fill, because to the cycle they are the same thing: text
+        it puts in a prompt after somebody confirmed.
+        """
+        if not requests or not requests[0].strip():
+            raise ValueError("Ask what? A question is the one thing this needs.")
+        question = requests[0].strip()
+        action = IntendedAction(
+            name=self.name,
+            summary=f"Answer from checked passages: {question[:60]}",
+            required=self.required,
+        )
+        break_ = chr(10)
+        template = (
+            "Below are passages taken from a set of documents. Every one of them has already "
+            "been checked: the words are really in the document named beside it."
+            + break_ * 2
+            + CONTENT_PLACEHOLDER
+            + break_ * 2
+            + f"Answer this question in {config.output_language}, using only those passages:"
+            + break_ * 2
+            + question
+            + break_ * 2
+            + "Quote only from the passages above. A sentence you remember from elsewhere is "
+            "not a passage, and quoting one will be caught. If the passages do not answer "
+            "the question, say so and stop - that is a useful answer and an invented one is "
+            "not."
+            + break_ * 2
+            + "For every point you make, give the words that establish it:"
+            + break_ * 2
+            + "POINT: what the passages support"
+            + break_
+            + "QUOTE: the exact words from a passage above"
+            + break_
+            + "SOURCE: the document named beside that passage"
+            + break_ * 2
+            + "One block per point, separated by a blank line. No preamble."
+        )
+        return SkillPlan(
+            action=action,
+            prompt_template=template,
+            verify_quotes=True,
+            fields=("point", "quote", "source"),
+            quote_field="quote",
+        )

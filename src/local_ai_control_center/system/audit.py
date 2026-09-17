@@ -28,6 +28,7 @@ EventKind = Literal[
     "permission_denied",
     "files_read",
     "read_in_passes",
+    "passages_selected",
     "document_converted",
     "revision_written",
     "revision_declined",

@@ -34,6 +34,7 @@ from local_ai_control_center.adapters.ollama import (
     check_engine,
     resolve_engine_host,
 )
+from local_ai_control_center.adapters.words import WordRetriever
 from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
 from local_ai_control_center.core.corpus import CollectedClaim, about, parse_corpus
@@ -42,13 +43,15 @@ from local_ai_control_center.core.declared import (
     FileSkill,
     load_declared_skills,
 )
-from local_ai_control_center.core.grounding import Claim, check_claim
+from local_ai_control_center.core.fence import CONTENT_PLACEHOLDER
+from local_ai_control_center.core.grounding import Claim, check_answer, check_claim
 from local_ai_control_center.core.headings import headings_in, matching
 from local_ai_control_center.core.passes import PageRangeError
 from local_ai_control_center.core.permissions import grant
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.core.run import Progress, ProgressFn, new_run_id
 from local_ai_control_center.core.skill import (
+    AskCorpusSkill,
     AssessSourceSkill,
     CritiqueFileSkill,
     ExtractClaimsSkill,
@@ -70,6 +73,7 @@ from local_ai_control_center.cycle import (
     PromptTooLargeError,
     ReadError,
     RunResult,
+    run_action,
     run_conversion,
     run_skill,
     write_new_file,
@@ -77,6 +81,7 @@ from local_ai_control_center.cycle import (
 from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
 from local_ai_control_center.ports.provider import Provider, ProviderError
+from local_ai_control_center.ports.retriever import Passage, Selection
 from local_ai_control_center.system.audit import (
     AnchorCheck,
     AuditLog,
@@ -1068,6 +1073,13 @@ def measure(
         ProviderChoice,
         typer.Option("--provider", help="Which provider to run against."),
     ] = ProviderChoice.ollama,
+    corpus_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--from",
+            help="Measure ask_corpus instead: the argument is the question, this is the corpus.",
+        ),
+    ] = None,
 ) -> None:
     """Run a skill several times and report the spread, not a single number.
 
@@ -1092,6 +1104,18 @@ def measure(
         raise typer.Exit(code=1) from error
 
     plan = _plan_or_exit(resolved, tuple(requests), config)
+
+    # Measuring the synthesis path: the argument is the question and --from is the corpus.
+    # The passages are chosen once and reused across every run, so what varies between them
+    # is the model and not the selection.
+    material: str | None = None
+    if corpus_file is not None:
+        resolved = AskCorpusSkill()
+        selection, material = _passages_for(requests[0], corpus_file, config, workspace)
+        _report_the_selection(selection)
+        if not selection.chosen:
+            raise typer.Exit(code=1)
+        plan = _plan_or_exit(resolved, (requests[0],), config)
     preview = preview_action(
         plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
     )
@@ -1113,16 +1137,32 @@ def measure(
         for attempt in range(0, runs + 1):
             status.update("Warming up..." if attempt == 0 else f"Run {attempt} of {runs}...")
             try:
-                result = _do_run(
-                    resolved, tuple(requests), config, workspace, provider, audit, new_run_id()
-                )
+                if material is None:
+                    result = _do_run(
+                        resolved, tuple(requests), config, workspace, provider, audit, new_run_id()
+                    )
+                else:
+                    result = _ask_once(
+                        plan, material, config, workspace, provider, audit, new_run_id()
+                    )
             except (ProviderError, ReadError, PromptTooLargeError) as error:
                 where = "The warm-up run" if attempt == 0 else f"Run {attempt}"
                 console.print(f"[red]{where} failed:[/red] {error}")
                 raise typer.Exit(code=1) from error
             if attempt == 0:
                 continue
-            checked = result.checked_claims
+            # Synthesis is checked against what was sent, not against a document: what is in
+            # doubt is whether the model quoted what it was shown or what it remembers.
+            checked = (
+                result.checked_claims
+                if material is None
+                else check_answer(
+                    result.completion.text if result.completion else "",
+                    material,
+                    plan.fields,
+                    plan.quote_field,
+                )
+            )
             # Counted by whether the quotation is in the document. `holds` also requires a
             # page, which measures LACC's ability to place it rather than the model's
             # fidelity - and mixing the two is what made a corpus of real quotations look
@@ -1393,6 +1433,222 @@ def collect(
         console.print(
             f"[yellow]{len(failed)} documents were not collected:[/yellow] {', '.join(failed)}"
         )
+
+
+def _ask_once(
+    plan: SkillPlan,
+    material: str,
+    config: Config,
+    workspace: Workspace,
+    provider: Provider,
+    audit: AuditLog,
+    run_id: str,
+) -> RunResult:
+    """Send one question with its selected passages, and record it.
+
+    Shared by `ask` and `measure`, so that measuring the synthesis path measures the same
+    thing asking does. The quotations are not checked here: they belong against the material
+    that was sent rather than against a document, and the caller does that.
+    """
+    return run_action(
+        plan.action,
+        plan.prompt_template.replace(CONTENT_PLACEHOLDER, material),
+        grant_for(AskCorpusSkill(), config),
+        config,
+        workspace,
+        provider,
+        audit,
+        run_id,
+        lambda _preview: True,
+        verify_quotes=False,
+        temperature=plan.temperature,
+    )
+
+
+def _passages_for(
+    question: str, corpus_file: Path, config: Config, workspace: Workspace
+) -> tuple[Selection, str]:
+    """Read a corpus, select for the question, and render what would be sent."""
+    text = workspace.resolve_within(corpus_file).read_text(encoding="utf-8", errors="replace")
+    collected = [c for c in parse_corpus(text) if "NOT IN THE DOCUMENT" not in c.recorded_verdict]
+    passages = tuple(
+        Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
+    )
+    window = config.context_tokens or 0
+    budget = (window - answer_reserve(window)) // 2 if window else 0
+    selection = WordRetriever().select(question, passages, budget)
+    return selection, _as_material(selection)
+
+
+@app.command()
+def ask(
+    question: Annotated[str, typer.Argument(help="What you want answered.")],
+    corpus_file: Annotated[
+        Path, typer.Option("--from", help="A corpus written by lacc collect or lacc corpus.")
+    ],
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+    provider_choice: Annotated[
+        ProviderChoice, typer.Option("--provider", help="Which provider to run against.")
+    ] = ProviderChoice.ollama,
+) -> None:
+    """Answer a question from passages already checked against their documents.
+
+    A corpus of six hundred quotations does not fit a context window, so something has to
+    choose what goes in. That choosing discards material on your behalf, which is why this
+    says how much it set aside before it asks anything (ADR-050).
+
+    Only passages that were found in the document they name are eligible, and the answer's
+    own quotations are checked again against the passages it was given. A model that quotes
+    something it remembers rather than something it was shown is caught by that.
+    """
+    config, workspace = _load(config_path)
+    audit = AuditLog(workspace, config)
+    if config.context_tokens is None:
+        console.print(
+            "[red]No context window is configured,[/red] so there is no budget to select "
+            "against. Set context_tokens to the window the model actually has."
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        text = workspace.resolve_within(corpus_file).read_text(encoding="utf-8", errors="replace")
+    except (ValueError, OSError) as error:
+        console.print(f"[red]Cannot read {corpus_file}: {error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    # Only what was found in its document is eligible. Retrieving over unverified text and
+    # checking afterwards would verify what the model echoed, not what it was shown.
+    collected = [c for c in parse_corpus(text) if "NOT IN THE DOCUMENT" not in c.recorded_verdict]
+    if not collected:
+        console.print(f"[yellow]{corpus_file} holds no usable quotations.[/yellow]")
+        raise typer.Exit(code=1)
+
+    passages = tuple(
+        Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
+    )
+    budget = (config.context_tokens - answer_reserve(config.context_tokens)) // 2
+    selection = WordRetriever().select(question, passages, budget)
+    _report_the_selection(selection)
+    if not selection.chosen:
+        raise typer.Exit(code=1)
+
+    resolved = AskCorpusSkill()
+    plan = _plan_or_exit(resolved, (question,), config)
+    preview = preview_action(
+        plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
+    )
+    if not _confirm(preview):
+        console.print("[yellow]Declined.[/yellow] Nothing was run.")
+        return
+
+    try:
+        provider = _build_provider(provider_choice, config)
+    except ProviderError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    run_id = new_run_id()
+    audit.record(
+        run_id,
+        "passages_selected",
+        f"Selected {len(selection.chosen)} of {selection.considered} passages",
+        {
+            "question": question,
+            "retriever": selection.how,
+            "selected": len(selection.chosen),
+            "set_aside": selection.set_aside,
+            "considered": selection.considered,
+        },
+    )
+
+    material = _as_material(selection)
+    started = time.monotonic()
+    try:
+        with console.status("Asking..."):
+            result = _ask_once(plan, material, config, workspace, provider, audit, run_id)
+    except (ProviderError, PromptTooLargeError) as error:
+        _announce(resolved.name, "failed", time.monotonic() - started, config, audit, run_id)
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    _announce(resolved.name, result.outcome, time.monotonic() - started, config, audit, run_id)
+    if result.completion is not None:
+        console.print(result.completion.text)
+    _check_against_what_was_sent(result, material, plan, audit, run_id)
+    console.print(
+        f"[dim]{selection.set_aside} of {selection.considered} passages were not sent. An "
+        "answer drawn from a selection is an answer about that selection.[/dim]"
+    )
+
+
+def _report_the_selection(selection: Selection) -> None:
+    """Say what was chosen and what was not, before anything is sent."""
+    if not selection.chosen:
+        console.print(
+            f"[yellow]Nothing in those {selection.considered} passages matches that "
+            "question.[/yellow] The ranking is by the words you used, and it does not cross "
+            "languages - a question in Spanish will not find quotations in English."
+        )
+        return
+    console.print(
+        f"[green]{len(selection.chosen)} passages selected[/green] of {selection.considered}; "
+        f"{selection.set_aside} set aside. [dim]{selection.how}[/dim]"
+    )
+
+
+def _as_material(selection: Selection) -> str:
+    """Render the chosen passages as the text that goes into the prompt."""
+    blocks = []
+    for passage in selection.chosen:
+        where = f"{passage.source}, p. {passage.page}" if passage.page else passage.source
+        blocks.append(f"[{where}]{chr(10)}{passage.text}")
+    return (chr(10) * 2).join(blocks)
+
+
+def _check_against_what_was_sent(
+    result: RunResult, material: str, plan: SkillPlan, audit: AuditLog, run_id: str
+) -> None:
+    """Check the answer's quotations against the passages it was given, not the documents.
+
+    The passages were already checked against their documents when the corpus was built. What
+    is unknown here is whether the model quoted what it was shown or something it remembers,
+    and the material it was shown is what answers that.
+    """
+    if result.completion is None:
+        return
+    checked = check_answer(result.completion.text, material, plan.fields, plan.quote_field)
+    if not checked:
+        console.print(
+            "[yellow]No quotations to check.[/yellow] The answer did not use the format, so "
+            "nothing in it was verified."
+        )
+        return
+    invented = [c for c in checked if not c.found]
+    audit.record(
+        run_id,
+        "quotations_checked",
+        f"Checked {len(checked)} quotations against the passages sent",
+        {
+            "action": plan.action.name,
+            "quotations": len(checked),
+            "verified": len(checked) - len(invented),
+            "not_in_the_document": len(invented),
+        },
+    )
+    if not invented:
+        console.print(
+            f"[green]All {len(checked)} quotations are in the passages that were sent.[/green]"
+        )
+        return
+    console.print(
+        f"[red]{len(invented)} of {len(checked)} quotations are not in what was sent.[/red] "
+        "The model quoted something it was not shown. Do not cite these without opening the "
+        "document."
+    )
+    for claim in invented:
+        console.print(f"  [red]x[/red] {claim.claim.quote[:100]}")
 
 
 @app.command()
