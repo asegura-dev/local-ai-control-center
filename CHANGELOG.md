@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A shape the engine enforces, rather than one it is asked for** (ADR-052). This project's
+  most transferable finding is that structure is obeyed and instruction is negotiated; every
+  skill still *asked* for `CLAIM:` / `QUOTE:` / `PAGE:` in prose and parsed whatever arrived.
+  That already cost something: a skill that declared it verified quotations verified none,
+  because the model wrote `**CLAIM:**` in bold.
+
+  A skill may now declare `enforce_shape`, and the engine constrains decoding to a schema
+  **generated from the fields it already declares** - nothing is authored twice. `Provider`
+  carries the schema; the Ollama adapter passes it as `format`; the mock accepts and ignores
+  it, which is the contract for anything that cannot enforce.
+
+  **The line-oriented parser stays**, and a model that ignores a schema or a provider that
+  cannot apply one is parsed exactly as before. Enforcement improves a path that works; it
+  does not replace it, because a control that only works on one engine is a control this
+  project cannot claim to have.
+
+  Off by default, and the record says why: constrained decoding can fight the way a model
+  composes, and a format that arrives perfectly with worse content inside would be a loss
+  reported as a win. It is measured per skill before it becomes a default - the ADR was
+  written before the measurement, which means it may have to be corrected like the others.
+
 - **A model per kind of work** (ADR-051). Two models compared on the same material turned
   out to differ in kind rather than in quality: the 32B is more faithful to what it is
   handed - 97% and 96% extraction fidelity against 95% and 93%, and a synthesis that kept

@@ -32,7 +32,12 @@ class _Recorder(Provider):
     def name(self) -> str:
         return "recorder"
 
-    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
+    def complete(
+        self,
+        prompt: str,
+        temperature: float = 0.0,
+        schema: dict[str, object] | None = None,
+    ) -> Completion:
         self.prompts.append(prompt)
         index = len(self.prompts) - 1
         text = self._answers[index] if index < len(self._answers) else "nothing to report"
@@ -134,7 +139,12 @@ def test_a_quotation_is_checked_against_the_whole_document_not_its_pass(tmp_path
     class _QuotesWhatItCannotSee(_Recorder):
         """Answers with the quotation only from passes that do not contain it."""
 
-        def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
+        def complete(
+            self,
+            prompt: str,
+            temperature: float = 0.0,
+            schema: dict[str, object] | None = None,
+        ) -> Completion:
             self.prompts.append(prompt)
             if quote in prompt:
                 return Completion(text="nothing", provider=self.name)

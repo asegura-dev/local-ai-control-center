@@ -17,7 +17,7 @@ import contextlib
 import difflib
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -449,6 +449,7 @@ def _ask(
     audit: AuditLog,
     run_id: str,
     temperature: float,
+    schema: dict[str, Any] | None = None,
 ) -> Completion:
     """Measure a prompt, refuse it if it will not fit, send it, and record all three.
 
@@ -486,7 +487,7 @@ def _ask(
             )
             raise PromptTooLargeError(message)
 
-    completion = provider.complete(prompt, temperature)
+    completion = provider.complete(prompt, temperature, schema)
 
     audit.record(
         run_id,
@@ -527,6 +528,7 @@ def run_action(
     uses_context: bool = False,
     fields: tuple[str, ...] = ("claim", "quote", "page"),
     quote_field: str = "quote",
+    schema: dict[str, Any] | None = None,
 ) -> RunResult:
     """Run ``action`` through the whole system, in order, and ask a provider.
 
@@ -542,7 +544,7 @@ def run_action(
 
     read, prompt = _prepare(prompt_template, action, config, workspace, audit, run_id, uses_context)
 
-    completion = _ask(prompt, action, config, provider, audit, run_id, temperature)
+    completion = _ask(prompt, action, config, provider, audit, run_id, temperature, schema)
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})
 
     checked: tuple[CheckedClaim, ...] = ()
@@ -812,6 +814,7 @@ def run_in_passes(
     progress: ProgressFn | None = None,
     fields: tuple[str, ...] = ("claim", "quote", "page"),
     quote_field: str = "quote",
+    schema: dict[str, Any] | None = None,
 ) -> RunResult:
     """Read one document in as many passes as the window needs, and answer from all of them.
 
@@ -897,6 +900,7 @@ def run_in_passes(
             audit,
             run_id,
             temperature,
+            schema,
         )
         answers.append(completion.text)
         asked += completion.answer_tokens or 0
@@ -987,6 +991,7 @@ def run_skill(
             progress,
             plan.fields,
             plan.quote_field,
+            plan.output_schema,
         )
     return run_action(
         plan.action,
@@ -1005,4 +1010,5 @@ def run_skill(
         plan.uses_context,
         plan.fields,
         plan.quote_field,
+        plan.output_schema,
     )

@@ -7,6 +7,7 @@ crosses it live here; every engine that satisfies it lives under `adapters` (ADR
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -47,7 +48,12 @@ class Provider(ABC):
         """Short identifier recorded on completions this provider produces."""
 
     @abstractmethod
-    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
+    def complete(
+        self,
+        prompt: str,
+        temperature: float = 0.0,
+        schema: dict[str, Any] | None = None,
+    ) -> Completion:
         """Return a completion for ``prompt``.
 
         ``temperature`` is per request because it is a property of the task, not of the

@@ -11,6 +11,7 @@ Everything in this module is a pure function over text.
 from __future__ import annotations
 
 import difflib
+import json
 import re
 from typing import Literal
 
@@ -138,6 +139,46 @@ class CheckedClaim(BaseModel):
         )
 
 
+def _from_json(text: str, fields: tuple[str, ...], quote_field: str) -> tuple[Claim, ...] | None:
+    """Read an answer the engine was made to shape, or return nothing and let lines be tried.
+
+    Returns ``None`` rather than an empty tuple when this is not JSON, so that a model which
+    ignored a schema - or a provider that could not enforce one - still gets parsed the way
+    it always was. Enforcement improves a path that works; it does not replace it (ADR-052).
+    """
+    stripped = text.strip()
+    if not stripped.startswith("{"):
+        return None
+    try:
+        loaded = json.loads(stripped)
+    except ValueError:
+        return None
+    entries = loaded.get("entries") if isinstance(loaded, dict) else None
+    if not isinstance(entries, list):
+        return None
+
+    describes = next((name for name in fields if name != quote_field), fields[0] if fields else "")
+    claims: list[Claim] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        said, quoted = (
+            str(entry.get(describes, "")).strip(),
+            str(entry.get(quote_field, "")).strip(),
+        )
+        if not said or not quoted:
+            continue
+        digits = "".join(c for c in str(entry.get("page", "")) if c.isdigit())
+        claims.append(
+            Claim(
+                claim=said,
+                quote=quoted.strip("\"'" + chr(0x201C) + chr(0x201D)),
+                page=int(digits) if digits else None,
+            )
+        )
+    return tuple(claims)
+
+
 def parse_claims(
     text: str,
     fields: tuple[str, ...] = ("claim", "quote", "page"),
@@ -155,6 +196,10 @@ def parse_claims(
     words, and it is the only one that gets checked - everything else is the model's prose
     and is returned for a person to read.
     """
+    structured = _from_json(text, fields, quote_field)
+    if structured is not None:
+        return structured
+
     claims: list[Claim] = []
     current: dict[str, str] = {}
     opens = fields[0] if fields else "claim"

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
+from typing import Any
 
 from local_ai_control_center.ports.provider import Completion, Provider
 
@@ -30,7 +31,12 @@ class MockProvider(Provider):
         """Identify completions produced by this provider."""
         return "mock"
 
-    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
+    def complete(
+        self,
+        prompt: str,
+        temperature: float = 0.0,
+        schema: dict[str, Any] | None = None,
+    ) -> Completion:
         """Return the scripted answer for ``prompt``, or a derived one.
 
         ``temperature`` is accepted and ignored: this provider is already deterministic,

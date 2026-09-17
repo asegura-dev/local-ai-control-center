@@ -173,7 +173,12 @@ class OllamaProvider(Provider):
         """Identify completions produced by this provider."""
         return f"ollama:{self._model}"
 
-    def complete(self, prompt: str, temperature: float = 0.0) -> Completion:
+    def complete(
+        self,
+        prompt: str,
+        temperature: float = 0.0,
+        schema: dict[str, Any] | None = None,
+    ) -> Completion:
         """Send the prompt to Ollama and return the complete response.
 
         Translates connection, model, and timeout failures into clear messages.
@@ -188,6 +193,10 @@ class OllamaProvider(Provider):
         if self._context_tokens is not None:
             options["num_ctx"] = self._context_tokens
         payload["options"] = options
+        if schema is not None:
+            # The engine constrains decoding to this, so the shape stops being a request
+            # and becomes something the model cannot emit its way around (ADR-052).
+            payload["format"] = schema
         body = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(
             url, data=body, headers={"Content-Type": "application/json"}

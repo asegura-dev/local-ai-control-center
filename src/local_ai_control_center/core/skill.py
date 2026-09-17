@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -95,6 +96,45 @@ class SkillPlan(BaseModel):
 
     A declaration chooses the label. It cannot choose how the checking is done.
     """
+
+    enforce_shape: bool = False
+    """Whether the engine should be made to produce exactly these fields.
+
+    Off by default, and turned on per skill after measuring it. Constraining decoding can
+    fight the way a model composes, and a format that arrives perfectly with worse content
+    inside would be a loss reported as a win (ADR-052).
+    """
+
+    @property
+    def output_schema(self) -> dict[str, Any] | None:
+        """A JSON schema for this skill's fields, or nothing when it does not enforce one.
+
+        Not called `schema`: Pydantic's BaseModel has a deprecated classmethod by that name,
+        and shadowing it would have been a silent collision rather than an error.
+
+        Generated from the fields the skill already declares, so nothing is authored twice.
+        An array of entries, each an object, because every skill here returns a list of
+        blocks rather than a single answer.
+        """
+        if not self.enforce_shape or not self.fields:
+            return None
+        properties = {name: {"type": "string"} for name in self.fields}
+        return {
+            "type": "object",
+            "properties": {
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": properties,
+                        "required": [self.fields[0], self.quote_field]
+                        if self.quote_field in self.fields
+                        else [self.fields[0]],
+                    },
+                }
+            },
+            "required": ["entries"],
+        }
 
     uses_context: bool = False
     """Whether the standing context file belongs in this skill's prompt.
