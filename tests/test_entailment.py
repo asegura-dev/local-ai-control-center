@@ -121,3 +121,17 @@ def test_the_real_case_is_the_first_seed() -> None:
     assert first["verdict"] == "neither"
     assert "choline" in first["quotation"]
     assert "PSMA" in first["claim"]
+
+
+def test_the_binary_is_what_a_report_should_lead_with() -> None:
+    """Measured on eight pairs: the three-way label was right six times and the binary eight.
+
+    Both errors came with correct reasoning attached to the wrong label - a quotation about
+    choline read as PSMA was called `contradicts` where the answer is `neither`. The judge
+    finds the problem and misnames it, so a report leads with whether somebody should look
+    and gives the label beside it (ADR-053).
+    """
+    for verdict in ("contradicts", "neither"):
+        judged = Judgement(verdict=verdict)  # type: ignore[arg-type]
+        assert judged.worth_a_look, "both kinds of problem must reach a person"
+        assert not judged.supported

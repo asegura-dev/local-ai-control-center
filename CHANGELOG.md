@@ -32,11 +32,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check paraphrases would cost everyone who never uses it. A purpose-built entailment model
   stays possible behind the same port, once a measurement justifies the dependency.
 
-  **No figure from it will be published until it is graded** against eight pairs whose labels
-  were written by a person first, the same demand ADR-044 made of the quotation check. The
-  first seed is the real case above.
+  **Graded before anything was claimed for it**, against eight pairs labelled by a person
+  first. The three-way label is right 6 of 8; the binary "should somebody look at this" is
+  right **8 of 8**, with no false alarm on the 3 readings that were fine.
+
+  Both errors are the same shape and came with correct reasoning attached to the wrong
+  label - on the choline pair it answered *contradicts* where the answer is *neither*,
+  explaining that the sentence names choline and the reading names PSMA. **It finds the
+  problem and misnames it.** So reports lead with the binary and give the label beside it.
+
+  Eight pairs is not a measurement of anything general; it is enough to say the label is
+  weaker than the binary, and not enough to publish a rate. Over 548 claims it costs about
+  thirty-six minutes.
 
 ### Fixed
+- **The generation timeout budgeted for writing and nothing for reading.** It derived from
+  `answer_reserve` alone, so a full answer at the slowest measured rate used the entire
+  budget and left zero for processing the prompt. A run with a 15,205-token prompt on a
+  model that does not fit its card was killed **twice** at 2,730 seconds while it was still
+  working: the answer cap and the timeout were fighting each other, and the timeout was the
+  one that was wrong.
+
+  Both halves are counted now, with prompt tokens charged at the same rate as generated ones
+  - pessimistic, and the right direction for a limit whose job is to not kill work that is
+  progressing. The cost is that a hung engine on a large prompt is given up on after hours
+  rather than minutes, which is the price of the alternative having been measured.
+
 - **The answer reserve was subtracted from the window and never imposed on the answer.**
   `answer_reserve` appears in seven places, all of them deciding whether a prompt fits;
   `num_predict` appeared nowhere. LACC held back 8,192 tokens for the answer, refused

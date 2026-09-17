@@ -402,3 +402,30 @@ def test_without_a_configured_window_nothing_is_capped() -> None:
     assert isinstance(options, dict)
     assert "num_predict" not in options
     assert "num_ctx" not in options
+
+
+def test_the_timeout_counts_reading_the_prompt_as_well_as_writing() -> None:
+    """Deriving it from the reserve alone left nothing for the prompt, and killed a run
+    twice at 2,730 seconds while it was still working: the answer cap and the timeout were
+    fighting, and the timeout was the one that was wrong."""
+    from local_ai_control_center.adapters.ollama import generation_timeout
+
+    bare = generation_timeout(32768)
+    with_prompt = generation_timeout(32768, 15_205)
+    assert bare == 8192 // 3
+    assert with_prompt == (15_205 + 8192) // 3
+    assert with_prompt > bare, "a long prompt must buy time, not spend it"
+
+
+def test_a_window_nobody_named_gets_the_floor() -> None:
+    from local_ai_control_center.adapters.ollama import generation_timeout
+
+    assert generation_timeout(None) == 300
+    assert generation_timeout(None, 50_000) == 300, "no window, no budget to derive from"
+
+
+def test_a_tiny_window_never_falls_below_the_floor() -> None:
+    """Shorter than a model load is not a timeout, it is a coin toss."""
+    from local_ai_control_center.adapters.ollama import generation_timeout
+
+    assert generation_timeout(1024) == 300

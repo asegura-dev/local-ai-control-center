@@ -164,6 +164,14 @@ aside.
 What choosing sections *did* buy was the document at all: sixteen passes that failed twice
 and cost fifty-five minutes became four calls and 5.7 minutes.
 
+**A judge of readings finds the problem and misnames it.** The gap ADR-026 left - a
+quotation is checked, the paraphrase above it never is - produced a live failure: a 14B
+attributed choline PET/CT's figures to PSMA above a quotation that names choline, and every
+mechanical control here passed it. A judge graded on eight pairs labelled in advance gets the
+three-way label right 6 times, the binary "should somebody look at this" right 8 times, and
+raises no false alarm on the 3 readings that were fine. Both its errors came with correct
+reasoning attached to the wrong label. The reporting leads with the binary for that reason.
+
 ## How to read a figure from this project
 
 **Ask what the check could not see.** Six of the seven wrong figures above were the check

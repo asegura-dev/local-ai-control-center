@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted, and graded. The measurement is at the end and it changes how the verdict is
+reported: the three-way label is unreliable and the binary under it is not.
 
 ## Context
 
@@ -80,3 +81,30 @@ follow from its quotation. It cannot say whether the claim is true, or whether t
 right, or whether the quotation was fairly chosen from its context. The first of those is
 outside any tool; the third is a gap this opens and does not close - a quotation can entail
 its paraphrase perfectly and still misrepresent the paper it came from.
+
+## Graded (v1.4.0)
+
+Eight pairs, labelled by a person before the judge existed. A 14B, temperature zero, four
+seconds a pair.
+
+| question | right |
+|---|---|
+| which kind of problem is this? | **6 of 8** |
+| **should a person look at this?** | **8 of 8** |
+| false alarms on readings that were fine | **0 of 3** |
+
+Both errors are the same shape, and the reasoning behind them was correct. On the pair this
+port exists for - a quotation about choline read as PSMA - it answered `contradicts` where the
+answer is `neither`, explaining: *"The sentence refers to 'choline PET/CT', whereas the
+reading mentions 'PSMA PET/CT'. These are different."* **It found the problem and misnamed
+it.** The same happened on a single-centre finding widened into a claim about the method in
+general.
+
+**So the three-way label is a hint and the binary is the finding.** Reports lead with "a
+person should read this before citing it" and give the label beside it, because the
+distinction between *says otherwise* and *does not settle it* is where this judge is weak and
+the distinction between *fine* and *not fine* is where it is not.
+
+Eight pairs is not a measurement of anything general. It is enough to say the label is
+weaker than the binary, which is what the reporting now reflects, and not enough to publish a
+rate. Over 548 claims this costs about thirty-six minutes.

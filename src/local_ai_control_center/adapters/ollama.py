@@ -20,7 +20,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from local_ai_control_center.core.budget import answer_reserve
+from local_ai_control_center.core.budget import answer_reserve, estimate_tokens
 from local_ai_control_center.core.config import is_loopback, normalized_host
 from local_ai_control_center.ports.provider import Completion, Provider, ProviderError
 
@@ -37,22 +37,30 @@ _MINIMUM_GENERATE_TIMEOUT = 300
 """Floor, for windows small enough that the derivation would be shorter than a model load."""
 
 
-def generation_timeout(context_tokens: int | None) -> int:
-    """How long one generation may legitimately take, from the window it was given.
+def generation_timeout(context_tokens: int | None, prompt_tokens: int = 0) -> int:
+    """How long one call may legitimately take: reading the prompt, then writing the answer.
 
-    The window bounds the answer through `answer_reserve`; the slowest measured rate turns
-    that bound into a time. A fixed number is unrelated to the work asked for and was wrong
-    in both directions: 300 seconds refused passes that were still being generated at 252,
-    and reported them as an engine that could not be reached (ADR-046).
+    A fixed number was unrelated to the work asked for and wrong in both directions: 300
+    seconds refused passes still being generated at 252 (ADR-046).
 
-    A hung engine therefore costs this long before it is given up on. That is the price of
-    not abandoning work that is merely slow.
+    **Deriving it from the reserve alone was wrong too, and for a subtler reason.** The
+    answer is capped at `answer_reserve`, so a full answer at the slowest measured rate takes
+    `reserve / rate` seconds - and that budget left nothing for reading the prompt. A run
+    with a 15,205-token prompt on a model that does not fit its card was killed twice at
+    2,730 seconds while it was still working. The cap and the timeout were fighting, and the
+    timeout was the one that was wrong.
+
+    Both halves are counted now. Prompt tokens are charged at the same rate as generated
+    ones, which is pessimistic - reading is usually faster than writing - and pessimistic is
+    the right direction for a limit whose job is to not kill work that is progressing.
+
+    A hung engine costs this long before it is given up on, and on a large prompt that is
+    hours. That price is paid because the alternative was measured: work abandoned twice.
     """
     if context_tokens is None:
         return _MINIMUM_GENERATE_TIMEOUT
-    return max(
-        _MINIMUM_GENERATE_TIMEOUT, answer_reserve(context_tokens) // _SLOWEST_TOKENS_PER_SECOND
-    )
+    work = prompt_tokens + answer_reserve(context_tokens)
+    return max(_MINIMUM_GENERATE_TIMEOUT, work // _SLOWEST_TOKENS_PER_SECOND)
 
 
 _NOT_LOOPBACK = (
@@ -209,7 +217,7 @@ class OllamaProvider(Provider):
         )
 
         try:
-            limit = generation_timeout(self._context_tokens)
+            limit = generation_timeout(self._context_tokens, estimate_tokens(prompt))
             with urllib.request.urlopen(request, timeout=limit) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
