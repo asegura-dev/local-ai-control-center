@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **A skill can be written down in a file** (ADR-048). A name, a summary, the instructions,
+  and the fields the answer should carry. LACC loads it beside the built-in ones, and a skill
+  for a seminar summary or an assumption audit becomes a file rather than a release.
+
+  **The structure is generated from the declared fields, not written by hand**, and that is
+  the decision rather than a convenience. Measured: a model asked to cover 24 documents
+  covered 10, and returned 23 when the same request came as a skeleton with 24 slots; told
+  explicitly not to invent a field it invented twelve. Structure is obeyed and instruction is
+  negotiated, so the structure is the part that cannot be handed over.
+
+  What a declaration may not do is the rest of the decision. It cannot grant itself anything
+  beyond reading, cannot replace a built-in skill, cannot define a new kind of check - it may
+  only name which field carries the quotation and opt into the existing one - and it lives
+  beside the configuration, never in the workspace where documents live. The preview says
+  out loud that a declared skill's wording was reviewed by nobody but its author.
+
+- **`lacc collect` says when it has finished.** The command that runs for an hour was the
+  only long one that did not notify, while `lacc run` notified after a minute. The message
+  carries counts and not names: how many papers somebody read is a smaller disclosure than
+  which ones, and a notification travels further than a terminal does.
+
 ## [1.3.0] - 2026-09-17
 
 Grading the check against answers known in advance, and stopping two places where a

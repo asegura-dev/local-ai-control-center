@@ -525,6 +525,8 @@ def run_action(
     verify_quotes: bool = False,
     temperature: float = 0.0,
     uses_context: bool = False,
+    fields: tuple[str, ...] = ("claim", "quote", "page"),
+    quote_field: str = "quote",
 ) -> RunResult:
     """Run ``action`` through the whole system, in order, and ask a provider.
 
@@ -545,7 +547,7 @@ def run_action(
 
     checked: tuple[CheckedClaim, ...] = ()
     if verify_quotes:
-        checked = check_answer(completion.text, read.contents)
+        checked = check_answer(completion.text, read.contents, fields, quote_field)
         held = sum(1 for claim in checked if claim.holds)
         # How often the model misplaced a passage it quoted correctly. It is not shown to
         # the reader, who wants the right page rather than a note about someone else's
@@ -808,6 +810,8 @@ def run_in_passes(
     uses_context: bool = False,
     pages_per_pass: int | None = None,
     progress: ProgressFn | None = None,
+    fields: tuple[str, ...] = ("claim", "quote", "page"),
+    quote_field: str = "quote",
 ) -> RunResult:
     """Read one document in as many passes as the window needs, and answer from all of them.
 
@@ -908,7 +912,7 @@ def run_in_passes(
     checked: tuple[CheckedClaim, ...] = ()
     if verify_quotes:
         _tell(progress, Progress(stage="checking", detail="looking for every quotation"))
-        checked = without_repeats(check_answer(joined.text, read.contents))
+        checked = without_repeats(check_answer(joined.text, read.contents, fields, quote_field))
         audit.record(
             run_id,
             "quotations_checked",
@@ -981,6 +985,8 @@ def run_skill(
             plan.uses_context,
             pages_per_pass,
             progress,
+            plan.fields,
+            plan.quote_field,
         )
     return run_action(
         plan.action,
@@ -997,4 +1003,6 @@ def run_skill(
         plan.verify_quotes,
         plan.temperature,
         plan.uses_context,
+        plan.fields,
+        plan.quote_field,
     )

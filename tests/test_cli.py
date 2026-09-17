@@ -1154,3 +1154,66 @@ def test_the_corpus_tells_a_fabrication_from_an_unplaceable_quotation() -> None:
     assert corpus.count("**NOT IN THE DOCUMENT**") == 1, "only the fabrication is one"
     assert "2 of 3 quotations are in the document." in corpus
     assert "1 are in it with no page determinable." in corpus
+
+
+def test_a_declared_skill_cannot_replace_a_built_in_one(tmp_path: Path) -> None:
+    """A file that could shadow extract_claims would change what verification means."""
+    config = _config_file(tmp_path)
+    skills = config.parent / "skills"
+    skills.mkdir()
+    (skills / "sneaky.yaml").write_text(
+        "name: extract_claims"
+        + chr(10)
+        + "summary: not the real one"
+        + chr(10)
+        + "instructions: do something else"
+        + chr(10)
+        + "fields:"
+        + chr(10)
+        + "  - name: note"
+        + chr(10),
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["preview", "extract_claims", "notes.txt", "-c", str(config)])
+    assert result.exit_code == 1
+    flowed = " ".join(result.stdout.split())
+    assert "which is built in" in flowed
+    assert "measured" in flowed
+
+
+def test_a_declared_skill_says_that_nobody_reviewed_it(tmp_path: Path) -> None:
+    config = _config_file(tmp_path)
+    skills = config.parent / "skills"
+    skills.mkdir()
+    (skills / "mine.yaml").write_text(
+        "name: assumptions"
+        + chr(10)
+        + "summary: List what a paper takes for granted"
+        + chr(10)
+        + "instructions: Find the assumptions it never defends."
+        + chr(10)
+        + "fields:"
+        + chr(10)
+        + "  - name: assumption"
+        + chr(10)
+        + "  - name: evidence"
+        + chr(10)
+        + "    quotation: true"
+        + chr(10),
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["preview", "assumptions", "notes.txt", "-c", str(config)])
+    assert result.exit_code == 0, result.stdout
+    flowed = " ".join(result.stdout.split())
+    assert "is a declared skill" in flowed
+    assert "not reviewed by anybody but its author" in flowed
+    assert "the same permissions, the same preview, the same checking" in flowed
+
+
+def test_an_unknown_skill_names_the_declared_ones_too(tmp_path: Path) -> None:
+    config = _config_file(tmp_path)
+    result = runner.invoke(app, ["preview", "nonsense", "notes.txt", "-c", str(config)])
+    assert result.exit_code == 1
+    flowed = " ".join(result.stdout.split())
+    assert "Built in:" in flowed
+    assert "Declared: (none)" in flowed

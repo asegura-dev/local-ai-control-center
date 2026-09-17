@@ -37,6 +37,11 @@ from local_ai_control_center.adapters.ollama import (
 from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
 from local_ai_control_center.core.corpus import CollectedClaim, about, parse_corpus
+from local_ai_control_center.core.declared import (
+    DeclarationError,
+    FileSkill,
+    load_declared_skills,
+)
 from local_ai_control_center.core.grounding import Claim, check_claim
 from local_ai_control_center.core.headings import headings_in, matching
 from local_ai_control_center.core.passes import PageRangeError
@@ -108,14 +113,48 @@ class ProviderChoice(StrEnum):
     mock = "mock"
 
 
-def _resolve_skill(name: str) -> Skill:
+def _known_skills(config_path: Path) -> dict[str, Skill]:
+    """The built-in skills, plus any declared beside the configuration (ADR-048).
+
+    A declaration cannot replace a built-in one. The five in code had their wording measured
+    and their decisions argued in records; a file that could shadow `extract_claims` would
+    let somebody change what verification means by putting a file somewhere.
+    """
+    known: dict[str, Skill] = dict(_SKILLS)
+    try:
+        declared = load_declared_skills(config_path)
+    except DeclarationError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+    for skill in declared:
+        if skill.name in _SKILLS:
+            console.print(
+                f"[red]A declared skill is named {skill.name}, which is built in.[/red] "
+                "Rename it: a file must not be able to replace a skill whose behaviour was "
+                "measured."
+            )
+            raise typer.Exit(code=1)
+        known[skill.name] = skill
+    return known
+
+
+def _resolve_skill(name: str, config_path: Path = DEFAULT_CONFIG_PATH) -> Skill:
     """Look up a skill by name, or exit with the list of known skills."""
-    skill = _SKILLS.get(name)
+    known = _known_skills(config_path)
+    skill = known.get(name)
     if skill is None:
-        available = ", ".join(sorted(_SKILLS)) or "(none)"
+        built_in = ", ".join(sorted(_SKILLS))
+        declared = ", ".join(sorted(set(known) - set(_SKILLS)))
         console.print(f"[red]Unknown skill:[/red] {name}")
-        console.print(f"Available skills: {available}")
+        console.print(f"Built in: {built_in}")
+        console.print(f"Declared: {declared or '(none)'}")
         raise typer.Exit(code=1)
+    if isinstance(skill, FileSkill):
+        console.print(
+            f"[yellow]{name} is a declared skill.[/yellow] Its wording came from a file and "
+            "was not reviewed by anybody but its author. What it may do is unchanged: the "
+            "same permissions, the same preview, the same checking."
+        )
     return skill
 
 
@@ -272,7 +311,7 @@ def run(
     ] = None,
 ) -> None:
     """Plan a skill, preview it, confirm, then execute and record it."""
-    resolved = _resolve_skill(skill)
+    resolved = _resolve_skill(skill, config_path)
     config, workspace = _load(config_path)
     audit = AuditLog(workspace, config)
 
@@ -592,6 +631,7 @@ def _announce(
     config: Config,
     audit: AuditLog,
     run_id: str,
+    body: str = "",
 ) -> None:
     """Tell the configured notifier that a run finished.
 
@@ -610,7 +650,7 @@ def _announce(
 
     notification = Notification(
         title=f"LACC: {skill_name} {outcome}",
-        body=f"{skill_name} {outcome} after {elapsed:.0f}s",
+        body=body or f"{skill_name} {outcome} after {elapsed:.0f}s",
         tags=(_OUTCOME_TAGS.get(outcome, "bell"),),
     )
     delivery = notifier.send(notification)
@@ -639,7 +679,7 @@ def preview(
     ] = DEFAULT_CONFIG_PATH,
 ) -> None:
     """Show what a skill would do, without asking, executing, or recording."""
-    resolved = _resolve_skill(skill)
+    resolved = _resolve_skill(skill, config_path)
     config, workspace = _load(config_path)
     plan = _plan_or_exit(resolved, tuple(requests), config)
     result = preview_action(
@@ -1023,7 +1063,7 @@ def measure(
     doing work, so it refuses any skill that writes and never varies the action between
     repetitions (ADR-032). One preview, one confirmation, covering all of them.
     """
-    resolved = _resolve_skill(skill)
+    resolved = _resolve_skill(skill, config_path)
     if "write_files" in resolved.required:
         console.print(
             f"[red]{skill} writes files, and measuring must not act.[/red] Repeating an "
@@ -1183,6 +1223,30 @@ def _collected_markdown(
     return chr(10).join(lines) + chr(10)
 
 
+def _announce_the_traverse(
+    skill_name: str,
+    gathered: list[tuple[str, RunResult | str]],
+    started: float,
+    config: Config,
+    audit: AuditLog,
+    outcome: str,
+) -> None:
+    """Say that a traverse across many documents finished, and what it found.
+
+    The body carries counts rather than names. How many papers somebody read is a smaller
+    disclosure than which ones, and a notification travels further than a terminal does -
+    even to a server you host yourself (ADR-027).
+    """
+    done = [outcome_ for _, outcome_ in gathered if isinstance(outcome_, RunResult)]
+    quotations = sum(len(result.checked_claims) for result in done)
+    found = sum(1 for result in done for claim in result.checked_claims if claim.found)
+    body = (
+        f"{len(done)} of {len(gathered)} documents, {found} of {quotations} quotations in "
+        f"their source, after {(time.monotonic() - started) / 60:.0f} min"
+    )
+    _announce(skill_name, outcome, time.monotonic() - started, config, audit, new_run_id(), body)
+
+
 @app.command()
 def collect(
     skill: Annotated[str, typer.Argument(help="Name of the skill to run on each document.")],
@@ -1221,7 +1285,7 @@ def collect(
     to itself, which also makes it impossible for a quotation to be attributed to the wrong
     paper: the source is a fact about which run produced it (ADR-039).
     """
-    resolved = _resolve_skill(skill)
+    resolved = _resolve_skill(skill, config_path)
     config, workspace = _load(config_path)
     if not resolved.plan((requests[0],), config).verify_quotes:
         console.print(
@@ -1256,6 +1320,7 @@ def collect(
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 
+    started = time.monotonic()
     gathered: list[tuple[str, RunResult | str]] = []
     with console.status("Collecting...") as status:
         for index, request in enumerate(requests, start=1):
@@ -1289,8 +1354,13 @@ def collect(
     try:
         write_new_file(destination, _collected_markdown(resolved.name, config.model, gathered))
     except ConversionError as error:
+        _announce_the_traverse(resolved.name, gathered, started, config, audit, "failed")
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
+
+    # The command that runs for an hour is the one that most needs to say it finished, and
+    # until now it was the only long one that did not.
+    _announce_the_traverse(resolved.name, gathered, started, config, audit, "completed")
 
     failed = [name for name, outcome in gathered if isinstance(outcome, str)]
     verified = sum(

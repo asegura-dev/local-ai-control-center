@@ -138,24 +138,36 @@ class CheckedClaim(BaseModel):
         )
 
 
-def parse_claims(text: str) -> tuple[Claim, ...]:
+def parse_claims(
+    text: str,
+    fields: tuple[str, ...] = ("claim", "quote", "page"),
+    quote_field: str = "quote",
+) -> tuple[Claim, ...]:
     """Read the claims a model returned, skipping anything malformed.
 
     Line-oriented rather than JSON, because a small local model follows it far more
     reliably and a malformed block costs one claim instead of the whole answer. A block
     without both a claim and a quotation is dropped: there is nothing to check.
+
+    ``fields`` are the labels to look for, in order, and the first of them starts a new
+    block. A skill declared in a file names its own (ADR-048); the defaults are what the
+    built-in skills ask for. ``quote_field`` says which label carries the document's own
+    words, and it is the only one that gets checked - everything else is the model's prose
+    and is returned for a person to read.
     """
     claims: list[Claim] = []
     current: dict[str, str] = {}
+    opens = fields[0] if fields else "claim"
+    describes = next((name for name in fields if name != quote_field), opens)
 
     def flush() -> None:
-        if "claim" in current and "quote" in current:
+        if describes in current and quote_field in current:
             raw_page = current.get("page", "")
             digits = "".join(character for character in raw_page if character.isdigit())
             claims.append(
                 Claim(
-                    claim=current["claim"],
-                    quote=current["quote"].strip("\"'“”"),
+                    claim=current[describes],
+                    quote=current[quote_field].strip("\"'“”"),
                     page=int(digits) if digits else None,
                 )
             )
@@ -167,10 +179,10 @@ def parse_claims(text: str) -> tuple[Claim, ...]:
         # quotations verify none of them, and report that it had.
         stripped = line.strip().lstrip("*_#- ")
         lowered = stripped.lower()
-        for field in ("claim", "quote", "page"):
+        for field in fields:
             if lowered.startswith(f"{field}:") or lowered.startswith(f"{field}**:"):
                 _, _, value = stripped.partition(":")
-                if field == "claim":
+                if field == opens:
                     flush()
                 current[field] = value.strip().lstrip("*_ ").strip()
                 break
@@ -359,6 +371,16 @@ def without_repeats(claims: tuple[CheckedClaim, ...]) -> tuple[CheckedClaim, ...
     return tuple(kept)
 
 
-def check_answer(answer: str, source: str) -> tuple[CheckedClaim, ...]:
-    """Parse an answer into claims and check every quotation against ``source``."""
-    return tuple(check_claim(claim, source) for claim in parse_claims(answer))
+def check_answer(
+    answer: str,
+    source: str,
+    fields: tuple[str, ...] = ("claim", "quote", "page"),
+    quote_field: str = "quote",
+) -> tuple[CheckedClaim, ...]:
+    """Parse an answer into claims and check every quotation against ``source``.
+
+    The field names come from the skill, so a declared one is checked by the same code as a
+    built-in one. A declaration chooses which label carries the quotation; it cannot choose
+    how the checking is done (ADR-048).
+    """
+    return tuple(check_claim(claim, source) for claim in parse_claims(answer, fields, quote_field))

@@ -82,6 +82,19 @@ class SkillPlan(BaseModel):
     verify_quotes: bool = False
     """Whether the answer's quotations should be checked against the source (ADR-026)."""
 
+    fields: tuple[str, ...] = ("claim", "quote", "page")
+    """The labels this skill asks the model to return, in order.
+
+    The first opens a block. A skill declared in a file names its own; the default is what
+    the built-in skills ask for (ADR-048).
+    """
+
+    quote_field: str = "quote"
+    """Which label carries the document's own words, and is therefore what gets checked.
+
+    A declaration chooses the label. It cannot choose how the checking is done.
+    """
+
     uses_context: bool = False
     """Whether the standing context file belongs in this skill's prompt.
 
