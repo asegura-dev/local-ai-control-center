@@ -75,6 +75,27 @@ left this unstated (ADR-043).
 
 ## What is measured and currently holds
 
+**The check, graded where the answer was known first.** Twelve quotations were written into
+a fixture corpus and marked real or seeded **by a person, before any check ran**: six that
+are in their document and six that are not. The check finds six of six and flags none of
+the six real ones. The assertion is exact in both directions, because reporting a limit as a
+catch is the failure the corpus exists for (ADR-044).
+
+**This is the only figure here whose answer was known in advance**, and it grades the
+detector rather than the model. Everything else in this chapter is an observation of a run.
+
+The corpus was itself checked by breaking the code on purpose, since a test that has never
+failed has not been shown to test anything. Disabling the spacing fold loses the
+letter-spaced quotation; disabling marker stripping loses the one that spans a page break;
+disabling normalisation loses both typesetting cases; a check that answered "found" to
+everything accepts all six seeded fabrications. Every seed is caught by at least one
+mutation, which is what makes the six-of-six meaningful.
+
+Its limits are written into the fixture beside the data: it grades whether a quotation's
+words are in a document, never whether what it says is true, and it measures the detector
+against the fabrications somebody thought to seed.
+
+
 **One quotation in five is invented.** On 24 papers of a real bibliography, a 14B model at
 temperature zero produced 237 quotations; 48 are not in the document they cite, and 44 of
 those are not present in any form tried - not stitched from separate sentences, not

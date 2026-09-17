@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted.
+Accepted, and built in v1.3.0. One deviation, recorded here rather than left to be noticed:
+the letter-spacing row was to be committed **failing first**, so the record would show the
+test finding the defect. It was not. The defect was found by re-measuring a corpus and fixed
+in v1.2.0, weeks before this fixture existed, so the row is a regression test rather than a
+discovery. The intent stands for the next defect.
 
 ## Context
 

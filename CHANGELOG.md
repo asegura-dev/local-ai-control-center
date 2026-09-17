@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **A fixture corpus whose answer was known before the check ran** (ADR-044, decided weeks
+  ago and deliberately not built until now). Twelve quotations across four small documents,
+  marked real or seeded by a person in `tests/fixtures/seeded/truth.yaml` - data beside the
+  fixture rather than assertions inside a test, so somebody auditing this can grade the
+  grader without reading the code that consumes it.
+
+  **Six of six seeded fabrications are caught, and none of the six real quotations is
+  flagged.** The assertion is exact in both directions: flagging a real quotation fails as
+  hard as missing a fake, because reporting a limit as a catch is the failure the corpus
+  exists for.
+
+  This is now the only figure this project publishes whose answer was known in advance.
+  Every other rate here was measured against real papers where nobody knew it, which is the
+  condition that produced nine wrong figures.
+
+  The corpus was verified by breaking the code on purpose. Disabling the spacing fold loses
+  the letter-spaced quotation; disabling marker stripping loses the one spanning a page
+  break; disabling normalisation loses both typesetting cases; a check answering "found" to
+  everything accepts all six fabrications. A test that has never failed has not been shown
+  to test anything.
+
 ## [1.2.0] - 2026-09-16
 
 Choosing what to read, and finding out that choosing better did not help the way it was

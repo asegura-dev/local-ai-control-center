@@ -1,0 +1,89 @@
+# Ground truth for the seeded corpus (ADR-044).
+#
+# Every quotation below is marked real or seeded, by a person, before any check ran. This
+# file is the grader. It is data rather than assertions inside a test so that somebody
+# auditing this project can read what the expected answer is without reading the code that
+# consumes it - because grading the grader is the point.
+#
+# `real: true`  - these words are in that document, and `check_claim` must find them.
+# `real: false` - these words are not, and `check_claim` must not find them.
+#
+# The assertion is exact in both directions. Flagging a real quotation fails as hard as
+# missing a seeded one: reporting a limit as a catch is the failure this corpus exists for.
+#
+# Not covered here, deliberately: page furniture (ADR-036). A running header extracted into
+# the middle of a sentence is an ingestion defect and is graded by the converter's own
+# tests. This corpus grades `check_claim`, which sees text after ingestion has finished
+# with it, and a fixture that blamed the check for what the converter produced would be the
+# same mistake in a new place.
+
+documents:
+  - file: spanning.md
+    note: A quotation running across a page break is the case ADR-042 exists for.
+    quotations:
+      - real: true
+        seed: plain sentence, wholly on one page
+        page: 1
+        quote: The sensitivity of the method was ninety four per cent in the derivation cohort.
+
+      - real: true
+        seed: spans the break between page 1 and page 2, with a marker sitting inside it
+        page: 1
+        quote: A consistent protocol improves comparability across sites and reduces the variance attributed to acquisition.
+
+      - real: false
+        seed: one number changed - the failure that matters most, since the figure is what gets copied into a table
+        quote: The sensitivity of the method was ninety six per cent in the derivation cohort.
+
+      - real: false
+        seed: one word changed, everything else faithful
+        quote: The specificity of the method was ninety four per cent in the derivation cohort.
+
+      - real: false
+        seed: two real sentences from different parts of the document joined into one quotation - observed once in a real corpus
+        quote: Prostate cancer staging depends on accurate nodal assessment. Later sections describe the reference standard used throughout.
+
+  - file: typeset.md
+    note: Typesetting differences a reader cannot see (ADR-034, ADR-035).
+    quotations:
+      - real: true
+        seed: the typesetter broke `sensi- tivity` across a line; the quotation is faithful
+        page: 1
+        quote: The reported sensitivity reached seventy-six per cent across the cohort.
+
+      - real: true
+        seed: source has an en-dash and curly quotes; a model writes the ASCII a keyboard has
+        page: 1
+        quote: Values ranged from 12-18 months, and the authors called this a "substantial" improvement.
+
+      - real: false
+        seed: the unit changed from months to weeks, with the typography otherwise identical
+        quote: Values ranged from 12-18 weeks, and the authors called this a "substantial" improvement.
+
+  - file: letter-spaced.md
+    note: >
+      Extraction spaced glyphs rather than words (ADR-046). This row failed on the code as
+      it stood when ADR-044 was written; it was fixed in v1.2.0 and is kept as a regression.
+    quotations:
+      - real: true
+        seed: source reads `A c c o r d i n gt o`; the quotation is what a reader sees
+        page: 1
+        quote: According to the average of three healthy volunteers, the radiation dose was low.
+
+      - real: false
+        seed: same spacing defect, and the number changed from three to five
+        quote: According to the average of five healthy volunteers, the radiation dose was low.
+
+  - file: no-markers.md
+    note: >
+      Anything LACC did not ingest has no pages. A real quotation from such a source must
+      still be found - `found` and `holds` are different questions (ADR-042).
+    quotations:
+      - real: true
+        placeable: false
+        seed: present in the document, and no page can be named because there are none
+        quote: A quotation from it is real and cannot be placed.
+
+      - real: false
+        seed: one word changed in a source that has no pages either way
+        quote: A quotation from it is false and cannot be placed.
