@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A run says where it has got to.** Reading a 251-page document takes sixteen calls and
+  twenty minutes, and until now it said nothing at all between starting and finishing - the
+  terminal showed a spinner that meant only "not dead yet".
+
+  `Progress` is data, not a sentence: a stage, a count, a total and a detail. The terminal
+  renders it as `Pass 3 of 16 - pages 39 to 56`; anything else can render it as a bar. The
+  cycle knows how far along it is and nothing about terminals, which is what lets a second
+  interface be written later **without the behaviour moving into it** - the condition the
+  roadmap set for an interface beyond the CLI, and the reason this comes first.
+
+  It is optional everywhere, and a run nobody watches behaves identically to one that is
+  watched. A listener that raises is swallowed: a document half read must not be lost to a
+  broken progress bar, and there is a test for that.
+
 ### Fixed
 - **The corpus writer called an unplaceable quotation a fabrication**, which is the error
   ADR-042 exists to correct - fixed in the check months ago and left standing in the writer,

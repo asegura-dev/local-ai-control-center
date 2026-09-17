@@ -64,6 +64,7 @@ def _go(
     provider: Provider,
     action: IntendedAction | None = None,
     verify_quotes: bool = False,
+    progress: object = None,
     **config_kwargs: object,
 ) -> tuple[RunResult, AuditLog]:
     workspace = Workspace.ensure(tmp_path)
@@ -80,6 +81,7 @@ def _go(
         "run-1",
         _accept,  # type: ignore[arg-type]
         verify_quotes=verify_quotes,
+        progress=progress,  # type: ignore[arg-type]
     )
     return result, audit
 
@@ -207,3 +209,52 @@ def test_repeats_are_dropped_on_the_quotation_however_it_is_spaced() -> None:
         (checked("The sensitivity was high."), checked("The s e n s i t i v i t y was high."))
     )
     assert len(kept) == 1
+
+
+def test_a_run_reports_where_it_has_got_to(tmp_path: Path) -> None:
+    """Seventeen passes used to say nothing between starting and finishing."""
+    from local_ai_control_center.core.run import Progress
+
+    _paper(tmp_path, _long_pages(10))
+    seen: list[Progress] = []
+    result, _ = _go(
+        tmp_path, _Recorder(), verify_quotes=True, context_tokens=2048, progress=seen.append
+    )
+
+    asked = [p for p in seen if p.stage == "asking"]
+    assert len(asked) == result.passes
+    assert [p.done for p in asked] == list(range(result.passes))
+    assert all(p.total == result.passes for p in asked)
+    assert [p.stage for p in seen if p.stage == "dividing"] == ["dividing"]
+    assert any(p.stage == "checking" for p in seen)
+    assert asked[0].fraction == 0.0
+    assert asked[-1].fraction < 1.0
+
+
+def test_a_watcher_that_breaks_does_not_take_the_run_with_it(tmp_path: Path) -> None:
+    """A document half read must not be lost to a broken progress bar."""
+
+    def explode(_where: object) -> None:
+        raise RuntimeError("the bar is on fire")
+
+    _paper(tmp_path, _long_pages(6))
+    result, _ = _go(tmp_path, _Recorder(), context_tokens=2048, progress=explode)
+    assert result.outcome == "completed"
+    assert result.passes > 1
+
+
+def test_a_run_nobody_watches_behaves_the_same(tmp_path: Path) -> None:
+    _paper(tmp_path, _long_pages(6))
+    watched, _ = _go(tmp_path, _Recorder(), context_tokens=2048, progress=lambda _w: None)
+    unwatched, _ = _go(tmp_path, _Recorder(), context_tokens=2048)
+    assert watched.passes == unwatched.passes
+    assert watched.completion is not None and unwatched.completion is not None
+    assert watched.completion.text == unwatched.completion.text
+
+
+def test_a_stage_with_no_total_reports_no_fraction() -> None:
+    """An empty bar is honest where a wrong one is not."""
+    from local_ai_control_center.core.run import Progress
+
+    assert Progress(stage="checking").fraction == 0.0
+    assert Progress(stage="asking", done=3, total=12).fraction == 0.25

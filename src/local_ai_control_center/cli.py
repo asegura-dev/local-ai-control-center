@@ -37,7 +37,7 @@ from local_ai_control_center.core.headings import headings_in, matching
 from local_ai_control_center.core.passes import PageRangeError
 from local_ai_control_center.core.permissions import grant
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
-from local_ai_control_center.core.run import new_run_id
+from local_ai_control_center.core.run import Progress, ProgressFn, new_run_id
 from local_ai_control_center.core.skill import (
     AssessSourceSkill,
     CritiqueFileSkill,
@@ -294,8 +294,8 @@ def run(
         if generating:
             with console.status("Contacting Ollama...") as status:
                 status.update(
-                    "Reading in passes... (one call per pass; this takes as long as it takes)"
-                    if in_passes
+                    "Reading in passes..."
+                    if in_passes or pages_per_pass
                     else "Generating... (the first run loads the model into memory and may "
                     "take longer)"
                 )
@@ -309,6 +309,7 @@ def run(
                     run_id,
                     in_passes,
                     pages_per_pass,
+                    _onto(status),
                 )
         else:
             result = _do_run(
@@ -513,6 +514,27 @@ def _build_provider(choice: ProviderChoice, config: Config) -> Provider:
     return OllamaProvider(config.model, config.context_tokens, host)
 
 
+def _onto(status: object) -> ProgressFn:
+    """Turn a Rich status line into something the cycle can report onto.
+
+    The cycle knows how far along it is and nothing about terminals; this knows about
+    terminals and nothing about runs. That separation is what lets an interface other than
+    this one be written later without the behaviour moving into it.
+    """
+
+    def show(where: Progress) -> None:
+        if where.stage == "asking" and where.total:
+            status.update(  # type: ignore[attr-defined]
+                f"Pass {where.done + 1} of {where.total} - {where.detail}"
+            )
+        elif where.stage == "dividing":
+            status.update(f"Divided into {where.detail}")  # type: ignore[attr-defined]
+        elif where.stage == "checking":
+            status.update("Checking every quotation against the document...")  # type: ignore[attr-defined]
+
+    return show
+
+
 def _do_run(
     resolved: Skill,
     requests: tuple[str, ...],
@@ -523,6 +545,7 @@ def _do_run(
     run_id: str,
     in_passes: bool = False,
     pages_per_pass: int | None = None,
+    progress: ProgressFn | None = None,
 ) -> RunResult:
     """Run the skill through the cycle with confirmation already handled."""
     return run_skill(
@@ -538,6 +561,7 @@ def _do_run(
         _approve,
         in_passes,
         pages_per_pass,
+        progress,
     )
 
 

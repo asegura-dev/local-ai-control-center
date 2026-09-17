@@ -13,6 +13,7 @@ function rather than performed here, so the core never contains interface code.
 
 from __future__ import annotations
 
+import contextlib
 import difflib
 from collections.abc import Callable
 from pathlib import Path
@@ -36,6 +37,7 @@ from local_ai_control_center.core.grounding import (
 from local_ai_control_center.core.passes import PageRangeError, only_pages, passes_over
 from local_ai_control_center.core.permissions import Capability, PermissionDenied, Permissions
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
+from local_ai_control_center.core.run import Progress, ProgressFn
 from local_ai_control_center.core.skill import Skill
 from local_ai_control_center.core.workspace import Workspace
 from local_ai_control_center.ports.converter import ConversionError, Converter
@@ -778,6 +780,19 @@ def run_conversion(
     return RunResult(preview=preview, outcome="completed")
 
 
+def _tell(progress: ProgressFn | None, where: Progress) -> None:
+    """Report where a run has got to, if anybody asked to be told.
+
+    Swallows whatever the listener raises. A watcher that fails is a watcher's problem, and
+    a run that got half way through a document must not be lost to a broken progress bar.
+    """
+    if progress is None:
+        return
+    # The run matters; the report does not. A watcher that raises is a watcher's problem.
+    with contextlib.suppress(Exception):
+        progress(where)
+
+
 def run_in_passes(
     action: IntendedAction,
     prompt_template: str,
@@ -792,6 +807,7 @@ def run_in_passes(
     temperature: float = 0.0,
     uses_context: bool = False,
     pages_per_pass: int | None = None,
+    progress: ProgressFn | None = None,
 ) -> RunResult:
     """Read one document in as many passes as the window needs, and answer from all of them.
 
@@ -847,9 +863,28 @@ def run_in_passes(
         },
     )
 
+    _tell(
+        progress,
+        Progress(
+            stage="dividing",
+            total=len(readings),
+            detail=f"{len(readings)} readings over pages "
+            f"{readings[0].first_page} to {readings[-1].last_page}",
+        ),
+    )
+
     answers: list[str] = []
     asked = 0
-    for reading in readings:
+    for number, reading in enumerate(readings, start=1):
+        _tell(
+            progress,
+            Progress(
+                stage="asking",
+                done=number - 1,
+                total=len(readings),
+                detail=f"pages {reading.first_page} to {reading.last_page}",
+            ),
+        )
         completion = _ask(
             prompt.replace(read.contents, reading.text, 1),
             action,
@@ -872,6 +907,7 @@ def run_in_passes(
 
     checked: tuple[CheckedClaim, ...] = ()
     if verify_quotes:
+        _tell(progress, Progress(stage="checking", detail="looking for every quotation"))
         checked = without_repeats(check_answer(joined.text, read.contents))
         audit.record(
             run_id,
@@ -912,6 +948,7 @@ def run_skill(
     approve: ApprovalFn | None = None,
     in_passes: bool = False,
     pages_per_pass: int | None = None,
+    progress: ProgressFn | None = None,
 ) -> RunResult:
     """Plan the skill, then run its plan through the execution cycle.
 
@@ -943,6 +980,7 @@ def run_skill(
             plan.temperature,
             plan.uses_context,
             pages_per_pass,
+            progress,
         )
     return run_action(
         plan.action,
