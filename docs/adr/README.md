@@ -1,6 +1,6 @@
 # Decision records
 
-Forty-five records, in the order they were decided. The number is the identity: it is how
+Fifty-four records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -280,3 +280,57 @@ Every rate this project published was measured where the correct answer was unkn
 
 Sets the scope of v2 at one thing: a document too large for the window is read in passes over its pages, overlapping by one so a passage crossing a break stays whole. A pass is what the model sees; the whole document stays what a quotation is checked against. Conversation across turns and letting the model choose what to do next are ruled out, the second because it contradicts PRINCIPLES.
 
+
+### 046 - how much to show at once
+
+[`ADR-046-how-much-to-show-at-once.md`](ADR-046-how-much-to-show-at-once.md)
+
+How much of a document to show at once becomes a setting rather than a consequence of what fits. Passes of a stated size gave 4.6 times the verified quotations for twice the time, and the confound - seventeen calls against three - is published beside the figure rather than after someone asks.
+
+### 047 - metadata the file already carries
+
+[`ADR-047-metadata-the-file-already-carries.md`](ADR-047-metadata-the-file-already-carries.md)
+
+Title, authors, DOI and date are read from the document's own XMP, with no network and no model, and a field that is absent is reported as absent. The journal is not reported at all: with a correct DOI a reference manager resolves it against a record, and LACC had a DOI for eleven of twenty-three documents where the model had one for none - having invented twelve.
+
+### 048 - a skill you can write down
+
+[`ADR-048-a-skill-you-can-write-down.md`](ADR-048-a-skill-you-can-write-down.md)
+
+A skill can be declared in a file, and LACC generates the structure from the fields it declares rather than handing the author a blank prompt - because the part that works is the part LACC controls. A declaration cannot grant itself a capability: the configuration stays a ceiling that only removes.
+
+### 049 - an anchor outside the file
+
+[`ADR-049-an-anchor-outside-the-file.md`](ADR-049-an-anchor-outside-the-file.md)
+
+A sidecar records how many records the trail holds and the digest of the last one, and the notification carries both to a machine the tamperer does not control. Described as a guard against loss rather than against an attacker, because that is what it is.
+
+### 050 - choosing what to send
+
+[`ADR-050-choosing-what-to-send.md`](ADR-050-choosing-what-to-send.md)
+
+Selection becomes a port, whose first implementation uses no model and no network. Whatever is not sent is counted and reported: a selection that hides its discards turns a partial answer into a confident one, which is the failure mode behind every wrong figure in this project's own record.
+
+### 051 - a model per kind of work
+
+[`ADR-051-a-model-per-kind-of-work.md`](ADR-051-a-model-per-kind-of-work.md)
+
+A configuration may name a model per skill. The routing is a table the user wrote, never a choice the model makes - the same line ADR-045 drew when it ruled out letting a model choose what to do next.
+
+### 052 - a shape the engine enforces
+
+[`ADR-052-a-shape-the-engine-enforces.md`](ADR-052-a-shape-the-engine-enforces.md)
+
+A skill may declare a schema and the engine enforces it, generated from the fields the skill already names. The line parser stays, because enforcement must improve a path that works rather than replace it with one that only works on one engine.
+
+### 053 - whether the reading follows from the words
+
+[`ADR-053-whether-the-reading-follows-from-the-words.md`](ADR-053-whether-the-reading-follows-from-the-words.md)
+
+The first check here that is a judgement rather than a measurement, and it says so: a port asks whether a quotation entails the reading given of it. Graded against eight pairs labelled first, it got the three-way label right 6 of 8 and the binary "should a person look at this" right 8 of 8 - so reports lead with the binary. It marks and never removes.
+
+### 054 - the same passage read twice
+
+[`ADR-054-the-same-passage-read-twice.md`](ADR-054-the-same-passage-read-twice.md)
+
+A quotation wholly inside another is the same passage read twice, and the longer one is kept - exact, unthresholded, no new module. Records the approximate deduplication that was planned and dropped: the corpus has zero near-duplicates between documents, the whole exact comparison takes 133 ms, and its most alike non-identical pair differs by one word that happens to be the name of a different drug.

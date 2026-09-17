@@ -12,7 +12,7 @@ rejected can.**
 Everything below was measured against a real bibliography on real hardware. Where a figure
 was published and later corrected, both are shown, because the correction is the finding.
 
-## Nine wrong figures, and which way each one leaned
+## Ten wrong figures, and which way each one leaned
 
 | Reported | What it actually was | Fixed in |
 |---|---|---|
@@ -24,6 +24,7 @@ was published and later corrected, both are shown, because the correction is the
 | Twenty-two more fabrications | Extraction had written `A c c o r d i n gt o`; spacing, not words | ADR-046 |
 | **Zero fabrications in 237 quotations** | **48 of 237, of which 44 are absent in any form tried** | ADR-042 |
 | Choosing sections by their headings would raise relevance | It did not: 46% on topic against 51% for the cruder method it replaced | measured, below |
+| The corpus has near-duplicate quotations between documents | It has none. Every repeat in it is inside one document, and there are six | ADR-054 |
 
 Six of these made the model look worse than it was. The seventh was the correction to that
 pattern, published in the same release that introduced it, and it overshot: it credited a
@@ -41,6 +42,16 @@ The ninth is different from all of them, and is kept because of it: **nothing wa
 wrong.** A prediction was announced before being taken, it favoured the thing being built,
 and it was false. Section headings were expected to select relevant pages better than
 counting keyword mentions; they selected slightly worse. The figures below say how much.
+
+The tenth is the ninth's twin and it cost more, because it had been written into a plan as a
+premise rather than as a prediction. The plan's next piece was approximate deduplication, on
+the stated grounds that the corpus held near-duplicates between documents. Nobody had looked.
+**It holds none** - all 654 quotations, all 26 documents, zero pairs across a document
+boundary - and the entire exact comparison it was to be an approximation of takes 133
+milliseconds. What it does hold is six repeats inside a document, of which equality was
+already catching three. A sentence stated as a fact in a planning document is a figure with no
+measurement behind it, and it is harder to notice than a wrong number because it never looked
+like a number.
 
 ## What was tested rather than reasoned about
 
@@ -172,6 +183,13 @@ three-way label right 6 times, the binary "should somebody look at this" right 8
 raises no false alarm on the 3 readings that were fine. Both its errors came with correct
 reasoning attached to the wrong label. The reporting leads with the binary for that reason.
 
+**Similarity is the wrong question where the content lives in the words that differ.** The
+two most alike quotations in the corpus that are not identical agree on 0.86 of their
+wording, and they name two different drugs - `Apalutamide` and `Darolutamide`, in otherwise
+identical sentences. The conventional near-duplicate threshold in corpus deduplication is
+0.80. **The highest-similarity non-identical pair in this corpus is one that must be kept**,
+which is why deduplication here is exact containment and has no threshold at all (ADR-054).
+
 ## How to read a figure from this project
 
 **Ask what the check could not see.** Six of the seven wrong figures above were the check
@@ -186,10 +204,16 @@ built (ADR-044).
 **Ask how many runs.** Two runs are a story, four are a measurement, and this project has
 published figures from one.
 
-**Ask whether the figure was predicted before it was taken.** The one prediction announced in
-advance here - that section headings would select better - was wrong, and it was wrong in the
-direction of the thing being built. That is not an argument against predicting. It is an
-argument for writing the prediction down where it can embarrass you.
+**Ask whether the figure was predicted before it was taken.** Both predictions announced in
+advance here were wrong, and both were wrong in the direction of the thing being built:
+section headings were to select better, and the corpus was to hold near-duplicates across
+documents. That is not an argument against predicting. It is an argument for writing the
+prediction down where it can embarrass you.
+
+**Ask whether a premise in a plan was ever a measurement.** The second of those was not
+phrased as a prediction. It was stated as a fact about the corpus, in the sentence justifying
+the work, and it read like something already known. A plan is where unmeasured claims are
+hardest to see, because nothing in it looks like a figure.
 
 ## What is not measured
 

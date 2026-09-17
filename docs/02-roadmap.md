@@ -366,6 +366,38 @@ most central, nnU-Net and the EAU and NCCN guidelines among them. The library-sc
 deferred to v2 below is not a nicety: without it a bibliography is read only in the parts
 that happen to fit.
 
+## A planned piece, measured and dropped
+
+The next item on the plan was approximate deduplication - MinHash over the corpus - and it
+was not built. The reason is worth more than the feature would have been.
+
+It was planned on a premise: *"the corpus has near-duplicates between documents."* That
+sentence sat in a planning document reading like something already known, and nobody had
+looked. Measured over all 654 quotations across all 26 documents, the corpus holds **zero**
+near-duplicates across a document boundary. Every repeat in it is inside a single document,
+and there are six.
+
+Two things follow, and the second is the general one.
+
+**MinHash was a solution to a cost that is not there.** It exists to avoid comparing
+everything with everything. Here that entire comparison - 213,531 pairs, exact - takes 133
+milliseconds. What did need fixing was found by looking at the six: a repeat across passes is
+rarely word for word, it is the same sentence with wider boundaries, and equality misses it.
+That is exact containment and it is ten lines (ADR-054).
+
+**A threshold would have been wrong in the direction that costs most.** The two most alike
+quotations in the corpus that are not identical agree on 0.86 of their wording, and they are
+`Apalutamide` and `Darolutamide` in otherwise identical sentences. The conventional
+near-duplicate threshold is 0.80. The highest-similarity non-identical pair in this corpus is
+one that must be kept.
+
+**The lesson for this roadmap is about plans rather than about duplication.** This project
+has a section counting ten figures it got wrong, and it learned to check numbers. The premise
+above was never a number. It was a claim about the world, written in the sentence justifying
+the work, and it was invisible for exactly that reason - nothing in a plan looks like a
+figure. **A plan is where unmeasured claims hide.** The question that catches them is asked
+of sentences, not of tables: *has anyone looked?*
+
 ## What this roadmap is not
 
 Not a release schedule, and not a promise. It is a statement of direction meant to

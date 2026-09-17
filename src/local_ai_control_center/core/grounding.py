@@ -395,25 +395,42 @@ def check_claim(claim: Claim, source: str) -> CheckedClaim:
 
 
 def without_repeats(claims: tuple[CheckedClaim, ...]) -> tuple[CheckedClaim, ...]:
-    """Drop claims whose quotation has already appeared, keeping the first.
+    """Drop quotations already seen, and those wholly inside one that was, keeping the longer.
 
     A document read in overlapping passes offers the overlapping page twice, and the same
     passage quoted twice is one quotation (ADR-045). Folded the way containment folds, so a
     difference nobody can see does not become two entries.
 
+    **Containment, not similarity.** The second pass rarely repeats a passage word for word;
+    it takes the same sentence with different boundaries, and equality misses that entirely.
+    A quotation wholly inside another is the same passage read twice, and the longer one is
+    kept because it is a superset of the shorter - nothing verified is lost by preferring it.
+    The order of what survives is the document's, not the order the dropping happened in.
+
+    Exact and unthresholded, and that is the whole design. A threshold on similarity would
+    be wrong here, and the corpus says so: the two most alike quotations in it that are not
+    identical differ by one word - `Apalutamide` against `Darolutamide` - and that word is
+    the entire content. Anything willing to merge at 0.86 would merge those (ADR-054).
+
     Merged on the quotation rather than on the claim. Two different readings of one sentence
     collapse into one, which is the cost: the quotation is what carries authority here, and
     a corpus with the same sentence in it twice is worse than a reading lost.
+
+    Called with the claims of one document, so containment never reaches across documents -
+    where the same sentence in two papers is a fact about the literature, not a repeat.
     """
-    seen: set[str] = set()
-    kept: list[CheckedClaim] = []
-    for checked in claims:
-        key = _unspaced(checked.claim.quote)
-        if key in seen:
+    folded = [_unspaced(checked.claim.quote) for checked in claims]
+    # Longest first, so a passage read twice is represented by the fuller reading. The sort
+    # is stable, so two identical quotations keep the earlier - the behaviour this had before
+    # containment was added, of which equality is now just the tied case.
+    longest_first = sorted(range(len(claims)), key=lambda i: -len(folded[i]))
+    kept: list[int] = []
+    for index in longest_first:
+        quotation = folded[index]
+        if not quotation or any(quotation in folded[other] for other in kept):
             continue
-        seen.add(key)
-        kept.append(checked)
-    return tuple(kept)
+        kept.append(index)
+    return tuple(claims[index] for index in sorted(kept))
 
 
 def check_answer(

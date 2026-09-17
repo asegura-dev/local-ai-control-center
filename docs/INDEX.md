@@ -15,7 +15,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Forty-five records front to back is a history. These are the threads through them, for
+Fifty-four records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -49,6 +49,10 @@ Ends on the one safety claim that did not hold, which is why it is worth reading
 → [025](adr/ADR-025-writing-and-several-documents.md)
 → [039](adr/ADR-039-a-library-is-read-one-document-at-a-time.md)
 → [045](adr/ADR-045-a-document-read-in-passes.md)
+→ [046](adr/ADR-046-how-much-to-show-at-once.md)
+→ [054](adr/ADR-054-the-same-passage-read-twice.md)
+Ends where reading twice does: two entries for one passage, and the measurement that said
+not to reach for an approximate algorithm to find them.
 
 **The shape of the program**
 [001](adr/ADR-001-foundational-structure.md) → [005](adr/ADR-005-provider-abstraction.md)
@@ -124,6 +128,7 @@ Ends on the one safety claim that did not hold, which is why it is worth reading
 | 051 | [a-model-per-kind-of-work](adr/ADR-051-a-model-per-kind-of-work.md) | Two models differ in kind rather than quality - the larger is more faithful to what it is handed, the smaller more productive - so one model for everything takes the worse half of both trades. A configuration may name a model per skill. The routing is a rule the user wrote, never a choice a model makes, and the record says the mapping makes the experiment possible without making the hypothesis true. |
 | 052 | [a-shape-the-engine-enforces](adr/ADR-052-a-shape-the-engine-enforces.md) | Structure is obeyed and instruction is negotiated, and every skill still asked for its format in prose. A skill may now declare a schema the engine constrains decoding to, generated from the fields it already names. The line parser stays for engines that cannot enforce, it is off by default, and whether constraining costs content quality is to be measured rather than assumed. |
 | 053 | [whether-the-reading-follows-from-the-words](adr/ADR-053-whether-the-reading-follows-from-the-words.md) | 548 verified quotations each carry a reading nobody checked, and one of them attributed choline PET/CT's figures to PSMA while passing every mechanical control. A port judges whether a quotation entails its claim - named a judgement rather than a measurement, marking rather than removing, and graded against labels written before it ran. |
+| 054 | [the-same-passage-read-twice](adr/ADR-054-the-same-passage-read-twice.md) | A repeat across passes is rarely word for word: it is the same sentence with wider boundaries, which equality misses. Drops a quotation wholly inside another and keeps the longer, exactly and without a threshold. Records the approximate deduplication that was planned and dropped - the corpus has zero near-duplicates across documents, the exact comparison of all 213,531 pairs takes 133 ms, and its most alike non-identical pair differs by one word that is the name of a different drug. |
 
 ## Guides (`docs/guides/`)
 

@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A quotation wholly inside another is now the same passage read twice** (ADR-054). Reading
+  in passes offers the overlapping page to the model twice, and `without_repeats` dropped a
+  quotation whose words had already appeared - by equality, which is not the shape a repeat
+  takes. The second pass rarely repeats a passage word for word; it takes the same sentence
+  with wider boundaries. One document contributed the proposal, and then the sentence before
+  it as well: two entries, one passage.
+
+  The longer quotation is kept, because it is a superset of the shorter and nothing verified
+  is lost by preferring it, and what survives stays in the document's order. Exact substring
+  after the same folding, within one document only - across documents the same sentence in
+  two papers is a fact about the literature, not a repeat. Over the real corpus this drops
+  six quotations of 654, where equality was dropping three.
+
 - **A port that asks whether a reading follows from the words it rests on** (ADR-053). This
   is the boundary ADR-026 drew and never crossed: LACC could say a quotation's words are in
   the document and could not say the paper means what the model says it means. Every claim
@@ -44,6 +57,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Eight pairs is not a measurement of anything general; it is enough to say the label is
   weaker than the binary, and not enough to publish a rate. Over 548 claims it costs about
   thirty-six minutes.
+
+### Not built
+- **Approximate deduplication (MinHash), which the plan called for next** (ADR-054). The
+  grounds were that the corpus held near-duplicate quotations between documents. Nobody had
+  checked, and it holds **none** - 654 quotations, 26 documents, zero pairs across a document
+  boundary. The whole exact comparison MinHash would approximate, all 213,531 pairs, takes
+  133 milliseconds; an approximation of that is a worse answer at no saving.
+
+  The second reason is the one that decided it. Any similarity threshold would be wrong here
+  in the direction that costs most. The two most alike quotations in the corpus that are not
+  identical agree on 0.86 of their wording:
+
+  > *"**Apalutamide** is a category 1, preferred option for patients with M0 CRPC…"*
+  > *"**Darolutamide** is a category 1, preferred option for patients with M0 CRPC…"*
+
+  Two different drugs, one word apart, and that word is the entire content. The conventional
+  near-duplicate threshold is 0.80, and it deletes one of them from a corpus meant to be
+  cited. **The highest-similarity non-identical pair in this corpus is one that must be
+  kept** - which is not an argument for a higher threshold but for not having one.
 
 ### Fixed
 - **The generation timeout budgeted for writing and nothing for reading.** It derived from

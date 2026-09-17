@@ -221,6 +221,54 @@ def test_repeats_are_dropped_on_the_quotation_however_it_is_spaced() -> None:
     assert len(kept) == 1
 
 
+def test_a_quotation_inside_another_is_the_same_passage_read_twice() -> None:
+    """The real shape of a repeat across passes: same sentence, wider boundaries.
+
+    Taken from the corpus. One pass quoted the proposal; the next quoted the sentence
+    before it as well. Equality saw two quotations where the document has one passage.
+    """
+
+    def checked(quote: str) -> CheckedClaim:
+        return CheckedClaim(claim=Claim(claim="c", quote=quote), verdict="verified")
+
+    short = "We propose to leverage nnU-Net as an out-of-the box tool."
+    long = "Based on the recipe proposed in this work, " + short
+    kept = without_repeats((checked(short), checked(long)))
+    assert [c.claim.quote for c in kept] == [long]
+
+
+def test_the_fuller_reading_survives_but_the_order_stays_the_document_s() -> None:
+    """Length decides what is dropped; it does not decide what comes first."""
+
+    def checked(quote: str) -> CheckedClaim:
+        return CheckedClaim(claim=Claim(claim="c", quote=quote), verdict="verified")
+
+    kept = without_repeats(
+        (checked("Alpha beta gamma delta."), checked("beta gamma"), checked("Zeta eta theta."))
+    )
+    assert [c.claim.quote for c in kept] == ["Alpha beta gamma delta.", "Zeta eta theta."]
+
+
+def test_one_word_apart_is_not_a_repeat() -> None:
+    """The corpus's most alike pair that is not identical, and it must survive.
+
+    Two drugs, one word between them, and that word is the whole content. Any threshold
+    willing to merge near-duplicates merges these: they agree on 0.86 of their wording
+    (ADR-054).
+    """
+
+    def checked(quote: str) -> CheckedClaim:
+        return CheckedClaim(claim=Claim(claim="c", quote=quote), verdict="verified")
+
+    kept = without_repeats(
+        (
+            checked("Apalutamide is a category 1, preferred option for M0 CRPC."),
+            checked("Darolutamide is a category 1, preferred option for M0 CRPC."),
+        )
+    )
+    assert len(kept) == 2
+
+
 def test_a_run_reports_where_it_has_got_to(tmp_path: Path) -> None:
     """Seventeen passes used to say nothing between starting and finishing."""
     from local_ai_control_center.core.run import Progress
