@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A port that asks whether a reading follows from the words it rests on** (ADR-053). This
+  is the boundary ADR-026 drew and never crossed: LACC could say a quotation's words are in
+  the document and could not say the paper means what the model says it means. Every claim
+  carries a paraphrase and no paraphrase had ever been checked.
+
+  The gap stopped being theoretical. Drafting from verified quotations, a 14B wrote *"PSMA
+  PET/CT had a pooled sensitivity of 62%"* above a quotation that says **choline** PET/CT had
+  those figures - and then contradicted itself by giving both the same numbers. The quotation
+  was real, was checked, and passed. **Every mechanical control in this project passed it.**
+
+  **It is a judgement, not a measurement, and is reported as one.** The quotation check
+  compares strings: exact, cheap, opinionless. This asks a model about meaning and can be
+  wrong in both directions. A run says *"the quotation is in the document"* and *"the reading
+  was judged to follow"* as two separate sentences, because they are two different strengths
+  of claim.
+
+  **It marks and never removes.** Dropping a claim on a model's word is authority this
+  project has spent fifty records refusing to take.
+
+  The first implementation uses the engine already configured, with the answer constrained to
+  three labels by a schema - no new dependency, because installing a deep-learning stack to
+  check paraphrases would cost everyone who never uses it. A purpose-built entailment model
+  stays possible behind the same port, once a measurement justifies the dependency.
+
+  **No figure from it will be published until it is graded** against eight pairs whose labels
+  were written by a person first, the same demand ADR-044 made of the quotation check. The
+  first seed is the real case above.
+
 ### Fixed
 - **The answer reserve was subtracted from the window and never imposed on the answer.**
   `answer_reserve` appears in seven places, all of them deciding whether a prompt fits;

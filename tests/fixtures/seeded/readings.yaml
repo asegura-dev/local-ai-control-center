@@ -1,0 +1,86 @@
+# Ground truth for judging readings (ADR-053).
+#
+# Each pair is a quotation and a reading somebody made of it, labelled by a person before any
+# judge ran. This grades the judge, and no figure from the judge is published until it has
+# been run against this - the same demand ADR-044 made of the quotation check.
+#
+# `follows`      - the reading is supported by that sentence alone
+# `contradicts`  - the sentence says otherwise
+# `neither`      - the sentence is about something else, or does not settle it
+#
+# The hardest label is `neither`, and it is the one that matters. A reading that may well be
+# true but is not established by these words must not be `follows`. That distinction is what
+# the first pair below is about, and it is not invented: it came out of a real run.
+
+pairs:
+  - verdict: neither
+    seed: >
+      The real one. Drafting from verified quotations, a 14B attributed choline PET/CT's
+      figures to PSMA PET/CT. The quotation was checked and passed; every mechanical control
+      in this project passed it. This pair is why the judge exists.
+    quotation: >
+      pooled sensitivity and specificity of choline PET/CT for pelvic LN metastases were 62%
+      (95% CI: 51-66%) and 92% (95% CI: 89-94%)
+    claim: >
+      PSMA PET/CT had a pooled sensitivity of 62% and specificity of 92% for pelvic lymph
+      node metastases.
+
+  - verdict: follows
+    seed: the reading restates what the sentence says, with nothing added
+    quotation: >
+      The sensitivity of the AI method for detecting pelvic lymph node metastases was 82%,
+      and the corresponding sensitivity for the human readers was 77% on average.
+    claim: >
+      The AI method detected pelvic lymph node metastases with a sensitivity of 82%, against
+      77% for human readers.
+
+  - verdict: contradicts
+    seed: the figure is reversed, which is the failure that ends up in a table
+    quotation: >
+      The AI model had an average of only 1.8 false positive lesions per patient.
+    claim: >
+      The AI model produced an average of 18 false positive lesions per patient.
+
+  - verdict: neither
+    seed: >
+      true of the paper, most likely, and not established by this sentence. The trap for a
+      judge that answers from what it knows rather than from what it was shown.
+    quotation: >
+      All patients underwent 18F-PSMA-1007 PET/CT before radical prostatectomy.
+    claim: >
+      18F-PSMA-1007 PET/CT is more sensitive than conventional imaging for nodal staging.
+
+  - verdict: follows
+    seed: a faithful narrowing - the reading claims less than the sentence does
+    quotation: >
+      Overall, 18F-PSMA-1007 PET/CT detected 18 of 19 lymph node metastases in the pelvis
+      including a node with a diameter as small as 1 mm.
+    claim: >
+      18F-PSMA-1007 PET/CT detected a lymph node metastasis as small as 1 mm.
+
+  - verdict: neither
+    seed: >
+      a widening that sounds like a summary. The sentence is about one cohort; the reading is
+      about the method in general.
+    quotation: >
+      In this single-centre cohort of 42 patients, the method identified all dominant
+      lesions.
+    claim: >
+      The method identifies all dominant lesions.
+
+  - verdict: contradicts
+    seed: the comparison is inverted while every number stays right
+    quotation: >
+      Image quality and spatial resolution of 68Ga PET/CT images were worse than those of 18F
+      or 64Cu, despite similar count rates.
+    claim: >
+      68Ga produced better spatial resolution than 18F at similar count rates.
+
+  - verdict: follows
+    seed: a restatement in the reader's own words, which is what a paraphrase is for
+    quotation: >
+      Nothing was sent, because an engine given more than fits does not fail - it drops what
+      does not fit and answers from the rest.
+    claim: >
+      An oversized prompt is refused rather than sent, because the engine would silently
+      discard part of it.
