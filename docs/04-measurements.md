@@ -12,7 +12,7 @@ rejected can.**
 Everything below was measured against a real bibliography on real hardware. Where a figure
 was published and later corrected, both are shown, because the correction is the finding.
 
-## Seven wrong figures, and which way each one leaned
+## Nine wrong figures, and which way each one leaned
 
 | Reported | What it actually was | Fixed in |
 |---|---|---|
@@ -23,18 +23,24 @@ was published and later corrected, both are shown, because the correction is the
 | A quotation was not in the paper | A running header had been extracted into the middle of the sentence | ADR-036 |
 | Twenty-two more fabrications | Extraction had written `A c c o r d i n gt o`; spacing, not words | ADR-046 |
 | **Zero fabrications in 237 quotations** | **48 of 237, of which 44 are absent in any form tried** | ADR-042 |
+| Choosing sections by their headings would raise relevance | It did not: 46% on topic against 51% for the cruder method it replaced | measured, below |
 
 Six of these made the model look worse than it was. The seventh was the correction to that
 pattern, published in the same release that introduced it, and it overshot: it credited a
 model that had invented forty-four quotations. **Knowing you are biased in one direction
 does not make the next figure unbiased.**
 
-There was an eighth during the session that produced this chapter, and it belongs here
-because it has the same shape and was not made by the tool. A script written to summarise
-the corpus reported that `collect` silently omitted documents it had refused. It does not -
-every refusal has its own section naming the token count and the budget. The script's filter
-dropped lines beginning with an asterisk, and `**Not collected.**` begins with one. A blind
-spot in the measuring instrument was reported as a defect in the thing measured.
+The eighth was not the tool's, and belongs here because it has the same shape. A script
+written to summarise the corpus reported that `collect` silently omitted documents it had
+refused. It does not - every refusal has its own section naming the token count and the
+budget. The script's filter dropped lines beginning with an asterisk, and `**Not collected.**`
+begins with one. A blind spot in the measuring instrument was reported as a defect in the
+thing measured.
+
+The ninth is different from all of them, and is kept because of it: **nothing was measured
+wrong.** A prediction was announced before being taken, it favoured the thing being built,
+and it was false. Section headings were expected to select relevant pages better than
+counting keyword mentions; they selected slightly worse. The figures below say how much.
 
 ## What was tested rather than reasoned about
 
@@ -88,6 +94,14 @@ the result**: seventeen calls against three, so more passes are more generation 
 per call the whole document does as well or better. The effect is only real in the right
 unit - per page examined, a three-page reading yields about 2.8 times a twelve-page one.
 
+**One defect has now appeared in two unrelated layers.** Extraction sometimes spaces
+glyphs rather than words, so `According to` arrives as `A c c o r d i n gt o`. It was found
+in the grounding check, where it made 22 real quotations look fabricated. It was found again
+in heading search, where `PSMA PET/CT` arrives as `PSM A PET/CT` and a search for "psma"
+could not find the document's own section on it. Both times folding the spacing away was the
+answer. Two places nobody had connected suggests a third, and the useful conclusion is to
+fold spacing wherever extracted text is compared to anything at all.
+
 **Structure is obeyed; instructions are negotiated.** Asked to list 24 documents, a 14B
 covered 10. Given the same request as a skeleton with 24 numbered slots to fill, it returned
 23. Asked in the same prompt, explicitly, not to use its own knowledge and to write "not
@@ -104,6 +118,25 @@ gave 4, 5, 7 and 3 claims, of which 2, 4, 3 and 2 verified - between 43% and 80%
 spread is wider than the gap between a 7B and a 14B on one run each, which had already been
 written into the roadmap as a finding. It was noise.
 
+**Choosing better pages did not produce more relevant claims.** A 251-page guideline was
+read three ways, looking for what it says about pelvic nodal staging:
+
+| how the pages were chosen | quotations | verified | on the subject |
+|---|---|---|---|
+| pages with the most keyword mentions | 27 | 88% | **51%** |
+| pages under the matching section headings | 111 | 85% | **46%** |
+
+The better method was slightly worse, and the reason is not the method. `extract_claims`
+returns what a page asserts, and a page under *Diagnosis - Clinical Staging* asserts things
+about biopsy. **The extractor is blind to the reader's subject by design**: ADR-041 forbids
+it the standing context precisely so that knowing what a thesis argues cannot make it favour
+the claims that fit. That 46% is the price of refusing confirmation bias, and it is the right
+price. Filtering by subject belongs after extraction, where a person can see what was set
+aside.
+
+What choosing sections *did* buy was the document at all: sixteen passes that failed twice
+and cost fifty-five minutes became four calls and 5.7 minutes.
+
 ## How to read a figure from this project
 
 **Ask what the check could not see.** Six of the seven wrong figures above were the check
@@ -117,6 +150,11 @@ built (ADR-044).
 
 **Ask how many runs.** Two runs are a story, four are a measurement, and this project has
 published figures from one.
+
+**Ask whether the figure was predicted before it was taken.** The one prediction announced in
+advance here - that section headings would select better - was wrong, and it was wrong in the
+direction of the thing being built. That is not an argument against predicting. It is an
+argument for writing the prediction down where it can embarrass you.
 
 ## What is not measured
 

@@ -32,7 +32,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pretend otherwise.
 
   On the EAU guidelines this is the difference between 251 pages in sixteen passes, which
-  failed twice on the engine, and eight pages in one call.
+  failed twice on the engine, and four sections read in 5.7 minutes: 111 quotations, 95 of
+  them verified.
+
+### Measured
+- **Choosing pages by their section headings did not make the claims more relevant**, and
+  that prediction was written down before it was taken. A 251-page guideline read for what
+  it says about pelvic nodal staging gave 51% on-subject quotations when pages were picked
+  by keyword mentions, and **46%** when picked by matching section headings. The better
+  method was slightly worse.
+
+  The reason is not the method. `extract_claims` returns what a page asserts, and a page
+  under *Diagnosis - Clinical Staging* asserts things about biopsy. **The extractor is blind
+  to the reader's subject by design** - ADR-041 withholds the standing context from it so
+  that knowing what a thesis argues cannot make it favour the claims that fit. The 46% is
+  the price of refusing confirmation bias, and filtering by subject belongs after
+  extraction, where a person can see what was set aside.
+
+  What section selection did buy is the document at all, which is not nothing: the corpus
+  now covers 23 of 24 papers, 779 quotations and 640 verified.
 
 - **`--pages-per-pass N`, because reading in passes turns out to help documents that fit.**
   ADR-045 built passes for documents too large for the window. Three documents that fit
