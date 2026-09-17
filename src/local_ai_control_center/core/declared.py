@@ -13,6 +13,7 @@ not hand over.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -80,6 +81,23 @@ class DeclaredSkill(BaseModel):
     reads_files: bool = True
     """Whether the skill is given documents. The only capability a declaration may ask for."""
 
+    over: Literal["document", "corpus"] = "document"
+    """What the skill works on: a document you name, or passages retrieved from a corpus.
+
+    A corpus skill is how drafting and organising become possible without new code. Its
+    material is quotations already checked against the documents they came from, so prose
+    built on them has claims that are traceable even though the prose itself is not - which
+    is the most this project can offer for writing, and worth being plain about.
+
+    A corpus skill declares no targets: the passages are chosen for it, so it needs no
+    capability at all and `reads_files` does not apply.
+    """
+
+    @property
+    def over_a_corpus(self) -> bool:
+        """Whether its material is retrieved rather than named."""
+        return self.over == "corpus"
+
     @field_validator("name")
     @classmethod
     def _usable_as_a_command(cls, value: str) -> str:
@@ -141,6 +159,8 @@ class FileSkill(Skill):
     @property
     def required(self) -> frozenset[Capability]:
         """What it needs, intersected with what a declaration is allowed to ask for."""
+        if self._declared.over_a_corpus:
+            return frozenset()  # The passages are handed to it; it opens nothing.
         asked: frozenset[Capability] = (
             frozenset({"read_files"}) if self._declared.reads_files else frozenset()
         )
@@ -154,7 +174,11 @@ class FileSkill(Skill):
             if requests
             else self._declared.summary,
             required=self.required,
-            targets=tuple(Path(item) for item in requests) if self._declared.reads_files else (),
+            targets=(
+                tuple(Path(item) for item in requests)
+                if self._declared.reads_files and not self._declared.over_a_corpus
+                else ()
+            ),
         )
         return SkillPlan(
             action=action,
@@ -187,7 +211,18 @@ def prompt_for(declared: DeclaredSkill, config: Config) -> str:
         if quoting
         else ""
     )
-    document = break_ * 2 + CONTENT_PLACEHOLDER + break_ * 2 if declared.reads_files else break_ * 2
+    if declared.over_a_corpus:
+        document = (
+            break_
+            * 2
+            + "Below are passages taken from a set of documents. Every one has been checked: "
+            "the words are really in the document named beside it. Use only these, and quote "
+            "nothing you do not see here." + break_ * 2 + CONTENT_PLACEHOLDER + break_ * 2
+        )
+    elif declared.reads_files:
+        document = break_ * 2 + CONTENT_PLACEHOLDER + break_ * 2
+    else:
+        document = break_ * 2
     return (
         declared.instructions.strip()
         + break_ * 2

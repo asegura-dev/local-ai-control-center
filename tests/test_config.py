@@ -285,3 +285,36 @@ def test_a_dotenv_cannot_smuggle_in_a_destination(
     assert config.remote_engine == ""
     with pytest.raises(ProviderError):
         resolve_engine_host(config.engine_host, network_access=True)
+
+
+def test_a_model_can_be_named_per_skill() -> None:
+    """Two models measured on the same material differ in kind, not in quality: the larger
+    is more faithful to what it is handed, the smaller more productive. Running one for
+    everything takes the worse half of both trades (ADR-051)."""
+    from local_ai_control_center.core.config import Config
+
+    config = Config(
+        workspace_root=Path("."),
+        model="qwen2.5:14b",
+        models={"draft": "qwen2.5:32b", "themes": "qwen2.5:32b"},
+    )
+    assert config.model_for("draft") == "qwen2.5:32b"
+    assert config.model_for("extract_claims") == "qwen2.5:14b"
+    assert config.model_for("") == "qwen2.5:14b"
+
+
+def test_a_mapping_that_names_no_model_is_refused() -> None:
+    """A configuration that refuses unknown fields should not accept a known one saying
+    nothing. Somebody who wrote `draft:` and left it blank meant something."""
+    from local_ai_control_center.core.config import Config
+
+    with pytest.raises(ValueError, match="name no model"):
+        Config(workspace_root=Path("."), model="a", models={"draft": "  "})
+
+
+def test_the_mapping_does_not_invent_a_model_where_there_is_none() -> None:
+    from local_ai_control_center.core.config import Config
+
+    config = Config(workspace_root=Path("."), models={"draft": "qwen2.5:32b"})
+    assert config.model_for("draft") == "qwen2.5:32b"
+    assert config.model_for("extract_claims") == ""

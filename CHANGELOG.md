@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A model per kind of work** (ADR-051). Two models compared on the same material turned
+  out to differ in kind rather than in quality: the 32B is more faithful to what it is
+  handed - 97% and 96% extraction fidelity against 95% and 93%, and a synthesis that kept
+  the page number it was given where the 14B dropped it - while the 14B is more productive,
+  making three points from two documents where the 32B made two from one.
+
+  Neither is better. Extraction wants coverage; drafting wants a citation that is right.
+  Running one model for everything takes the worse half of both trades, and until now the
+  configuration allowed exactly that: `model:` was a single string.
+
+  ```yaml
+  model: qwen2.5:14b
+  models:
+    draft: qwen2.5:32b
+  ```
+
+  **The routing is a rule you wrote, never a choice a model makes.** That line is the
+  decision. A model asked to choose what to do next omits silently - measured, ten documents
+  of twenty-four with none of the fourteen named - and a table from skill to model is as
+  inspectable as the retriever's ranking. The preview says when a skill runs on something
+  other than the default.
+
+- **A declared skill can work over a corpus** rather than over a document it names. Its
+  material is quotations already checked against their sources, so prose built on them has
+  claims that are traceable even though the prose itself is not - which is the most this
+  project can offer for writing, and worth being plain about. `lacc ask --using <skill>`.
+
+  Two of them ship as examples rather than as code: `draft`, which writes continuous prose
+  for a related-work section, and `themes`, which groups quotations the way a literature map
+  would. Both were written because a step was found missing, which is the order that works.
+
 - **`lacc ask`: a question answered from passages already checked against their documents.**
   The retriever chooses, the selection is reported *before* anything is sent, and the
   answer's own quotations are checked against **the passages it was given** rather than

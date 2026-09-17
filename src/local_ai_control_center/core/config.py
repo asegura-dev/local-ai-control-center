@@ -143,6 +143,17 @@ class Config(BaseModel):
             "'lacc profile'."
         ),
     )
+
+    models: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "A model per skill, falling back to `model` for anything not named. Two "
+            "models measured on the same material differed in kind: the larger one is "
+            "more faithful to what it is handed, the smaller one more productive. "
+            "Running one for everything takes the worse half of both trades. The "
+            "routing is a rule you wrote, never a choice a model makes (ADR-051)."
+        ),
+    )
     workspace_in_repository: bool = Field(
         default=False,
         description=(
@@ -237,6 +248,32 @@ class Config(BaseModel):
         if value <= 0:
             raise ValueError("max_input_bytes must be a positive number of bytes")
         return value
+
+    def model_for(self, skill: str) -> str:
+        """The model this skill should run against.
+
+        The mapping first, then the single model. A skill nobody named is not an error -
+        most configurations will name none of them - but a mapping that names a model for
+        a skill and leaves `model` empty is, because then something else has no engine.
+        """
+        return self.models.get(skill) or self.model
+
+    @field_validator("models")
+    @classmethod
+    def _models_are_named(cls, value: dict[str, str]) -> dict[str, str]:
+        """Refuse a mapping entry with no model, which would silently fall back.
+
+        A configuration that refuses unknown fields should not accept a known field saying
+        nothing. Somebody writing `draft:` and leaving it blank meant something.
+        """
+        blank = [skill for skill, model in value.items() if not model.strip()]
+        if blank:
+            raise ValueError(
+                "These skills name no model: "
+                + ", ".join(sorted(blank))
+                + ". Remove the line or name one."
+            )
+        return {skill: model.strip() for skill, model in value.items()}
 
     @field_validator("output_language")
     @classmethod

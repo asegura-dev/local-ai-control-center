@@ -326,7 +326,7 @@ def run(
     audit = AuditLog(workspace, config)
 
     try:
-        provider = _build_provider(provider_choice, config)
+        provider = _build_provider(provider_choice, config, resolved.name)
     except ProviderError as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
@@ -336,6 +336,7 @@ def run(
         plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
     )
     _show_preview(preview)
+    _say_which_model(config, resolved.name)
     _say_what_it_will_cost(plan.action, config, workspace, in_passes, pages_per_pass)
     if not typer.confirm("Proceed?", default=False):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
@@ -560,12 +561,30 @@ def _warn_no_context_ceiling() -> None:
     )
 
 
-def _build_provider(choice: ProviderChoice, config: Config) -> Provider:
-    """Construct the chosen provider. Ollama needs a configured model; the mock does not."""
+def _build_provider(choice: ProviderChoice, config: Config, skill: str = "") -> Provider:
+    """Construct the chosen provider, for this skill's model.
+
+    A configuration may name a model per skill and falls back to the one it always named
+    (ADR-051). The routing is a table somebody wrote; nothing here chooses.
+    """
     if choice is ProviderChoice.mock:
         return MockProvider()
     host = resolve_engine_host(config.engine_host, config.network_access)
-    return OllamaProvider(config.model, config.context_tokens, host)
+    return OllamaProvider(config.model_for(skill), config.context_tokens, host)
+
+
+def _say_which_model(config: Config, skill: str) -> None:
+    """Say when a skill runs on a model other than the configured default.
+
+    A run whose model came from a table is a run whose model the person should be told
+    about, at the moment they are deciding whether to start it.
+    """
+    chosen = config.model_for(skill)
+    if chosen and chosen != config.model:
+        console.print(
+            f"[yellow]{skill} runs on {chosen}[/yellow], not {config.model or 'the default'} - "
+            "your configuration names a model for this skill."
+        )
 
 
 def _onto(status: object) -> ProgressFn:
@@ -1107,7 +1126,7 @@ def measure(
     config, workspace = _load(config_path)
     audit = AuditLog(workspace, config)
     try:
-        provider = _build_provider(provider_choice, config)
+        provider = _build_provider(provider_choice, config, resolved.name)
     except ProviderError as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
@@ -1151,7 +1170,7 @@ def measure(
                     )
                 else:
                     result = _ask_once(
-                        plan, material, config, workspace, provider, audit, new_run_id()
+                        resolved, plan, material, config, workspace, provider, audit, new_run_id()
                     )
             except (ProviderError, ReadError, PromptTooLargeError) as error:
                 where = "The warm-up run" if attempt == 0 else f"Run {attempt}"
@@ -1357,7 +1376,7 @@ def collect(
 
     audit = AuditLog(workspace, config)
     try:
-        provider = _build_provider(provider_choice, config)
+        provider = _build_provider(provider_choice, config, resolved.name)
     except ProviderError as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
@@ -1443,7 +1462,27 @@ def collect(
         )
 
 
+def _corpus_skill(name: str, config_path: Path) -> Skill:
+    """Resolve a declared skill and insist that it works over a corpus.
+
+    A declaration meant for a document would be handed passages where it expects a file, and
+    would answer confidently about the wrong shape of material. Refusing is cheap; noticing
+    afterwards is not.
+    """
+    skill = _resolve_skill(name, config_path)
+    declared = getattr(skill, "declared", None)
+    if declared is None or not declared.over_a_corpus:
+        console.print(
+            f"[red]{name} does not work over a corpus.[/red] A skill used with --using must "
+            "declare `over: corpus`, because it is handed retrieved passages rather than a "
+            "file it named."
+        )
+        raise typer.Exit(code=1)
+    return skill
+
+
 def _ask_once(
+    resolved: Skill,
     plan: SkillPlan,
     material: str,
     config: Config,
@@ -1461,7 +1500,7 @@ def _ask_once(
     return run_action(
         plan.action,
         plan.prompt_template.replace(CONTENT_PLACEHOLDER, material),
-        grant_for(AskCorpusSkill(), config),
+        grant_for(resolved, config),
         config,
         workspace,
         provider,
@@ -1500,6 +1539,13 @@ def ask(
     provider_choice: Annotated[
         ProviderChoice, typer.Option("--provider", help="Which provider to run against.")
     ] = ProviderChoice.ollama,
+    using: Annotated[
+        str | None,
+        typer.Option(
+            "--using",
+            help="A declared skill that works over a corpus, instead of the built-in answer.",
+        ),
+    ] = None,
 ) -> None:
     """Answer a question from passages already checked against their documents.
 
@@ -1542,17 +1588,20 @@ def ask(
     if not selection.chosen:
         raise typer.Exit(code=1)
 
-    resolved = AskCorpusSkill()
+    resolved: Skill = AskCorpusSkill()
+    if using is not None:
+        resolved = _corpus_skill(using, config_path)
     plan = _plan_or_exit(resolved, (question,), config)
     preview = preview_action(
         plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
     )
+    _say_which_model(config, resolved.name)
     if not _confirm(preview):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 
     try:
-        provider = _build_provider(provider_choice, config)
+        provider = _build_provider(provider_choice, config, resolved.name)
     except ProviderError as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
@@ -1575,7 +1624,7 @@ def ask(
     started = time.monotonic()
     try:
         with console.status("Asking..."):
-            result = _ask_once(plan, material, config, workspace, provider, audit, run_id)
+            result = _ask_once(resolved, plan, material, config, workspace, provider, audit, run_id)
     except (ProviderError, PromptTooLargeError) as error:
         _announce(resolved.name, "failed", time.monotonic() - started, config, audit, run_id)
         console.print(f"[red]{error}[/red]")
