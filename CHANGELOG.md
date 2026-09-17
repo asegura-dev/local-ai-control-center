@@ -5,7 +5,11 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-09-16
+
+Choosing what to read, and finding out that choosing better did not help the way it was
+predicted to. The corpus this project was built for now covers 23 of 24 papers: 779
+quotations, 640 of them verified against the document they cite.
 
 ### Added
 - **`lacc outline`, which lists a document's sections and the page each starts on.** No
