@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from local_ai_control_center.core.budget import estimate_tokens
 from local_ai_control_center.core.grounding import Claim, check_claim, page_spans
-from local_ai_control_center.core.passes import passes_over
+from local_ai_control_center.core.passes import PageRangeError, only_pages, passes_over
 
 NL = chr(10)
 
@@ -111,3 +113,33 @@ def test_no_page_is_lost_when_a_size_is_stated() -> None:
     readings = passes_over(source, budget_tokens=100_000, pages_per_pass=3)
     covered = {n for r in readings for n in range(r.first_page, r.last_page + 1)}
     assert covered == set(range(1, 13))
+
+
+def test_a_range_keeps_the_documents_own_numbering() -> None:
+    """The whole point of taking a chapter is citing it, and page 1 of 251 is a wrong cite."""
+    source = _document([f"content of page {n}" for n in range(1, 21)])
+    kept = only_pages(source, 8, 11)
+    assert kept.startswith("<!-- page 8 -->")
+    assert "<!-- page 11 -->" in kept
+    assert "<!-- page 12 -->" not in kept
+    assert "<!-- page 7 -->" not in kept
+    assert "content of page 9" in kept
+
+
+def test_a_single_page_is_a_range_of_one() -> None:
+    source = _document([f"content of page {n}" for n in range(1, 6)])
+    kept = only_pages(source, 3, 3)
+    assert kept.startswith("<!-- page 3 -->")
+    assert "content of page 3" in kept
+    assert "content of page 4" not in kept
+
+
+def test_a_range_the_document_does_not_hold_says_what_it_does() -> None:
+    source = _document([f"content of page {n}" for n in range(1, 6)])
+    with pytest.raises(PageRangeError, match="holds 1 to 5"):
+        only_pages(source, 40, 68)
+
+
+def test_a_document_without_markers_cannot_be_cut_by_page() -> None:
+    with pytest.raises(PageRangeError, match="no page markers"):
+        only_pages("a plain file with no markers", 1, 2)

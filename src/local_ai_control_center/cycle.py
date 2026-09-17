@@ -33,7 +33,7 @@ from local_ai_control_center.core.grounding import (
     check_answer,
     without_repeats,
 )
-from local_ai_control_center.core.passes import passes_over
+from local_ai_control_center.core.passes import PageRangeError, only_pages, passes_over
 from local_ai_control_center.core.permissions import Capability, PermissionDenied, Permissions
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.core.skill import Skill
@@ -691,6 +691,7 @@ def run_conversion(
     audit: AuditLog,
     run_id: str,
     confirm: ConfirmationFn,
+    pages: tuple[int, int] | None = None,
 ) -> RunResult:
     """Turn ``source`` into text and write it to ``destination``, in the same order.
 
@@ -738,8 +739,13 @@ def run_conversion(
 
     try:
         text = converter.extract_text(resolved_source)
+        if pages is not None:
+            # After extraction rather than during it: the port has no notion of pages,
+            # because a Word document has none, and the markers carry the document's own
+            # numbering so a chapter taken from page 40 still cites as page 40 (ADR-046).
+            text = only_pages(text, *pages)
         write_new_file(resolved_destination, text)
-    except ConversionError as error:
+    except (ConversionError, PageRangeError) as error:
         audit.record(
             run_id,
             "ingestion_failed",
@@ -760,6 +766,7 @@ def run_conversion(
             "destination": str(resolved_destination),
             "destination_sha256": digest_of_file(resolved_destination),
             "characters": len(text),
+            "pages_taken": list(pages) if pages else None,
             # Ingestion now edits rather than only transcribing, so what it removed is
             # recorded. An extraction that dropped an implausible amount should be visible
             # afterwards, not only at the time (ADR-036).

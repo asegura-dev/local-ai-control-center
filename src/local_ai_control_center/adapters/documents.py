@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
+from local_ai_control_center.core.headings import Heading
 from local_ai_control_center.ports.converter import ConversionError, Converter
 
 PAGE_MARKER = "<!-- page {number} -->"
@@ -363,3 +364,44 @@ def converter_for(path: Path) -> Converter:
     raise ConversionError(
         f"LACC does not know how to convert {path.name}. Supported formats: {supported}."
     )
+
+
+def embedded_outline(path: Path) -> tuple[Heading, ...]:
+    """Read the table of contents a PDF carries, when it carries one.
+
+    Publishers embed one; ten of twelve papers from a real bibliography had it, and the
+    two that did not were a preprint and a 251-page guideline. When it is there it is the
+    document's own structure rather than a guess at it, which is the difference between
+    knowing where a section starts and inferring it from how a line was typed.
+
+    Returns nothing rather than raising when the file has no outline, cannot be opened, or
+    names a destination that resolves to no page. This answers "what is in here", and a
+    question like that should come back empty rather than fail.
+    """
+    try:
+        reader = PdfReader(path)
+        entries = reader.outline
+    except (PyPdfError, OSError, ValueError):
+        return ()
+
+    found: list[Heading] = []
+
+    def walk(node: object, depth: int) -> None:
+        if isinstance(node, list):
+            for child in node:
+                walk(child, depth + 1 if not isinstance(child, list) else depth)
+            return
+        title = str(getattr(node, "title", "") or "").strip()
+        if not title:
+            return
+        try:
+            index = reader.get_destination_page_number(node)  # type: ignore[arg-type]
+        except Exception:  # noqa: BLE001 - a broken destination costs one entry, not the list
+            return
+        if index is None:
+            return
+        page = index + 1
+        found.append(Heading(page=page, title=title, number="", depth_hint=max(0, depth - 1)))
+
+    walk(entries, 0)
+    return tuple(found)

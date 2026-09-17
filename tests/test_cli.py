@@ -1060,3 +1060,56 @@ def test_nothing_is_read_to_produce_the_estimate(tmp_path: Path) -> None:
     # which it could not have if it depended on parsing the document.
     assert "passes" in result.stdout
     assert "Declined" in result.stdout
+
+
+def test_outline_lists_sections_and_says_where_they_came_from(tmp_path: Path) -> None:
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    body = chr(10).join(
+        f"<!-- page {n} -->{chr(10)}{chr(10)}6.{n} Section number {n}{chr(10)}Prose here."
+        for n in range(1, 6)
+    )
+    (workspace / "guide.md").write_text(body, encoding="utf-8")
+    config = tmp_path / "config.yaml"
+    config.write_text(f"workspace_root: {workspace}{chr(10)}", encoding="utf-8")
+
+    result = runner.invoke(app, ["outline", "guide.md", "-c", str(config)])
+    assert result.exit_code == 0, result.stdout
+    assert "5 sections" in result.stdout
+    assert "numbered headings found in the text" in result.stdout
+    assert "Section number 3" in result.stdout
+
+
+def test_outline_says_how_many_the_filter_hid(tmp_path: Path) -> None:
+    """A filter that shows its hits and hides its count is the omission this avoids."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    body = chr(10).join(
+        f"<!-- page {n} -->{chr(10)}{chr(10)}6.{n} " + ("Nodal staging" if n == 2 else f"Other {n}")
+        for n in range(1, 8)
+    )
+    (workspace / "guide.md").write_text(body, encoding="utf-8")
+    config = tmp_path / "config.yaml"
+    config.write_text(f"workspace_root: {workspace}{chr(10)}", encoding="utf-8")
+
+    result = runner.invoke(app, ["outline", "guide.md", "-c", str(config), "--about", "nodal"])
+    assert result.exit_code == 0, result.stdout
+    # Rich wraps, so compare against the text with its line breaks folded away.
+    flowed = " ".join(result.stdout.split())
+    assert "Nodal staging" in flowed
+    assert "6 of 7 sections are hidden" in flowed
+    assert "the words are yours" in flowed
+
+
+def test_outline_on_a_document_with_nothing_to_find_says_so(tmp_path: Path) -> None:
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "plain.md").write_text("Just prose, no numbered headings.", encoding="utf-8")
+    config = tmp_path / "config.yaml"
+    config.write_text(f"workspace_root: {workspace}{chr(10)}", encoding="utf-8")
+
+    result = runner.invoke(app, ["outline", "plain.md", "-c", str(config)])
+    assert result.exit_code == 1
+    flowed = " ".join(result.stdout.split())
+    assert "No sections found" in flowed
+    assert "without guessing at how lines were typed" in flowed

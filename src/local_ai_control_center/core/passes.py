@@ -35,6 +35,37 @@ class Pass(BaseModel):
         return self.last_page - self.first_page + 1
 
 
+class PageRangeError(ValueError):
+    """Raised when a range of pages is asked for that the document does not hold."""
+
+
+def only_pages(source: str, first: int, last: int) -> str:
+    """Return the part of ``source`` between pages ``first`` and ``last``, inclusive.
+
+    **The numbering is the document's own and is not renumbered.** A chapter taken from
+    page 40 keeps saying page 40, because the point of taking it is to cite it, and a
+    citation that says page 1 of a 251-page guideline is a wrong citation rather than a
+    small one.
+
+    A document with no page markers cannot be cut this way and says so: anything LACC did
+    not ingest has no pages to name.
+    """
+    spans = page_spans(source)
+    if not spans:
+        raise PageRangeError(
+            "That document has no page markers, so there are no pages to take. Ingest it "
+            "with lacc ingest, which preserves them."
+        )
+    if first > last:
+        raise PageRangeError(f"Page {first} comes after page {last}.")
+
+    kept = [span for span in spans if first <= span[0] <= last]
+    if not kept:
+        held = f"{spans[0][0]} to {spans[-1][0]}"
+        raise PageRangeError(f"No pages between {first} and {last}. This document holds {held}.")
+    return source[kept[0][1] : kept[-1][2]].strip() + chr(10)
+
+
 def passes_over(
     source: str, budget_tokens: int, pages_per_pass: int | None = None
 ) -> tuple[Pass, ...]:

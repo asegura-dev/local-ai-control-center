@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`lacc outline`, which lists a document's sections and the page each starts on.** No
+  model is involved, and that is the decision rather than a limitation: choosing what to
+  read is the step before reading, and a model asked to choose leaves things out without
+  saying which. Measured: asked to cover 24 documents it covered 10 and named none of the
+  fourteen it dropped.
+
+  Two sources, in order. A PDF's embedded outline is the document's own structure - ten of
+  twelve papers from a real bibliography carry one. When there is none, numbered headings
+  are found in the text, which is what guidelines and theses have. The output says which
+  source it used.
+
+  **The list is complete by default, and `--about` says how much it hid.** On the EAU
+  guidelines: 216 sections found, 19 table-of-contents lines excluded and reported as such,
+  and a filter for the caller's own words shows seven while stating that 209 are hidden and
+  that a section can be about a subject without being named for it. A filter that shows its
+  hits and not its misses is the omission this command exists to avoid.
+
+- **`lacc ingest --pages 40-68`**, taking part of a document. **The document's own page
+  numbering is kept**, so a chapter taken from page 40 still cites as page 40 - renumbering
+  it would turn every citation from the excerpt into a wrong one. Applied after extraction
+  rather than during it, because a Word document has no pages and the port should not
+  pretend otherwise.
+
+  On the EAU guidelines this is the difference between 251 pages in sixteen passes, which
+  failed twice on the engine, and eight pages in one call.
+
 - **`--pages-per-pass N`, because reading in passes turns out to help documents that fit.**
   ADR-045 built passes for documents too large for the window. Three documents that fit
   comfortably, read twice against the same engine, model, window and temperature - once

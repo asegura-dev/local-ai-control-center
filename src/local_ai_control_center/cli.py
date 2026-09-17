@@ -9,6 +9,7 @@ a skill, previews it, asks for confirmation (defaulting to no), and executes;
 from __future__ import annotations
 
 import os
+import re
 import time
 from enum import StrEnum
 from pathlib import Path
@@ -20,7 +21,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from local_ai_control_center.adapters.documents import HiddenText, converter_for
+from local_ai_control_center.adapters.documents import HiddenText, converter_for, embedded_outline
 from local_ai_control_center.adapters.mock import MockProvider
 from local_ai_control_center.adapters.ntfy import notifier_from_config
 from local_ai_control_center.adapters.ollama import (
@@ -30,6 +31,8 @@ from local_ai_control_center.adapters.ollama import (
 )
 from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
+from local_ai_control_center.core.headings import headings_in, matching
+from local_ai_control_center.core.passes import PageRangeError
 from local_ai_control_center.core.permissions import grant
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.core.run import new_run_id
@@ -614,6 +617,113 @@ def preview(
     _show_preview(result)
 
 
+_PAGE_RANGE = re.compile(r"^\s*(\d+)\s*(?:-\s*(\d+))?\s*$")
+
+
+def _page_range(given: str | None) -> tuple[int, int] | None:
+    """Read `40-68`, or `40` for a single page. Anything else is refused, not guessed."""
+    if given is None:
+        return None
+    match = _PAGE_RANGE.match(given)
+    if not match:
+        raise typer.BadParameter(f"'{given}' is not a page or a range. Write 40 or 40-68.")
+    first = int(match.group(1))
+    last = int(match.group(2)) if match.group(2) else first
+    if first < 1:
+        raise typer.BadParameter("Pages are numbered from 1.")
+    if first > last:
+        raise typer.BadParameter(f"Page {first} comes after page {last}.")
+    return first, last
+
+
+@app.command()
+def outline(
+    source: Annotated[Path, typer.Argument(help="A document inside the workspace.")],
+    config_path: Annotated[
+        Path,
+        typer.Option("--config", "-c", help="Path to the configuration file."),
+    ] = DEFAULT_CONFIG_PATH,
+    about: Annotated[
+        str | None,
+        typer.Option(
+            "--about",
+            help="Show only sections whose title contains one of these words, comma separated.",
+        ),
+    ] = None,
+) -> None:
+    """List a document's sections and the page each starts on, so you can choose one.
+
+    Nothing is sent anywhere and no model is involved. Choosing what to read is the step
+    before reading, and a model asked to choose would leave things out without saying which
+    - measured behaviour, and the reason this is string matching (ADR-046).
+
+    Two sources, in order. A PDF's own embedded outline is the document's structure rather
+    than a guess at it, and most published papers carry one. When there is none, numbered
+    headings are found in the text, which is what guidelines and theses have.
+    """
+    config, workspace = _load(config_path)
+    try:
+        resolved = workspace.resolve_within(source)
+    except ValueError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+    if not resolved.exists():
+        console.print(f"[red]{source} is not in the workspace.[/red]")
+        raise typer.Exit(code=1)
+
+    found = embedded_outline(resolved) if resolved.suffix.lower() == ".pdf" else ()
+    how = "the document's own outline"
+    if not found:
+        text = _text_to_outline(resolved, config)
+        found = headings_in(text)
+        how = "numbered headings found in the text"
+    if not found:
+        console.print(
+            f"[yellow]No sections found in {source.name}.[/yellow] It carries no outline, and "
+            "its headings are not numbered - so there is nothing here that can be located "
+            "without guessing at how lines were typed."
+        )
+        raise typer.Exit(code=1)
+
+    sections = tuple(h for h in found if not h.in_contents)
+    contents = len(found) - len(sections)
+    shown = sections
+    if about:
+        words = tuple(word.strip() for word in about.split(",") if word.strip())
+        shown = matching(sections, words)
+
+    console.print(f"[bold]{source.name}[/bold] - {len(sections)} sections, from {how}.")
+    if contents:
+        console.print(f"{contents} more are lines from its table of contents, not shown.")
+    for heading in shown:
+        indent = "  " * min(heading.depth, 5)
+        number = f"{heading.number} " if heading.number else ""
+        console.print(f"  [dim]p.{heading.page:>4}[/dim]  {indent}{number}{heading.title}")
+
+    if about:
+        # Said whichever way it came out. A filter that shows its hits and hides its
+        # count is the invisible omission this command exists to avoid.
+        console.print(
+            f"[yellow]{len(sections) - len(shown)} of {len(sections)} sections are hidden "
+            f"by --about.[/yellow] Run without it to see them; the words are yours, and a "
+            "section can be about a subject without being named for it."
+        )
+
+
+def _text_to_outline(path: Path, config: Config) -> str:
+    """Return the document's text, converting it in memory when it is not already text.
+
+    Reads without writing: listing what is in a document should not leave a file behind.
+    """
+    if path.suffix.lower() in {".md", ".txt"}:
+        return path.read_text(encoding="utf-8", errors="replace")
+    try:
+        return converter_for(path).extract_text(path)
+    except ConversionError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+
 @app.command()
 def ingest(
     sources: Annotated[
@@ -628,6 +738,16 @@ def ingest(
         Path,
         typer.Option("--config", "-c", help="Path to the configuration file."),
     ] = DEFAULT_CONFIG_PATH,
+    pages: Annotated[
+        str | None,
+        typer.Option(
+            "--pages",
+            help=(
+                "Take only these pages, as 40-68 or 40. The document's own numbering is "
+                "kept, so what you take from page 40 still cites as page 40."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Extract documents' text into files LACC can read, after preview and confirmation.
 
@@ -677,6 +797,8 @@ def ingest(
         console.print("[yellow]Declined.[/yellow] Nothing was written.")
         return
 
+    wanted = _page_range(pages)
+
     done, failed = 0, []
     for source, target, converter in jobs:
         try:
@@ -691,8 +813,9 @@ def ingest(
                 audit,
                 new_run_id(),
                 lambda _preview: True,
+                wanted,
             )
-        except ConversionError as error:
+        except (ConversionError, PageRangeError) as error:
             # One unreadable document costs that document, not the batch.
             failed.append((source, str(error)))
             continue
