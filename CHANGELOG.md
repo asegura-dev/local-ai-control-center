@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Records removed from the end of the audit trail are now noticed** - the one safety claim
+  of seven that did not hold when ADR-043 tested them by running them. A sidecar beside the
+  trail remembers how many records it holds and which digest it ends on, rewritten on every
+  append. A trail shorter than its anchor is reported as loss, and a trail the same length
+  ending on a different digest is reported as a replaced last record, because those are
+  different events and one message for both would send somebody looking for the wrong thing.
+
+  **This narrows the hole rather than closing it, and the message says so.** PRINCIPLES
+  says nothing outside the workspace is touched, so the anchor lives beside the trail under
+  the same permissions: it catches a crashed write, a synchronisation conflict, a restored
+  backup and a careless tamperer, and it does not catch somebody who removes their own
+  records and updates the anchor too.
+
+  **The notification now carries the trail's length and head digest**, and that is the only
+  witness that is not on the machine. A local tamperer can rewrite the trail and its anchor;
+  they cannot rewrite a notification already delivered to a server you host. Best effort,
+  like every notification, and worth nothing if you do not keep them - which `lacc verify`
+  says rather than implies.
+
+  A trail written before anchors existed reports having none, and is not treated as
+  tampered with. Every trail this project has ever written is in that state.
+
 ### Added
 - **A skill can be written down in a file** (ADR-048). A name, a summary, the instructions,
   and the fields the answer should carry. LACC loads it beside the built-in ones, and a skill

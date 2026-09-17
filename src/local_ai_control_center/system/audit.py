@@ -9,6 +9,7 @@ prompt and completion content only under `full`. When a record cannot be written
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -158,7 +159,27 @@ class AuditLog:
                 raise AuditWriteError(f"Could not write audit record: {error}") from error
             return None
         self._previous = event.digest
+        self._anchor(event.digest)
         return event
+
+    def _anchor(self, head: str) -> None:
+        """Record how long the trail is now, beside it.
+
+        Best effort and deliberately not fatal: the record itself is already written, and
+        failing a run because a note about it could not be written would trade the thing for
+        the note about the thing.
+
+        Beside the trail rather than outside the workspace, because nothing outside the
+        workspace is touched. That places it under the same permissions as the trail, which
+        is why this guards against loss and not against a person (ADR-049).
+        """
+        try:
+            lines = sum(1 for line in self._path.read_text(encoding="utf-8").splitlines() if line)
+            self._path.with_suffix(ANCHOR_SUFFIX).write_text(
+                json.dumps({"records": lines, "head": head}) + chr(10), encoding="utf-8"
+            )
+        except OSError:
+            return
 
     def _head_digest(self) -> str:
         """The digest the next record links to: the last one written, or genesis.
@@ -271,3 +292,63 @@ def verify_chain(path: Path) -> ChainCheck:
 
 _CONTENT_KEYS = frozenset({"prompt", "completion"})
 """Detail keys treated as user content, omitted unless the level is ``full``."""
+
+
+ANCHOR_SUFFIX = ".anchor"
+"""What the sidecar beside the trail is called: `audit.anchor` next to `audit.jsonl`."""
+
+
+class AnchorCheck(BaseModel):
+    """What the sidecar says about a trail, compared with the trail itself.
+
+    Three outcomes rather than two, because "shorter than it was" and "the last record
+    changed" are different events with different causes, and a single "broken" would send
+    somebody looking for the wrong thing (ADR-049).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    present: bool = False
+    """Whether there is an anchor at all. Trails written before this have none."""
+
+    agrees: bool = False
+    expected_records: int = 0
+    found_records: int = 0
+    head_changed: bool = False
+    head: str = ""
+    """The digest the trail actually ends on, for a caller that wants to carry it somewhere."""
+
+    @property
+    def lost(self) -> int:
+        """How many records the trail is short of what the anchor remembers."""
+        return max(0, self.expected_records - self.found_records)
+
+
+def check_anchor(path: Path) -> AnchorCheck:
+    """Compare a trail against the sidecar beside it.
+
+    A missing sidecar is reported as absent rather than as a failure: every trail written
+    before this decision has none, and treating an old trail as tampered with would be an
+    alarm about this project's own history.
+    """
+    anchor = path.with_suffix(ANCHOR_SUFFIX)
+    try:
+        remembered = json.loads(anchor.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return AnchorCheck()
+    try:
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
+    except OSError:
+        lines = []
+
+    expected = int(remembered.get("records", 0))
+    head = str(remembered.get("head", ""))
+    actual_head = _last_digest(path)
+    return AnchorCheck(
+        present=True,
+        agrees=len(lines) == expected and actual_head == head,
+        expected_records=expected,
+        found_records=len(lines),
+        head_changed=len(lines) == expected and actual_head != head,
+        head=actual_head,
+    )

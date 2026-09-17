@@ -77,7 +77,12 @@ from local_ai_control_center.cycle import (
 from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
 from local_ai_control_center.ports.provider import Provider, ProviderError
-from local_ai_control_center.system.audit import AuditLog, verify_chain
+from local_ai_control_center.system.audit import (
+    AnchorCheck,
+    AuditLog,
+    check_anchor,
+    verify_chain,
+)
 from local_ai_control_center.system.profiler import SystemProfile, profile_system
 
 DEFAULT_CONFIG_PATH = Path("configs/config.yaml")
@@ -648,9 +653,16 @@ def _announce(
     if notifier is None:
         return
 
+    # The only witness to this trail that is not on this machine. A local tamperer can
+    # rewrite the trail and its anchor; they cannot rewrite a notification already
+    # delivered to a server somebody else keeps (ADR-049).
+    anchor = check_anchor(audit.path)
+    witness = (
+        f" [trail: {anchor.found_records} records, {anchor.head[:8]}]" if anchor.present else ""
+    )
     notification = Notification(
         title=f"LACC: {skill_name} {outcome}",
-        body=body or f"{skill_name} {outcome} after {elapsed:.0f}s",
+        body=(body or f"{skill_name} {outcome} after {elapsed:.0f}s") + witness,
         tags=(_OUTCOME_TAGS.get(outcome, "bell"),),
     )
     delivery = notifier.send(notification)
@@ -1570,15 +1582,57 @@ def verify(
             f"[yellow]{result.unverifiable} of them predate the chain[/yellow] and cannot "
             "be vouched for either way."
         )
+    _report_the_anchor(check_anchor(audit.path))
     # Two limits, and the one that was never stated is the easier attack. Tested: editing,
     # deleting a middle record and reordering are all caught; removing records from the end
     # is not, and no chain can catch it from the file alone (ADR-043).
     console.print(
-        "[dim]This catches a record edited, removed from the middle, or reordered. It does "
-        "not catch records removed from the end - a shorter chain is still a valid chain - "
-        "nor a deliberate rewrite, since whatever can write the file can recompute the "
-        "digests. The dates above are your check against the first: a trail ending before "
-        "your last run has lost something.[/dim]"
+        "[dim]The chain catches a record edited, removed from the middle, or reordered. It "
+        "does not catch records removed from the end - a shorter chain is still a valid "
+        "chain - nor a deliberate rewrite, since whatever can write the file can recompute "
+        "the digests. The anchor beside the trail catches loss, and sits under the same "
+        "permissions as the trail, so it does not catch a person who wants it gone. If you "
+        "keep your notifications, those are the only record of this that is not on this "
+        "machine.[/dim]"
+    )
+
+
+def _report_the_anchor(anchor: AnchorCheck) -> None:
+    """Say what the sidecar beside the trail knows, and what it cannot know.
+
+    Three outcomes rather than two: shorter than it was, and a changed last record, are
+    different events with different causes (ADR-049).
+    """
+    if not anchor.present:
+        console.print(
+            "[dim]This trail has no anchor beside it - it was written before anchors "
+            "existed. One will be written the next time something is recorded.[/dim]"
+        )
+        return
+    if anchor.agrees:
+        console.print(
+            f"[green]The anchor agrees:[/green] {anchor.expected_records} records, and the "
+            "last one is the last one it saw."
+        )
+        return
+    if anchor.lost:
+        console.print(
+            f"[red]{anchor.lost} records are missing from the end.[/red] The anchor "
+            f"remembers {anchor.expected_records} and the trail holds {anchor.found_records}. "
+            "A crashed write, a synchronisation conflict or a restored backup will do this; "
+            "so will somebody removing them."
+        )
+        return
+    if anchor.head_changed:
+        console.print(
+            "[red]The last record is not the one the anchor saw.[/red] The count matches, so "
+            "nothing was removed - the final record was replaced."
+        )
+        return
+    console.print(
+        f"[yellow]The trail is longer than the anchor remembers[/yellow] "
+        f"({anchor.found_records} against {anchor.expected_records}). Something wrote to it "
+        "without going through LACC."
     )
 
 

@@ -73,6 +73,12 @@ end of the audit trail are undetectable**, and nothing inside the file can catch
 the cheapest attack of the set, and the earlier decision had named the sophisticated one and
 left this unstated (ADR-043).
 
+That one is now **narrowed and not closed**. A sidecar beside the trail remembers its length,
+so truncation is noticed - by a crashed write, a sync conflict, a restored backup or a
+careless tamperer. It sits under the same permissions as the trail, because nothing outside
+the workspace is touched, so it does not stop somebody who updates both. The notification
+carries the head digest and is the only witness that is not on the machine (ADR-049).
+
 ## What is measured and currently holds
 
 **The check, graded where the answer was known first.** Twelve quotations were written into
