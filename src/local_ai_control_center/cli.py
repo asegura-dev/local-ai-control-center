@@ -21,7 +21,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from local_ai_control_center.adapters.documents import HiddenText, converter_for, embedded_outline
+from local_ai_control_center.adapters.documents import (
+    HiddenText,
+    converter_for,
+    embedded_metadata,
+    embedded_outline,
+)
 from local_ai_control_center.adapters.mock import MockProvider
 from local_ai_control_center.adapters.ntfy import notifier_from_config
 from local_ai_control_center.adapters.ollama import (
@@ -660,6 +665,60 @@ def _page_range(given: str | None) -> tuple[int, int] | None:
     if first > last:
         raise typer.BadParameter(f"Page {first} comes after page {last}.")
     return first, last
+
+
+@app.command()
+def metadata(
+    sources: Annotated[list[Path], typer.Argument(help="Documents inside the workspace.")],
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Print what each document says about itself: title, authors, DOI and date.
+
+    No network and no model. Asked for a journal, a model supplied one from memory twelve
+    times out of twenty-four **with an instruction in the same prompt not to** - and two
+    were wrong in a way that would put a false citation in a thesis (ADR-047).
+
+    The journal is not among the fields, and the DOI is why: with a correct identifier a
+    reference manager resolves journal, volume and pages against a record rather than a
+    recollection. What a file does not carry is reported as missing, never guessed.
+    """
+    _, workspace = _load(config_path)
+    silent: list[str] = []
+    for source in sources:
+        try:
+            path = workspace.resolve_within(source)
+        except ValueError as error:
+            console.print(f"[red]{error}[/red]")
+            raise typer.Exit(code=1) from error
+        if not path.exists():
+            console.print(f"[red]{source} is not in the workspace.[/red]")
+            raise typer.Exit(code=1)
+
+        found = embedded_metadata(path)
+        console.print(f"[bold]{source.name}[/bold]")
+        if not found.says_anything:
+            console.print("  [yellow]This file says nothing about itself.[/yellow]")
+            silent.append(source.name)
+            continue
+        if found.title:
+            console.print(f"  Title:   {found.title}")
+        if found.authors:
+            console.print(f"  Authors: {', '.join(found.authors)}")
+        if found.doi:
+            console.print(f"  DOI:     [bold]{found.doi}[/bold]")
+        if found.date:
+            console.print(f"  Date:    {found.date}")
+        if found.missing:
+            console.print(f"  [dim]Not in the file: {', '.join(found.missing)}[/dim]")
+
+    if silent:
+        console.print(
+            f"[yellow]{len(silent)} of {len(sources)} carry no metadata at all.[/yellow] "
+            "Preprints, statistics sheets and some guidelines ship without it. Nothing here "
+            "will invent it for you, which is the point."
+        )
 
 
 @app.command()

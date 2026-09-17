@@ -152,3 +152,56 @@ def _folded(text: str) -> str:
     same defect here, and folding is the same answer.
     """
     return "".join(c for c in text.lower() if c.isalnum())
+
+
+class DocumentMetadata(BaseModel):
+    """What a file says about itself, and nothing more.
+
+    Named for what it is rather than "the metadata", because a publisher's tooling wrote it
+    and nothing here verifies it. Every field defaults to empty, and empty means the file
+    did not say - never that LACC could not be bothered to guess (ADR-047).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    title: str = ""
+    authors: tuple[str, ...] = ()
+    doi: str = ""
+    date: str = ""
+
+    @property
+    def missing(self) -> tuple[str, ...]:
+        """The fields this file does not carry, named so a reader can go and find them."""
+        absent = []
+        if not self.title:
+            absent.append("title")
+        if not self.authors:
+            absent.append("authors")
+        if not self.doi:
+            absent.append("DOI")
+        if not self.date:
+            absent.append("date")
+        return tuple(absent)
+
+    @property
+    def says_anything(self) -> bool:
+        """Whether the file carried any of it."""
+        return bool(self.title or self.authors or self.doi or self.date)
+
+
+_DOI_PREFIXES = ("https://doi.org/", "http://doi.org/", "doi:", "DOI:")
+
+
+def normalized_doi(given: str) -> str:
+    """Strip the ways a DOI is written down to the DOI itself.
+
+    Observed in one bibliography: bare, `doi:`-prefixed, and as a doi.org URL. A citation
+    manager wants the identifier, and three spellings of it are three identifiers to anyone
+    comparing strings.
+    """
+    doi = given.strip()
+    for prefix in _DOI_PREFIXES:
+        if doi.lower().startswith(prefix.lower()):
+            doi = doi[len(prefix) :].strip()
+            break
+    return doi if doi.startswith("10.") else ""

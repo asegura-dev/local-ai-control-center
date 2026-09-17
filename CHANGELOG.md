@@ -5,9 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-09-17
+
+Grading the check against answers known in advance, and stopping two places where a
+plausible answer stood in for no answer.
 
 ### Added
+- **`lacc metadata`, which reports what a document says about itself** - title, authors,
+  DOI and date, read from the file. No network and no model.
+
+  Asked for a journal, a 14B supplied one from memory twelve times out of twenty-four
+  **with an instruction in the same prompt not to**, and two were wrong in a way that would
+  put a false citation in a thesis. The fix is not a better prompt.
+
+  **The journal is not among the fields, and the DOI is why.** Measured over 23 real papers:
+  18 carry a title, 15 an author, 11 a DOI - and the field that looks like a journal names
+  the *publisher* in ten of eleven. `Springer US` reported as a journal is the same
+  plausible wrong answer in a new place. With a correct DOI a reference manager resolves
+  journal, volume and pages against a record instead of a recollection.
+
+  Crossref is deferred rather than rejected, with the reason written down in ADR-047: a DOI
+  sent to a third party says what you are reading, and a bibliography of them says what you
+  are working on.
+
 - **A run says where it has got to.** Reading a 251-page document takes sixteen calls and
   twenty minutes, and until now it said nothing at all between starting and finishing - the
   terminal showed a spinner that meant only "not dead yet".

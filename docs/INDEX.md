@@ -117,6 +117,7 @@ Ends on the one safety claim that did not hold, which is why it is worth reading
 | 044 | [an-answer-we-already-know](adr/ADR-044-an-answer-we-already-know.md) | Every rate this project published was measured where the correct answer was unknown - the condition that produced six mis-measurements, all flattering. |
 | 045 | [a-document-read-in-passes](adr/ADR-045-a-document-read-in-passes.md) | Sets the scope of v2 at one thing: a document too large for the window is read in passes over its pages, overlapping by one so a passage crossing a break stays whole. |
 | 046 | [how-much-to-show-at-once](adr/ADR-046-how-much-to-show-at-once.md) | Reading in passes was built for documents too large for the window and turns out to help documents that fit: measured over three of them, three-page readings gave 4.6x the verified quotations for twice the time. Makes pass size a setting, and derives the generation timeout from the window after a fixed 300 seconds reported slow work as an unreachable engine. |
+| 047 | [metadata-the-file-already-carries](adr/ADR-047-metadata-the-file-already-carries.md) | A model asked for a journal invented one twelve times in twenty-four, with an instruction not to. Reports the title, authors, DOI and date a file carries and nothing else; the journal is omitted because the embedded field names the publisher in ten of eleven files, and a DOI lets a reference manager resolve the rest. Defers Crossref, because a DOI sent to a third party says what you are reading. |
 
 ## Guides (`docs/guides/`)
 

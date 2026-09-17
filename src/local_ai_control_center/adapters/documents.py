@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 from docx import Document
 from docx.opc.exceptions import OpcError, PackageNotFoundError
@@ -25,7 +26,7 @@ from pydantic import BaseModel, ConfigDict
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
-from local_ai_control_center.core.headings import Heading
+from local_ai_control_center.core.headings import DocumentMetadata, Heading, normalized_doi
 from local_ai_control_center.ports.converter import ConversionError, Converter
 
 PAGE_MARKER = "<!-- page {number} -->"
@@ -405,3 +406,57 @@ def embedded_outline(path: Path) -> tuple[Heading, ...]:
 
     walk(entries, 0)
     return tuple(found)
+
+
+_DOI_FIELDS = ("dc_identifier", "prism_doi", "pdfx_doi")
+_JOURNAL_IS_USUALLY_THE_PUBLISHER = ("prism_publicationName", "dc_publisher", "dc_source")
+"""Measured over 23 papers: these name the publisher, not the journal, in ten of eleven.
+
+`Springer US` is not a journal, and reporting it as one would be a plausible wrong answer -
+which is the thing this whole area exists to stop. Nothing reads these; they are named here
+so the next person does not try (ADR-047).
+"""
+_DATE_FIELDS = ("prism_coverDisplayDate", "prism_publicationDate", "xmp_create_date")
+
+
+def embedded_metadata(path: Path) -> DocumentMetadata:
+    """Read what a PDF says about itself: title, authors, DOI and date.
+
+    The journal is deliberately not among them. What the embedded fields call a publication
+    is the publisher in almost every file measured, and a publisher reported as a journal is
+    exactly the plausible wrong answer this replaces (ADR-047).
+
+    Returns an empty record rather than raising. "This file says nothing about itself" is an
+    answer, and five of twenty-three real papers give it.
+    """
+    try:
+        reader = PdfReader(path)
+        info: Any = reader.metadata or {}
+        xmp = reader.xmp_metadata
+    except (PyPdfError, OSError, ValueError):
+        return DocumentMetadata()
+
+    title = str(info.get("/Title", "") or "").strip()
+    raw_authors = str(info.get("/Author", "") or "").strip()
+    authors = tuple(
+        part.strip()
+        for part in re.split(r"\s*(?:;|,| and )\s*", raw_authors)
+        if part.strip() and len(part.strip()) > 1
+    )
+
+    doi = date = ""
+    if xmp is not None:
+        doi = normalized_doi(_first(xmp, _DOI_FIELDS))
+        date = _first(xmp, _DATE_FIELDS)[:10]
+    return DocumentMetadata(title=title, authors=authors, doi=doi, date=date)
+
+
+def _first(xmp: object, fields: tuple[str, ...]) -> str:
+    """The first of ``fields`` the XMP carries, as a string. Lists give their first entry."""
+    for field in fields:
+        value = getattr(xmp, field, None)
+        if isinstance(value, list):
+            value = value[0] if value else None
+        if value:
+            return str(value).strip()
+    return ""
