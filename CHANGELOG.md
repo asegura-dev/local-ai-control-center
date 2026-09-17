@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A port for choosing which passages go into a prompt**, with a first implementation that
+  uses no model and no network (ADR-050). A corpus from a real bibliography is 654
+  quotations and about thirty thousand tokens; the window is 24,576. The thing this project
+  produces cannot be read by the thing it runs on, and reading in passes does not help -
+  traversal and selection are different mechanisms.
+
+  **Whatever is not sent is counted and reported, always.** This is the first component in
+  LACC that discards material on the user's behalf, and a selection that hides its discards
+  turns a partial answer into a confident one. That is the shape of the worst failure this
+  project has measured: a model asked to cover 24 documents covered 10 and named none of
+  the fourteen it dropped.
+
+  Ranking is by the question's words, weighted by how rare each is across the corpus. An
+  embedding model may well rank better; nobody here has measured that it does, and a port
+  means a measurement can decide rather than a fashion.
+
+### Known limits
+- **Word ranking does not cross languages, and that is now measured rather than suspected.**
+  On a real corpus of English quotations, a question in Spanish about neural network
+  architecture matched two passages of 654 and both were irrelevant. For somebody whose
+  sources are in English and whose thesis is in Spanish, this is the limit that matters, and
+  it is the honest reason to try embeddings next. A test pins it so a later retriever has
+  something to beat.
+
+### Fixed
+- **An assembled corpus could not be read back by the parser that defined its format.** The
+  bullet used to mark a quotation as being on the reader's subject - `- > ` instead of `> ` -
+  made 265 of 654 quotations silently unreadable. The round-trip test passed throughout
+  because it only ever round-tripped a corpus with no marks in it, which is the failure the
+  module's own docstring says it is uneasy about, arriving by exactly the route it predicted.
+
 ### Security
 - **Records removed from the end of the audit trail are now noticed** - the one safety claim
   of seven that did not hold when ADR-043 tested them by running them. A sidecar beside the

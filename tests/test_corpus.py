@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from local_ai_control_center.cli import _collected_markdown
 from local_ai_control_center.core.corpus import about, parse_corpus
 from local_ai_control_center.core.grounding import CheckedClaim, Claim
@@ -105,3 +107,28 @@ def test_marking_with_no_words_marks_nothing() -> None:
     claims = parse_corpus(_collected_markdown("extract_claims", "m", [("p.md", result)]))
     assert about(claims, ()) == frozenset()
     assert about(claims, ("  ",)) == frozenset()
+
+
+def test_a_marked_quotation_is_still_readable(tmp_path: Path) -> None:
+    """The bullet an assembled corpus uses to mark a subject broke the reader.
+
+    The round trip passed throughout, because it only ever round-tripped a corpus with no
+    marks in it. Two hundred and sixty-five quotations were silently unreadable.
+    """
+    marked = (
+        "## paper.md"
+        + chr(10) * 2
+        + "### Citable"
+        + chr(10) * 2
+        + "- > a marked quotation"
+        + chr(10) * 2
+        + "p. 3 - the paraphrase"
+        + chr(10) * 2
+        + "> an unmarked one"
+        + chr(10) * 2
+        + "p. 4 - another paraphrase"
+        + chr(10)
+    )
+    read_back = parse_corpus(marked)
+    assert [c.quote for c in read_back] == ["a marked quotation", "an unmarked one"]
+    assert [c.page for c in read_back] == [3, 4]

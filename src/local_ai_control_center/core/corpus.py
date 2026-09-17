@@ -19,7 +19,13 @@ import re
 from pydantic import BaseModel, ConfigDict
 
 _SECTION = re.compile(r"^## (.+)$")
-_QUOTED = re.compile(r"^> (.+)$")
+_QUOTED = re.compile(r"^(?:- )?> (.+)$")
+"""A quoted line, with or without the bullet an assembled corpus uses to mark a subject.
+
+The bullet was added to the writer and broke the reader, which the round-trip test did not
+catch because it only ever round-tripped an unmarked corpus. Two hundred and sixty-five
+quotations were silently unreadable - the exact failure this module's docstring is uneasy
+about, arriving by the exact route it predicted."""
 _VERDICT = re.compile(r"^(p\. \d+|page unknown) - (.+)$")
 _NEAREST = "Closest text in the source: "
 _UNCOLLECTED = "**Not collected.**"
