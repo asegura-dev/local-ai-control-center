@@ -1113,3 +1113,44 @@ def test_outline_on_a_document_with_nothing_to_find_says_so(tmp_path: Path) -> N
     flowed = " ".join(result.stdout.split())
     assert "No sections found" in flowed
     assert "without guessing at how lines were typed" in flowed
+
+
+def _checked(quote: str, verdict: str, page: int | None = None) -> object:
+    from local_ai_control_center.core.grounding import CheckedClaim, Claim
+
+    return CheckedClaim(
+        claim=Claim(claim="a claim", quote=quote), verdict=verdict, found_on_page=page
+    )
+
+
+def test_the_corpus_tells_a_fabrication_from_an_unplaceable_quotation() -> None:
+    """The error ADR-042 exists to correct, which lived on in the writer after the check.
+
+    A quotation that is in the document and cannot be placed on a page is not a
+    fabrication, and a corpus that calls it one sends its reader to re-check real work.
+    """
+    from local_ai_control_center.cli import _collected_markdown
+    from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction
+    from local_ai_control_center.cycle import RunResult
+
+    preview = ExecutionPreview(
+        action=IntendedAction(name="extract_claims", summary="s", required=frozenset()),
+        allowed=True,
+    )
+    result = RunResult(
+        preview=preview,
+        outcome="completed",
+        checked_claims=(
+            _checked("placed on a page", "verified", 7),
+            _checked("real but unplaceable", "page_unknown"),
+            _checked("nowhere in the paper", "not_found"),
+        ),
+    )
+    corpus = _collected_markdown("extract_claims", "a-model", [("paper.md", result)])
+
+    assert "p. 7 - verified" in corpus
+    assert "page unknown - in the document, page not determined" in corpus
+    assert "page unknown - **NOT IN THE DOCUMENT**" in corpus
+    assert corpus.count("**NOT IN THE DOCUMENT**") == 1, "only the fabrication is one"
+    assert "2 of 3 quotations are in the document." in corpus
+    assert "1 are in it with no page determinable." in corpus

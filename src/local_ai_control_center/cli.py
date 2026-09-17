@@ -31,6 +31,8 @@ from local_ai_control_center.adapters.ollama import (
 )
 from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
+from local_ai_control_center.core.corpus import CollectedClaim, about, parse_corpus
+from local_ai_control_center.core.grounding import Claim, check_claim
 from local_ai_control_center.core.headings import headings_in, matching
 from local_ai_control_center.core.passes import PageRangeError
 from local_ai_control_center.core.permissions import grant
@@ -1063,16 +1065,28 @@ def _collected_markdown(
             lines += [f"**Not collected.** {outcome}", ""]
             continue
         claims = outcome.checked_claims
-        held = sum(1 for c in claims if c.holds)
+        held = sum(1 for c in claims if c.found)
         how = (
             f" Read in {outcome.passes} passes, so the model never held all of it at once."
             if outcome.passes > 1
             else ""
         )
-        lines += [f"*{held} of {len(claims)} quotations verified.*{how}", ""]
+        unplaceable = sum(1 for c in claims if c.found and not c.holds)
+        aside = f" {unplaceable} are in it with no page determinable." if unplaceable else ""
+        lines += [
+            f"*{held} of {len(claims)} quotations are in the document.*{aside}{how}",
+            "",
+        ]
         for checked in claims:
-            page = f"p. {checked.found_on_page}" if checked.found_on_page else "page unknown"
-            mark = "verified" if checked.holds else "**NOT IN THE DOCUMENT**"
+            # Three outcomes, not two. A quotation that is in the document and cannot be
+            # placed on a page is not a fabrication, and calling it one is the error
+            # ADR-042 exists to correct - which lived on here after the check was fixed.
+            if checked.holds:
+                page, mark = f"p. {checked.found_on_page}", "verified"
+            elif checked.found:
+                page, mark = "page unknown", "in the document, page not determined"
+            else:
+                page, mark = "page unknown", "**NOT IN THE DOCUMENT**"
             lines += [
                 f"> {checked.claim.quote}",
                 "",
@@ -1214,6 +1228,156 @@ def collect(
         console.print(
             f"[yellow]{len(failed)} documents were not collected:[/yellow] {', '.join(failed)}"
         )
+
+
+@app.command()
+def corpus(
+    sources: Annotated[list[Path], typer.Argument(help="Corpus files written by lacc collect.")],
+    into: Annotated[Path, typer.Option("--into", help="Where to write the assembled corpus.")],
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+    about_words: Annotated[
+        str | None,
+        typer.Option(
+            "--about",
+            help=(
+                "Mark quotations mentioning these words, comma separated. Nothing is "
+                "removed - a quotation can be about a subject without naming it."
+            ),
+        ),
+    ] = None,
+) -> None:
+    """Assemble collected corpora into one file, re-checking every quotation as it goes.
+
+    No model is involved. Each quotation is looked for again in the document it names, so a
+    corpus written by older code tells the truth without being re-generated: before v1.2.0
+    the writer labelled an unplaceable quotation a fabrication, which is the error ADR-042
+    exists to correct.
+
+    Quotations are grouped by outcome, because a reader wants the ones they can cite first
+    and the ones they must not cite marked as such.
+    """
+    _, workspace = _load(config_path)
+    collected: list[CollectedClaim] = []
+    for source in sources:
+        try:
+            text = workspace.resolve_within(source).read_text(encoding="utf-8", errors="replace")
+        except (ValueError, OSError) as error:
+            console.print(f"[red]Cannot read {source}: {error}[/red]")
+            raise typer.Exit(code=1) from error
+        collected.extend(parse_corpus(text))
+
+    if not collected:
+        console.print("[yellow]Nothing to assemble.[/yellow] Those files hold no quotations.")
+        raise typer.Exit(code=1)
+
+    marked = about(tuple(collected), _words(about_words))
+    rechecked, missing = _recheck(collected, workspace)
+    text = _assembled(rechecked, marked, sources)
+
+    try:
+        write_new_file(workspace.resolve_within(into), text)
+    except ConversionError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    real = sum(1 for _, found in rechecked if found)
+    console.print(f"[green]{len(collected)} quotations from {len(sources)} files[/green] -> {into}")
+    console.print(f"  {real} are in their document, {len(collected) - real} are not.")
+    if marked:
+        shown = sum(1 for claim, _ in rechecked if claim.quote in marked)
+        console.print(f"  {shown} mention your words; none were removed.")
+    if missing:
+        console.print(
+            f"[yellow]{len(missing)} came from documents not in the workspace[/yellow] and "
+            "could not be re-checked. They carry the label their corpus gave them."
+        )
+
+
+def _words(given: str | None) -> tuple[str, ...]:
+    """Split a comma-separated option into words, dropping the empties."""
+    return tuple(word.strip() for word in (given or "").split(",") if word.strip())
+
+
+def _recheck(
+    collected: list[CollectedClaim], workspace: Workspace
+) -> tuple[list[tuple[CollectedClaim, bool | None]], list[CollectedClaim]]:
+    """Look for every quotation again in the document it names.
+
+    Returns each claim with whether it is really there, or ``None`` when the document is no
+    longer in the workspace - which is reported rather than guessed at.
+    """
+    sources: dict[str, str | None] = {}
+    out: list[tuple[CollectedClaim, bool | None]] = []
+    missing: list[CollectedClaim] = []
+    for claim in collected:
+        if claim.document not in sources:
+            try:
+                path = workspace.resolve_within(Path(claim.document))
+                sources[claim.document] = path.read_text(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                sources[claim.document] = None
+        text = sources[claim.document]
+        if text is None:
+            missing.append(claim)
+            out.append((claim, None))
+            continue
+        out.append((claim, check_claim(Claim(claim=claim.claim, quote=claim.quote), text).found))
+    return out, missing
+
+
+_STANDINGS = ((True, "Citable"), (None, "Not re-checked"), (False, "Not in the document"))
+
+
+def _assembled(
+    rechecked: list[tuple[CollectedClaim, bool | None]],
+    marked: frozenset[str],
+    sources: list[Path],
+) -> str:
+    """Render one corpus, grouped by document, with each quotation's current standing."""
+    named = ", ".join(source.name for source in sources)
+    real = sum(1 for _, found in rechecked if found)
+    lines = [
+        "# Collected quotations",
+        "",
+        f"Assembled from {named}. Every quotation was looked for again in the document it "
+        f"names: {real} of {len(rechecked)} are there.",
+        "",
+        "This file is generated and is not a source. The quotation is what can be cited; "
+        "the line under it is the model's paraphrase and was never checked.",
+        "",
+    ]
+    if marked:
+        # Counted as entries rather than as distinct quotations: the same sentence can be
+        # quoted from two documents, and the number here has to match what a reader counts.
+        shown = sum(1 for claim, _ in rechecked if claim.quote in marked)
+        lines += [
+            f"**{shown} quotations are marked** with a bullet, for mentioning words you "
+            "gave. Nothing was removed, and a quotation can be about a subject without "
+            "naming it.",
+            "",
+        ]
+
+    by_document: dict[str, list[tuple[CollectedClaim, bool | None]]] = {}
+    for claim, found in rechecked:
+        by_document.setdefault(claim.document, []).append((claim, found))
+
+    for document, entries in by_document.items():
+        here = sum(1 for _, found in entries if found)
+        lines += [f"## {document}", "", f"*{here} of {len(entries)} are in the document.*", ""]
+        for standing, heading in _STANDINGS:
+            group = [c for c, found in entries if found is standing]
+            if not group:
+                continue
+            lines += [f"### {heading}", ""]
+            for claim in group:
+                mark = "- " if claim.quote in marked else ""
+                where = f"p. {claim.page}" if claim.page else "page unknown"
+                lines += [f"{mark}> {claim.quote}", "", f"{where} - {claim.claim}", ""]
+                if claim.nearest and standing is False:
+                    lines += [f"Closest text in the source: {claim.nearest}", ""]
+    return chr(10).join(lines) + chr(10)
 
 
 @app.command()

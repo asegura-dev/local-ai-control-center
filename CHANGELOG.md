@@ -7,7 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The corpus writer called an unplaceable quotation a fabrication**, which is the error
+  ADR-042 exists to correct - fixed in the check months ago and left standing in the writer,
+  where `"verified" if holds else "**NOT IN THE DOCUMENT**"` had no third outcome. No test
+  covered the labelling, so nothing caught it.
+
+  It cost real work: on one collected corpus, 72 quotations carried that label and **24 of
+  them are in their document**. A reader sent to re-check 72 sentences was being sent to
+  re-check 48.
+
 ### Added
+- **`lacc corpus`, which assembles collected corpora into one file and re-checks every
+  quotation as it goes.** No model is involved. Each quotation is looked for again in the
+  document it names, so a corpus written by older code tells the truth without being
+  re-generated - which is how the 24 above were recovered.
+
+  Grouped by document and then by standing: citable first, not-in-the-document last and
+  marked as such. `--about` marks quotations mentioning words you supply and **removes
+  nothing**, and says so, because a quotation can be about a subject without naming it -
+  measured twice this month.
+
+  Run over a real bibliography: 654 quotations from three files, **548 in their document**
+  against the 524 the old labels claimed.
+
 - **A fixture corpus whose answer was known before the check ran** (ADR-044, decided weeks
   ago and deliberately not built until now). Twelve quotations across four small documents,
   marked real or seeded by a person in `tests/fixtures/seeded/truth.yaml` - data beside the
