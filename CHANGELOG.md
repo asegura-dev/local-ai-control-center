@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The answer reserve was subtracted from the window and never imposed on the answer.**
+  `answer_reserve` appears in seven places, all of them deciding whether a prompt fits;
+  `num_predict` appeared nowhere. LACC held back 8,192 tokens for the answer, refused
+  prompts on that arithmetic, and then let generation run until the context filled.
+
+  Caught by a run that took **45.5 minutes and then died on the generation timeout without
+  returning anything** - the same skill on a smaller model took 10.9. Nothing said when to
+  stop.
+
+  The cap is the reserve itself, so the promise the window arithmetic already made is now
+  kept. A long answer stops, returns what it produced, and the run reports that it stopped
+  for want of room - which `lacc run` already knew how to say and never had cause to.
+
+  It bounds the wait rather than shortening it: 8,192 tokens is 43 minutes on a model that
+  does not fit its card and under five on one that does.
+
 ### Added
 - **A shape the engine enforces, rather than one it is asked for** (ADR-052). This project's
   most transferable finding is that structure is obeyed and instruction is negotiated; every

@@ -353,3 +353,52 @@ def test_nothing_configured_and_nothing_in_the_environment_stays_on_this_machine
     """The default is unchanged: loopback, with no network access needed or granted."""
     monkeypatch.delenv("OLLAMA_HOST", raising=False)
     assert resolve_engine_host("", network_access=True) == ollama_host()
+
+
+def test_the_answer_is_capped_by_the_reserve_the_window_already_set() -> None:
+    """The reserve was subtracted from the window to decide what prompt fits, and then
+    never imposed on the answer. A generation could run past what the window was budgeted
+    for - measured at fifty-one minutes against eleven for the same skill on a smaller
+    model, because nothing said when to stop."""
+    from unittest.mock import patch
+
+    from local_ai_control_center.core.budget import answer_reserve
+
+    sent: dict[str, object] = {}
+
+    def _capture(request: object, **_: object) -> object:
+        import json as _json
+
+        sent.update(_json.loads(request.data.decode("utf-8")))  # type: ignore[attr-defined]
+        return _fake_generate_response("an answer")
+
+    provider = OllamaProvider("qwen2.5:3b", 32768)
+    with patch("urllib.request.urlopen", side_effect=_capture):
+        provider.complete("a prompt")
+
+    options = sent["options"]
+    assert isinstance(options, dict)
+    assert options["num_predict"] == answer_reserve(32768) == 8192
+    assert options["num_ctx"] == 32768
+
+
+def test_without_a_configured_window_nothing_is_capped() -> None:
+    """A window nobody named is a window LACC cannot budget against, and inventing a cap
+    would be guessing at a number the configuration deliberately did not give."""
+    from unittest.mock import patch
+
+    sent: dict[str, object] = {}
+
+    def _capture(request: object, **_: object) -> object:
+        import json as _json
+
+        sent.update(_json.loads(request.data.decode("utf-8")))  # type: ignore[attr-defined]
+        return _fake_generate_response("an answer")
+
+    with patch("urllib.request.urlopen", side_effect=_capture):
+        OllamaProvider("qwen2.5:3b").complete("a prompt")
+
+    options = sent["options"]
+    assert isinstance(options, dict)
+    assert "num_predict" not in options
+    assert "num_ctx" not in options

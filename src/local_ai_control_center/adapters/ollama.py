@@ -192,6 +192,12 @@ class OllamaProvider(Provider):
         options: dict[str, Any] = {"temperature": temperature}
         if self._context_tokens is not None:
             options["num_ctx"] = self._context_tokens
+            # The reserve was already subtracted from the window to decide whether the
+            # prompt fits. Until now it was never imposed on the answer, so a generation
+            # could run past what the window was budgeted for: measured at fifty-one
+            # minutes against eleven for the same skill on a smaller model, because
+            # nothing said when to stop (ADR-019 decided the budget; this keeps it).
+            options["num_predict"] = answer_reserve(self._context_tokens)
         payload["options"] = options
         if schema is not None:
             # The engine constrains decoding to this, so the shape stops being a request
