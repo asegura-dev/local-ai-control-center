@@ -1303,3 +1303,50 @@ def test_ask_needs_a_window_to_select_against(tmp_path: Path) -> None:
     )
     assert result.exit_code == 1
     assert "No context window is configured" in " ".join(result.stdout.split())
+
+
+def test_measure_can_repeat_the_synthesis_path(tmp_path: Path) -> None:
+    """Built, and then never run end to end: measure resolved by name and ask_corpus is
+    deliberately not in the registry, so the first real launch failed at once."""
+    config = _corpus_file(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "measure",
+            "ask_corpus",
+            "pelvic lymph node sensitivity",
+            "--from",
+            "corpus.md",
+            "-n",
+            "2",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 0, result.stdout
+    flowed = " ".join(result.stdout.split())
+    assert "passages selected" in flowed
+    assert "ask_corpus against" in flowed
+
+
+def test_measuring_from_a_corpus_refuses_another_skill(tmp_path: Path) -> None:
+    config = _corpus_file(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "measure",
+            "extract_claims",
+            "a question",
+            "--from",
+            "corpus.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "--from measures ask_corpus" in " ".join(result.stdout.split())

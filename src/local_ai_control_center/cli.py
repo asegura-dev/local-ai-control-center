@@ -1087,7 +1087,16 @@ def measure(
     doing work, so it refuses any skill that writes and never varies the action between
     repetitions (ADR-032). One preview, one confirmation, covering all of them.
     """
-    resolved = _resolve_skill(skill, config_path)
+    # Not resolved by name when a corpus is given: ask_corpus is deliberately absent from
+    # the registry, because `lacc run ask_corpus <path>` would send a prompt with the
+    # passages hole unfilled. It is reached through `ask` and through here, and nowhere else.
+    if corpus_file is not None and skill != AskCorpusSkill().name:
+        console.print(
+            f"[red]--from measures ask_corpus, not {skill}.[/red] Write "
+            '`lacc measure ask_corpus "your question" --from corpus.md`.'
+        )
+        raise typer.Exit(code=1)
+    resolved = AskCorpusSkill() if corpus_file is not None else _resolve_skill(skill, config_path)
     if "write_files" in resolved.required:
         console.print(
             f"[red]{skill} writes files, and measuring must not act.[/red] Repeating an "
@@ -1110,7 +1119,6 @@ def measure(
     # is the model and not the selection.
     material: str | None = None
     if corpus_file is not None:
-        resolved = AskCorpusSkill()
         selection, material = _passages_for(requests[0], corpus_file, config, workspace)
         _report_the_selection(selection)
         if not selection.chosen:
