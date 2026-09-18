@@ -93,6 +93,7 @@ from local_ai_control_center.system.audit import (
     AnchorCheck,
     AuditLog,
     check_anchor,
+    digest_of,
     verify_chain,
 )
 from local_ai_control_center.system.profiler import SystemProfile, profile_system
@@ -1710,6 +1711,19 @@ def _judge_the_readings(
 
     flagged = [(c, v) for c, v in verdicts if v.worth_a_look]
     undecided = sum(1 for _, v in verdicts if v.verdict == "undecided")
+    # One record for the batch, carrying a row per reading. The judge's calls do not
+    # appear as `provider_called`: the adapter builds those prompts and the audit lives
+    # above it, so what is recorded is what was judged and what came back rather than a
+    # prompt this layer never sees. Digests always, the judge's words only under `full`,
+    # the same rule every other content follows (ADR-059).
+    judged_rows = [
+        {
+            "quote_sha256": digest_of(claim.claim.quote),
+            "claim_sha256": digest_of(claim.claim.claim),
+            "verdict": verdict.verdict,
+        }
+        for claim, verdict in verdicts
+    ]
     audit.record(
         run_id,
         "readings_judged",
@@ -1720,7 +1734,10 @@ def _judge_the_readings(
             "judged": len(real),
             "worth_a_look": len(flagged),
             "undecided": undecided,
-            "verdicts": [v.verdict for _, v in verdicts],
+            "judged_readings": judged_rows,
+            "completion": [
+                {"verdict": verdict.verdict, "why": verdict.detail} for _, verdict in verdicts
+            ],
         },
     )
 

@@ -23,6 +23,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stale inventory reads exactly like a current one.
 
 ### Fixed
+- **The judge recorded that it had judged, and not what** (ADR-059, phase three). It makes one
+  engine call per claim - hundreds on a real corpus, each carrying a quotation and the reading
+  made of it - and the batch record said only how many and which verdicts. A check whose whole
+  purpose is to mark claims for a person could not say afterwards **which** claim got which
+  verdict, which is the useful part the moment the terminal scrolls.
+
+  It records a row per reading now: the digests of the quotation and the claim, and the
+  verdict, with the judge's reasoning under `audit_level: full` like any other content. Its
+  calls remain absent from `provider_called`, and that is now stated rather than left to be
+  discovered - the adapter builds those prompts and the audit lives above it, so what is
+  recorded is what was judged and what came back.
+
 - **ADR-004 described a permission guard that was never in the execution path** - found by
   the inventory above on its first run. The record that defines this project's permission
   model says a companion `require` raises so that *"an ignored return value should never

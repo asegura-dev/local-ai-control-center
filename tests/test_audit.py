@@ -87,6 +87,35 @@ def test_standard_level_omits_content(tmp_path: Path) -> None:
     assert detail == {"provider": "mock"}
 
 
+def test_a_judged_reading_leaves_its_digests_and_not_its_words(tmp_path: Path) -> None:
+    """The judge records what it judged, and its reasoning follows the same content rule.
+
+    The judge makes one engine call per claim and those calls are not `provider_called` -
+    the adapter builds those prompts and the audit lives above it - so this record is what
+    says a run judged anything at all. Losing which claim got which verdict would make a
+    check that marks claims for a person useless the moment the terminal scrolls (ADR-059).
+
+    The reasoning arrives as a list rather than a string, and the filter works on the key,
+    so this pins that a shape change does not quietly start publishing content.
+    """
+    log = _log(tmp_path)
+    rows = [{"quote_sha256": "a" * 64, "claim_sha256": "b" * 64, "verdict": "neither"}]
+    log.record(
+        "run-1",
+        "readings_judged",
+        "judged 1 reading",
+        {
+            "judge": "asking:mock",
+            "judged": 1,
+            "judged_readings": rows,
+            "completion": [{"verdict": "neither", "why": "it names a different drug"}],
+        },
+    )
+    detail = _lines(log.path)[0]["detail"]
+    assert detail["judged_readings"] == rows, "which reading got which verdict survives"
+    assert "completion" not in detail, "the judge's words are content, like any other"
+
+
 def test_full_level_records_content(tmp_path: Path) -> None:
     """Under `full`, content is recorded as an explicit opt-in."""
     log = _log(tmp_path, audit_level="full")

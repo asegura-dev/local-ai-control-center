@@ -92,8 +92,32 @@ which is how a reader learns to skip a section. What survives the filter is four
 prose that looks like code, and a reader tells them apart in a minute.
 
 **Three - one pass over all 59 records**, asking of each: what does this claim, where is it in
-the code, does it cover that. Five defects in three days is a rate, not bad luck, and it says
-there are more. With the inventory this is hours of reading rather than a project.
+the code, does it cover that. ~~Not built.~~ **Done, and the instrument was not the inventory.**
+
+Ranking records by their thinnest symbol found nothing: almost every low count is a CLI
+command registered by a decorator, or a function with one correct caller. The question is
+textual, not numerical, so what was searched for instead was **universal claims that name
+code** - a sentence containing *every*, *always*, *never*, *each* or *nothing* alongside a
+backticked symbol. Those are the sentences carrying a coverage obligation. There are **90**
+across the 59 records, and they read in an afternoon.
+
+Most hold. Spot-checked and true: `measure` refuses any skill declaring `write_files`;
+ingestion refuses a destination that exists; content is dropped from the audit unless the
+level is `full`; nothing in `preview`, `cycle` or `skill` imports Typer or Rich.
+
+**One did not, and it was a day old.** ADR-033 says the trail records `prompt_sha256` and
+`completion_sha256` for every run, and three places call `provider.complete`: the cycle, which
+records it; the engine probe, whose prompt is a fixed string holding nothing of the user's; and
+**the judge wired in this record, which recorded nothing about any of its calls**. It made one
+call per claim - hundreds on a real corpus - carrying the quotation and the reading, and the
+batch event said only how many and which verdicts.
+
+The narrow loss is the one that matters: a check whose whole purpose is to mark claims for a
+person could not say afterwards **which** claim got which verdict. It records a row per
+reading now - the digests of the quotation and the claim, and the verdict - with the judge's
+reasoning under `full` like any other content. Its calls are still not `provider_called`, and
+that is stated rather than papered over: the adapter builds those prompts and the audit lives
+above it, so what is recorded is what was judged and what came back.
 
 ## Trade-off
 
