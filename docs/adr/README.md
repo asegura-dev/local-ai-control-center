@@ -1,6 +1,6 @@
 # Decision records
 
-Fifty-eight records, in the order they were decided. The number is the identity: it is how
+Fifty-nine records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -358,3 +358,9 @@ The prompt was byte-identical whether or not a schema was sent, so a constrained
 [`ADR-058-controls-that-did-not-cover-what-they-claimed.md`](ADR-058-controls-that-did-not-cover-what-they-claimed.md)
 
 Two findings from sweeping for the shape ADR-055 and ADR-056 showed twice in two days. Deduplication was applied on one of the four paths that produce checked claims - the one ADR-045 happened to be thinking about - while a single answer repeats passages too, three of nineteen on the measured paper. And ntfy's docstring promised basic credentials whose helper was tested, called by nothing, and had no configuration field. Records that the reachability test from ADR-055 would have caught neither.
+
+### 059 - checking that a control covers what it claims
+
+[`ADR-059-checking-that-a-control-covers-what-it-claims.md`](ADR-059-checking-that-a-control-covers-what-it-claims.md)
+
+Three standing checks, each derived from a defect that happened: nothing public is defined that only a test reaches, controls that must travel together do, and neither answer format loses everything when it is cut. Building the first immediately found two more - `AskingJudge`, the judge of readings with a published grade, was constructed by nothing at all, and `require` was dead while its docstring called itself the execution path. The judge is wired as `lacc ask --judge`. Names the inventory and the one-time audit as phases two and three, and explains why the ranking that was tried is a reading queue rather than a detector.

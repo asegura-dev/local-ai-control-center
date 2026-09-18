@@ -1273,6 +1273,38 @@ def test_ask_says_what_it_set_aside_before_it_asks_anything(tmp_path: Path) -> N
     assert "Declined" in flowed
 
 
+def test_ask_offers_the_judge_of_readings(tmp_path: Path) -> None:
+    """The judge had a port, an adapter, tests and a published grade, and no way in.
+
+    Nothing in the program constructed `AskingJudge`: no command, no flag, no configuration.
+    It was graded by a script that built it directly, which is the mistake ADR-055 names
+    (ADR-059).
+
+    This asserts the option reaches the command. What it cannot assert is the judging itself:
+    the mock provider answers with prose, so no quotation is found and there is no reading to
+    judge. The guard against it becoming unreachable again is structural, in
+    `test_reachable.py`.
+    """
+    config = _corpus_file(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "ask",
+            "pelvic lymph node sensitivity",
+            "--from",
+            "corpus.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+            "--judge",
+        ],
+        input="n" + chr(10),
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "No such option" not in result.stdout
+
+
 def test_ask_will_not_use_a_quotation_that_was_never_in_its_document(tmp_path: Path) -> None:
     """Retrieving over unverified text would verify what the model echoed, not what it saw."""
     config = _corpus_file(tmp_path)

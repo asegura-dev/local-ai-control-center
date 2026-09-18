@@ -15,7 +15,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Fifty-eight records front to back is a history. These are the threads through them, for
+Fifty-nine records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -133,6 +133,7 @@ not to reach for an approximate algorithm to find them.
 | 056 | [what-arrived-whole](adr/ADR-056-what-arrived-whole.md) | A shaped answer cut at the token cap parsed to nothing - one unclosed brace defeats `json.loads` - so an answer carrying 76 entries was published in v1.4.0 as zero, with advice not to use the feature. Recovers every entry that arrived whole with `raw_decode`, repairing and guessing nothing. Corrected: 32 verified quotations against the line format's 15, at the same fidelity, and the advice was backwards. |
 | 057 | [the-prompt-and-the-grammar-disagreed](adr/ADR-057-the-prompt-and-the-grammar-disagreed.md) | The prompt was byte-identical whether or not a schema was sent, so a constrained run was told to write `CLAIM:` lines while the grammar forbade them - an instruction the model could not obey, and very likely why it never stopped. Builds both forms from one description of the fields, and replaces ADR-055's condition: `assess_source` checks its quotations and answers with prose *and* blocks, which a schema would delete. |
 | 058 | [controls-that-did-not-cover-what-they-claimed](adr/ADR-058-controls-that-did-not-cover-what-they-claimed.md) | A sweep for the shape found twice in two days. Deduplication covered one of the four paths that produce checked claims, though a single answer repeats passages too - three of nineteen measured. ntfy's docstring promised basic credentials with a tested helper nothing called and no configuration field to reach it. Notes that ADR-055's reachability test would have caught neither: reading did. |
+| 059 | [checking-that-a-control-covers-what-it-claims](adr/ADR-059-checking-that-a-control-covers-what-it-claims.md) | Three standing checks, each from a defect that happened: nothing public is defined that only a test reaches, paired controls travel together, and neither answer format loses everything when cut. Building the first found two more - `AskingJudge`, graded and published, was constructed by nothing, and `require` was dead while calling itself the execution path. Wires the judge as `lacc ask --judge`; names the record-to-code inventory and a one-time audit of all 58 records as the phases not yet built. |
 
 ## Guides (`docs/guides/`)
 

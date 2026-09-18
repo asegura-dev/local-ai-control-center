@@ -44,6 +44,7 @@ EventKind = Literal[
     "fence_markers_removed",
     "instruction_shapes_seen",
     "standing_context_used",
+    "readings_judged",
     "notification_sent",
     "notification_failed",
 ]

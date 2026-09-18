@@ -10,12 +10,10 @@ from pydantic import ValidationError
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.permissions import (
     CAPABILITIES,
-    PermissionDenied,
     Permissions,
     check,
     effective_permissions,
     grant,
-    require,
 )
 
 
@@ -92,18 +90,6 @@ def test_check_with_no_requirements_is_allowed() -> None:
     """Requiring nothing is allowed even with no permissions."""
     result = check(set(), Permissions(), _config())
     assert result.allowed is True
-
-
-def test_require_passes_when_allowed() -> None:
-    """require() returns quietly when the requirement is satisfied."""
-    require({"read_files"}, Permissions(read_files=True), _config())
-
-
-def test_require_raises_when_denied() -> None:
-    """require() raises PermissionDenied naming the missing capabilities."""
-    with pytest.raises(PermissionDenied) as excinfo:
-        require({"write_files"}, Permissions(), _config())
-    assert "write_files" in str(excinfo.value)
 
 
 def test_capabilities_tuple_matches_model_fields() -> None:

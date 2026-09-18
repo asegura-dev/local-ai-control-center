@@ -21,6 +21,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from local_ai_control_center.adapters.asking import AskingJudge
 from local_ai_control_center.adapters.documents import (
     HiddenText,
     converter_for,
@@ -45,6 +46,7 @@ from local_ai_control_center.core.declared import (
 )
 from local_ai_control_center.core.fence import CONTENT_PLACEHOLDER
 from local_ai_control_center.core.grounding import (
+    CheckedClaim,
     Claim,
     check_answer,
     check_claim,
@@ -1553,6 +1555,14 @@ def ask(
             help="A declared skill that works over a corpus, instead of the built-in answer.",
         ),
     ] = None,
+    judge: Annotated[
+        bool,
+        typer.Option(
+            "--judge",
+            help="Also ask whether each reading follows from the words it rests on. "
+            "One extra engine call per claim, and a judgement rather than a check.",
+        ),
+    ] = False,
 ) -> None:
     """Answer a question from passages already checked against their documents.
 
@@ -1640,7 +1650,7 @@ def ask(
     _announce(resolved.name, result.outcome, time.monotonic() - started, config, audit, run_id)
     if result.completion is not None:
         console.print(result.completion.text)
-    _check_against_what_was_sent(result, material, plan, audit, run_id)
+    _check_against_what_was_sent(result, material, plan, audit, run_id, provider if judge else None)
     console.print(
         f"[dim]{selection.set_aside} of {selection.considered} passages were not sent. An "
         "answer drawn from a selection is an answer about that selection.[/dim]"
@@ -1671,8 +1681,76 @@ def _as_material(selection: Selection) -> str:
     return (chr(10) * 2).join(blocks)
 
 
+def _judge_the_readings(
+    checked: tuple[CheckedClaim, ...],
+    provider: Provider,
+    plan: SkillPlan,
+    audit: AuditLog,
+    run_id: str,
+) -> None:
+    """Ask whether each verified quotation supports the reading made of it (ADR-053).
+
+    Only the quotations that were found: a reading resting on words the model invented is
+    already reported, and judging it would say the same thing twice in a weaker voice.
+
+    **Leads with the binary and gives the label beside it.** Graded on eight pairs labelled
+    first, this judge got the three-way label right 6 times and *should a person look at
+    this* right 8 times out of 8, with no false alarm on the three that were fine. Both its
+    errors arrived with correct reasoning attached to the wrong label, so the reliable half
+    goes first.
+    """
+    real = tuple(claim for claim in checked if claim.found)
+    if not real:
+        return
+    judge = AskingJudge(provider)
+    verdicts = []
+    with console.status(f"Judging {len(real)} readings..."):
+        for claim in real:
+            verdicts.append((claim, judge.judge(claim.claim.claim, claim.claim.quote)))
+
+    flagged = [(c, v) for c, v in verdicts if v.worth_a_look]
+    undecided = sum(1 for _, v in verdicts if v.verdict == "undecided")
+    audit.record(
+        run_id,
+        "readings_judged",
+        f"Judged {len(real)} readings for {plan.action.name}",
+        {
+            "action": plan.action.name,
+            "judge": judge.name,
+            "judged": len(real),
+            "worth_a_look": len(flagged),
+            "undecided": undecided,
+            "verdicts": [v.verdict for _, v in verdicts],
+        },
+    )
+
+    console.print(
+        "[dim]A model judging a model. The quotation check compares strings and has no "
+        "opinion; this has one, and can be wrong in both directions (ADR-053).[/dim]"
+    )
+    if not flagged:
+        console.print(
+            f"[green]All {len(real)} readings were judged to follow from their quotations.[/green]"
+        )
+    else:
+        console.print(
+            f"[yellow]{len(flagged)} of {len(real)} readings are worth reading before you "
+            f"cite them.[/yellow]"
+        )
+        for claim, verdict in flagged:
+            console.print(f"  [yellow]?[/yellow] {claim.claim.claim[:95]}")
+            console.print(f"    [dim]{verdict.verdict}: {verdict.detail[:110]}[/dim]")
+    if undecided:
+        console.print(f"[dim]{undecided} could not be judged, and that is not approval.[/dim]")
+
+
 def _check_against_what_was_sent(
-    result: RunResult, material: str, plan: SkillPlan, audit: AuditLog, run_id: str
+    result: RunResult,
+    material: str,
+    plan: SkillPlan,
+    audit: AuditLog,
+    run_id: str,
+    provider: Provider | None = None,
 ) -> None:
     """Check the answer's quotations against the passages it was given, not the documents.
 
@@ -1707,6 +1785,8 @@ def _check_against_what_was_sent(
         console.print(
             f"[green]All {len(checked)} quotations are in the passages that were sent.[/green]"
         )
+        if provider is not None:
+            _judge_the_readings(checked, provider, plan, audit, run_id)
         return
     console.print(
         f"[red]{len(invented)} of {len(checked)} quotations are not in what was sent.[/red] "
@@ -1715,6 +1795,8 @@ def _check_against_what_was_sent(
     )
     for claim in invented:
         console.print(f"  [red]x[/red] {claim.claim.quote[:100]}")
+    if provider is not None:
+        _judge_the_readings(checked, provider, plan, audit, run_id)
 
 
 @app.command()

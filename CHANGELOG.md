@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`lacc ask --judge`: the judge of readings, reachable at last** (ADR-059). ADR-053 built a
+  port and an adapter for asking whether a quotation supports the reading made of it, graded
+  it against eight pairs labelled first, and published the result - 6 of 8 on the three-way
+  label, **8 of 8 on whether a person should look**, no false alarm on the three that were
+  fine - in a decision record, this changelog, chapter 4 and a git tag.
+
+  **Nothing in the program constructed it.** No command, no flag, no configuration. It had
+  been graded by a script that built it directly, which is exactly the mistake ADR-055 named,
+  made again two days later by the same hand. It is now a flag on `lacc ask`, off unless
+  asked for, one extra engine call per claim, judging only the quotations that were found. It
+  leads with the binary and gives the label beside it, which is what the grading concluded and
+  what nothing had been able to act on.
+
+- **Three standing checks for the shape of defect this project keeps producing** (ADR-059):
+  nothing public is defined that only a test reaches; controls that must travel together do
+  (`check_answer` implies `without_repeats`); and neither answer format loses everything when
+  the answer is cut. Each guards itself with a second test that feeds it the original defect
+  and asserts it is reported - the third is verified to **fail** against the parser as
+  released in v1.4.0. The first found both defects fixed in this release.
+
+### Removed
+- **`require`, which was dead and said it was the execution path** (ADR-059). Its module
+  docstring read *"`require` raises for the execution path"*, and its own rationale was *"so an
+  ignored return value can never become an unnoticed grant"*. Nothing called it. The gate is
+  real and tested - `preview.allowed`, refused before any effect, with the missing
+  capabilities named and audited - but it is the returned-value shape that sentence warns
+  about, so the sentence is gone rather than left to reassure somebody.
+
 ### Fixed
 - **The prompt asked for a format the grammar forbade** (ADR-057). With the shape enforced,
   the prompt sent to the engine was **byte-identical** to the unenforced one - the audit

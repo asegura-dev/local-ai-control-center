@@ -284,3 +284,105 @@ def test_the_prompt_asks_for_the_shape_the_engine_will_enforce(tmp_path: Path) -
     assert "CLAIM: what the document asserts" in asking
     assert "CLAIM:" not in forcing, "it cannot ask for a format the grammar forbids"
     assert Q + "entries" + Q in forcing and Q + "claim" + Q in forcing
+
+
+def _three_entries_as_lines() -> str:
+    blocks = []
+    for name in ("first", "second", "third"):
+        blocks.append(
+            "CLAIM: the "
+            + name
+            + " thing this document asserts"
+            + NL
+            + "QUOTE: the "
+            + name
+            + " set of words from the document"
+            + NL
+            + "PAGE: 1"
+        )
+    return (NL * 2).join(blocks)
+
+
+def _three_entries_as_json() -> str:
+    entries = []
+    for name in ("first", "second", "third"):
+        entries.append(
+            "    {"
+            + NL
+            + "      "
+            + Q
+            + "claim"
+            + Q
+            + ": "
+            + Q
+            + "the "
+            + name
+            + " thing"
+            + Q
+            + ","
+            + NL
+            + "      "
+            + Q
+            + "quote"
+            + Q
+            + ": "
+            + Q
+            + "the "
+            + name
+            + " words"
+            + Q
+            + ","
+            + NL
+            + "      "
+            + Q
+            + "page"
+            + Q
+            + ": "
+            + Q
+            + "1"
+            + Q
+            + NL
+            + "    }"
+        )
+    return "{" + NL + Q + "entries" + Q + ": [" + NL + ("," + NL).join(entries) + NL + "]}"
+
+
+def test_neither_format_loses_everything_when_the_answer_is_cut() -> None:
+    """The property that would have caught ADR-056 the day the schema was written.
+
+    Cut a valid answer at every character. What parses out must never drop to nothing while
+    a whole entry still precedes the cut - and it must never *exceed* what the whole answer
+    held, which is the other way a lenient parser goes wrong.
+
+    The JSON path failed this for a release: one unclosed brace and `json.loads` returned
+    nothing for the entire document, so an answer carrying seventy-six entries parsed to
+    none of them (ADR-056).
+    """
+    for shape, whole in (("lines", _three_entries_as_lines()), ("json", _three_entries_as_json())):
+        complete = len(parse_claims(whole))
+        assert complete == 3, shape
+
+        best_so_far = 0
+        for cut in range(1, len(whole)):
+            recovered = len(parse_claims(whole[:cut]))
+            assert recovered <= complete, (
+                shape + ": a cut answer parsed to more than the whole one did, at " + str(cut)
+            )
+            assert recovered >= best_so_far - 1, (
+                shape
+                + ": what parses out collapsed from "
+                + str(best_so_far)
+                + " to "
+                + str(recovered)
+                + " at character "
+                + str(cut)
+                + ", losing entries that had "
+                "already arrived whole"
+            )
+            best_so_far = max(best_so_far, recovered)
+        assert best_so_far >= 2, (
+            shape
+            + ": cutting this answer anywhere never recovered more than "
+            + str(best_so_far)
+            + " of its 3 entries"
+        )

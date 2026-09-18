@@ -389,8 +389,26 @@ in three fewer places than it should be is not a setting, and a sentence in a do
 not one either. Reading found them - specifically, asking of each control *"what does this
 cover, and is that what its record claims?"*
 
-There is no automated form of that question yet, and this document should not pretend there
-is one.
+Three standing checks now encode the three that have a mechanical form (ADR-059), and
+**building the first of them immediately found two more**: the judge of readings from ADR-053
+- graded, tabled and published in a git tag - was constructed by nothing at all, and `require`
+was dead while its docstring called itself the execution path.
+
+**Five defects in three days, on fifty-eight records, is a rate rather than bad luck.** Two
+phases follow from that and are not built:
+
+- **An inventory from each record to the code it names.** Measured: 52 of 58 records name at
+  least one real symbol, 97 distinct. A generated report of what each record mentions and
+  where it is used. It detects nothing; it makes the reading finite.
+- **One pass over all 58 records**, asking of each what it claims, where that is in the code,
+  and whether it covers it. Hours with the inventory, a project without it.
+
+A ranking was tried and rejected: citations-per-use puts a correct one-caller function at the
+top and puts a control **low because it had just been fixed**. It is a reading queue, not a
+detector, and shipping it as one would be this project's own recurring error in a new costume.
+
+What stays irreducible is choosing what to verify. The checks make five known defects
+impossible to repeat; none of them finds a kind that has not happened yet.
 
 ## A feature that was counted as delivered and was not there
 

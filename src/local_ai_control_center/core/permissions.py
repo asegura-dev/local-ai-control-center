@@ -2,8 +2,15 @@
 
 Every capability starts disabled (ADR-004). A skill declares what it needs, and a
 check decides whether that is granted, with the configuration acting as a ceiling:
-what the configuration forbids, no permission can grant. Checking returns a result
-so a preview can report what is missing; `require` raises for the execution path.
+what the configuration forbids, no permission can grant. Checking returns a result,
+and the cycle refuses on it before anything runs.
+
+A `require` lived here that raised instead of returning, and its docstring said the
+execution path used it *"so an ignored return value can never become an unnoticed
+grant"*. Nothing called it. The gate is real - `preview.allowed`, checked before any
+effect, refused with the missing capabilities named and audited - but it is the shape
+that sentence warned about, so the sentence is gone rather than left to reassure
+somebody (ADR-058).
 """
 
 from __future__ import annotations
@@ -83,21 +90,6 @@ def check(
     available = effective_permissions(permissions, config)
     missing = tuple(sorted(set(required) - available))
     return PermissionCheck(allowed=not missing, missing=missing)
-
-
-def require(
-    required: frozenset[Capability] | set[Capability],
-    permissions: Permissions,
-    config: Config,
-) -> None:
-    """Raise :class:`PermissionDenied` unless every required capability is available.
-
-    The execution path uses this form so an ignored return value can never become
-    an unnoticed grant.
-    """
-    result = check(required, permissions, config)
-    if not result.allowed:
-        raise PermissionDenied(f"Missing required capabilities: {', '.join(result.missing)}")
 
 
 def grant(
