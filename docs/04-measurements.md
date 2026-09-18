@@ -198,6 +198,30 @@ three-way label right 6 times, the binary "should somebody look at this" right 8
 raises no false alarm on the 3 readings that were fine. Both its errors came with correct
 reasoning attached to the wrong label. The reporting leads with the binary for that reason.
 
+**A schema the engine enforces delivers the shape and loses the answer.** ADR-052 said
+constraining decoding might cost content quality and had to be measured before anyone believed
+it. Measured on `extract_claims`, one paper, a 14B at temperature zero - four measured runs in
+each condition plus a warm-up each, every run within a condition byte-identical:
+
+| | asked for the format | shape enforced |
+|---|---|---|
+| answer tokens | 1,621 | **8,192, and not finished** |
+| why it stopped | `stop` | `length` |
+| quotations parsed | **19** | **0** |
+| found in the document | **18 of 19 (94%)** | **none to check** |
+| the four runs took | 5 min | 24 min |
+
+**The fear was wrong and the failure is real.** Content quality did not degrade: the JSON is
+well-formed, the fields are exactly the declared ones, and its first entry carries the same
+claim and quotation as the unconstrained run, word for word. What broke is that the answer
+never ended - the grammar admits another array element at every point, so nothing pushes the
+model to close the array, and the same content costs five times the tokens along the way.
+
+**The lesson is about which format survives being cut.** A truncated line-oriented answer
+yields every complete block before the cut. A truncated JSON answer yields nothing: one
+unclosed brace and the document is unparseable. The fallback kept "for engines that cannot
+enforce" turns out to be the robust format, and the enforced one the brittle one.
+
 **Similarity is the wrong question where the content lives in the words that differ.** The
 two most alike quotations in the corpus that are not identical agree on 0.86 of their
 wording, and they name two different drugs - `Apalutamide` and `Darolutamide`, in otherwise

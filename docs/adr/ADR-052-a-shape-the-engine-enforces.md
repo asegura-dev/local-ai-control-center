@@ -65,3 +65,47 @@ engine is a control this project cannot claim to have.
 visible nonsense and zero claims; under a schema it produces well-formed fields that may be
 empty or wrong. Well-formed and wrong is harder to notice than malformed and wrong, and that
 is worth watching for rather than assuming away.
+
+## Measured (v1.4.0)
+
+This record said constraining might cost content quality and had to be measured. It was, as
+soon as ADR-055 made it possible to switch on at all. `extract_claims`, one paper, qwen2.5:14b
+at temperature zero, a 16,613-token prompt. Four measured runs in each condition, each
+preceded by its own warm-up. Every run within a condition returned a byte-identical answer, so
+the spread is zero and the comparison is between two numbers rather than two distributions.
+
+| | asked for the format | shape enforced |
+|---|---|---|
+| answer tokens | 1,621 | **8,192, and not finished** |
+| why it stopped | `stop` | `length` - the cap |
+| quotations parsed | **19** | **0** |
+| found in the document | **18 of 19 (94%)** | **none to check** |
+| the four runs took | 5 min | 24 min |
+
+**Content quality is not what failed.** The constrained answer is well-formed JSON with
+exactly the declared fields, and its first entry carries the same claim and the same quotation
+as the unconstrained one, word for word. The fear this record named did not happen.
+
+**What failed is that the answer never ended.** Unconstrained, the model wrote 1,621 tokens
+and stopped. Constrained, it was still listing entries at 8,192 and was cut mid-string. The
+grammar admits another array element at every point, so nothing pushes the model toward
+closing the array, and the same content costs five times the tokens in JSON before that even
+matters.
+
+**And a truncated JSON answer is worth nothing, where a truncated line-oriented answer is
+worth almost everything.** Cut in half, the line format yields every complete block before the
+cut. Cut in half, the JSON yields zero - one unclosed brace and the whole document is
+unparseable. The parser fell back to lines, found no `CLAIM:`, and returned nothing.
+
+**So the line format is kept for a better reason than this record gave.** It was kept for
+engines that cannot enforce a schema. The measurement says it is also the format that
+degrades gracefully, and the enforced one is the brittle one.
+
+**`enforce_shape` stays off, and for `extract_claims` on a 14B the honest advice is not to
+turn it on.** The decision to make it per-skill and measured rather than global was right, and
+this is the first skill it was measured on. Whether a schema with a bounded array, or a
+parser that recovers complete entries from truncated JSON, changes the answer is open and not
+yet measured - the second is the more principled of the two, because it needs no number.
+
+**One document, one model, one skill.** Determinism within a condition is not generality
+across them: this says what happened here, and a different model may well close its array.

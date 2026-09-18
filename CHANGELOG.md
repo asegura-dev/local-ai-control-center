@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-18
+
 ### Added
 - **A quotation wholly inside another is now the same passage read twice** (ADR-054). Reading
   in passes offers the overlapping page to the model twice, and `without_repeats` dropped a
@@ -58,6 +60,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   weaker than the binary, and not enough to publish a rate. Over 548 claims it costs about
   thirty-six minutes.
 
+### Measured
+- **Enforcing the shape delivers the format and loses the answer** (ADR-052). The measurement
+  that record promised, taken as soon as ADR-055 made the switch reachable. `extract_claims`,
+  one paper, qwen2.5:14b at temperature zero; four measured runs in each condition plus a
+  warm-up each, every run within a condition byte-identical.
+
+  | | asked for the format | shape enforced |
+  |---|---|---|
+  | answer tokens | 1,621 | **8,192, and not finished** |
+  | why it stopped | `stop` | `length` |
+  | quotations parsed | **19** | **0** |
+  | found in the document | **18 of 19 (94%)** | **none to check** |
+  | the four runs took | 5 min | 24 min |
+
+  **The fear ADR-052 named did not happen.** Content quality did not degrade - the JSON is
+  well-formed, carries exactly the declared fields, and its first entry has the same claim and
+  the same quotation as the unconstrained answer, word for word.
+
+  **The answer simply never ended.** The grammar admits another array element at every point,
+  so nothing pushes the model toward closing the array; it was still listing entries when it
+  hit the cap, cut mid-string. And a truncated JSON answer is worth nothing where a truncated
+  line-oriented answer is worth almost everything: one unclosed brace makes the document
+  unparseable, while the line format yields every complete block before the cut.
+
+  So **the line parser is the robust format and the enforced one is the brittle one** - a
+  better reason to keep it than "for engines that cannot enforce". `enforce_shape` stays off
+  for everything, and for `extract_claims` on a 14B the honest advice is not to turn it on.
+  One document, one model, one skill: determinism within a condition is not generality across
+  them.
+
 ### Not built
 - **Approximate deduplication (MinHash), which the plan called for next** (ADR-054). The
   grounds were that the corpus held near-duplicate quotations between documents. Nobody had
@@ -103,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `plan` and fails against the code as released.
 
   Nothing about ADR-052's promised measurement is prejudged by this. It simply becomes
-  possible: it could not be run before.
+  possible: it could not be run before - and it was taken immediately, below.
 
 - **The generation timeout budgeted for writing and nothing for reading.** It derived from
   `answer_reserve` alone, so a full answer at the slowest measured rate used the entire

@@ -366,6 +366,28 @@ most central, nnU-Net and the EAU and NCCN guidelines among them. The library-sc
 deferred to v2 below is not a nicety: without it a bibliography is read only in the parts
 that happen to fit.
 
+## A feature that was counted as delivered and was not there
+
+Going to run the measurement ADR-052 promised - *does constraining decoding cost content
+quality?* - found that it could not be run. `enforce_shape` had no flag, no configuration key
+and no field in a skill declaration, so no schema had ever been sent to any engine. The
+feature was in the changelog, in a decision record, and in nothing the program could execute.
+
+Six tests passed because they built the plan object directly. The program never does; it
+calls `plan`, and `plan` was the part with nothing in it. **This was the second instance** -
+`ask_corpus` was tested the same way, was absent from the registry, and failed on its first
+real launch with the suite green.
+
+So the rule is in the suite rather than in anyone's memory: every field with a default, on
+every model the program builds in code rather than reads from a file, must be set somewhere
+in the source. Eighty-seven fields qualify; all pass now, and a third instance fails the build
+(ADR-055).
+
+**For a roadmap, the lesson is what "done" is allowed to mean.** This document and the
+changelog both listed a feature that existed as a type and not as a path. Neither was lying:
+the code was written, reviewed and tested. The question that separates the two is one
+sentence - *what in the program sets this?* - and until it is answered, a feature is a design.
+
 ## A planned piece, measured and dropped
 
 The next item on the plan was approximate deduplication - MinHash over the corpus - and it
