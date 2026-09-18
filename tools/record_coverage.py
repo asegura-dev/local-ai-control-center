@@ -135,9 +135,12 @@ def _sites(trees: dict[pathlib.Path, ast.Module]) -> dict[str, list[str]]:
                 found[node.id].append(f"{where}:{line}")
             elif isinstance(node, ast.Attribute):
                 found[node.attr].append(f"{where}:{line}")
-            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-                if node.value.isidentifier():
-                    found[node.value].append(f"{where}:{line} (by name)")
+            elif (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and node.value.isidentifier()
+            ):
+                found[node.value].append(f"{where}:{line} (by name)")
     return found
 
 
