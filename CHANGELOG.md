@@ -8,6 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`docs/05-assurance.md`: every promise this project makes, and what holds it up.** A full
+  pass over `PRINCIPLES.md` and the decision records across cybersecurity, traceability,
+  reproducibility, degradation and the human in the loop - each claim paired with the code or
+  the test that makes it true, and a verdict: held, held by test, or gap.
+
+  Most hold, and a good number hold by test. Verified along the way: no `eval`, `exec`,
+  `pickle`, `subprocess` or `os.system` anywhere in the source and both YAML loads are
+  `safe_load`; `OLLAMA_HOST` is honoured only when it resolves to loopback; a `.env` cannot
+  override a variable already set; the cycle's only read site resolves through the workspace
+  boundary on the line above the open; writing happens in three places and no others.
+
+### Known limits
+- **The ntfy destination arrives through the environment, which ADR-030 forbids.** That record
+  decides a `.env` supplies secrets and *"never supplies destinations or permissions"*, calling
+  it the load-bearing half - and `server_url_env` names an environment variable holding the
+  server URL, so a `.env` decides where a notification goes.
+
+  What travels bounds it, and was designed to: a notification carries the skill's name, the
+  outcome, elapsed time, counts and the audit head digest. A traverse reports *"16 of 24
+  documents, 431 of 508 quotations in their source"* and never which ones, on the stated
+  reasoning that how many is less disclosure than which. **No quotation, document name or file
+  content has ever left this way.** What leaks is metadata about research activity, to somebody
+  who can already set environment variables on the machine.
+
+  The fix that matches the principle splits the field by what each part is: the server URL is a
+  destination and belongs in the YAML beside `engine_host`; the topic and the token are secrets
+  and stay in the environment - on a public ntfy server the topic *is* the access control. It
+  is written down before it is changed because it costs anyone with a working setup a move of
+  one value out of `.env`.
+
+- **`run_commands` is a declared capability that nothing implements.** No skill requires it, it
+  cannot be granted through the configuration, and it would grant nothing if it could.
+  Reserved rather than reachable, and recorded so nobody reads the capability list and
+  concludes that LACC runs commands.
+
+### Added
 - **`tools/record_coverage.py`: what every record names, and where the code uses it**
   (ADR-059, phase two). Prints per decision record the symbols it cites and every reference
   site, plus what a record names that the source never mentions. **It detects nothing.** A
