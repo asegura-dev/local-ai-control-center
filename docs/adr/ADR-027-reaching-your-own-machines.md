@@ -41,6 +41,13 @@ notifier:
     priority: 3
 ```
 
+> **The block above contradicts the sentence above it, and it took until v1.6.0 to
+> notice.** *"Every destination is written down"* - and `server_url_env` is a destination
+> arriving through the environment, which ADR-030 forbids in the very next record. It is
+> `server_url: http://desk:8080` now, written here beside `engine_host`. The topic and the
+> token stay named, the topic because on a public ntfy server it **is** the access control
+> (ADR-060).
+
 `OLLAMA_HOST` keeps its v0.21.0 treatment: an environment variable still cannot send
 documents anywhere. A non-loopback engine is reached only when the configuration both
 permits network access and names the host, so the escape hatch is a file the user wrote,

@@ -62,6 +62,10 @@ PROSE = frozenset(
 DELIBERATE = {
     ("ADR-004-permissions", "require"): "removed in v1.5.0; the record carries the correction",
     ("ADR-059-checking-that-a-control-covers-what-it-claims", "require"): "records its removal",
+    ("ADR-027-reaching-your-own-machines", "server_url_env"): (
+        "shows the field it had; the record carries the correction (ADR-060)"
+    ),
+    ("ADR-060-the-address-is-not-a-secret", "server_url_env"): "records its removal",
     ("ADR-046-how-much-to-show-at-once", "_GENERATE_TIMEOUT_SECONDS"): (
         "describes what was there before this record changed it; now _MINIMUM_GENERATE_TIMEOUT"
     ),
