@@ -12,7 +12,7 @@ rejected can.**
 Everything below was measured against a real bibliography on real hardware. Where a figure
 was published and later corrected, both are shown, because the correction is the finding.
 
-## Eleven wrong figures, and which way each one leaned
+## Twelve wrong figures, and which way each one leaned
 
 | Reported | What it actually was | Fixed in |
 |---|---|---|
@@ -26,6 +26,7 @@ was published and later corrected, both are shown, because the correction is the
 | Choosing sections by their headings would raise relevance | It did not: 46% on topic against 51% for the cruder method it replaced | measured, below |
 | The corpus has near-duplicate quotations between documents | It has none. Every repeat in it is inside one document, and there are six | ADR-054 |
 | A schema the engine enforces, shipped and documented | Nothing in the program could switch it on. Six tests passed by building the object the program never builds | ADR-055 |
+| Enforcing the shape gives 0 quotations against 19; do not use it | The parser refused a truncated document carrying 76 entries. It gives **32 verified against 15**, and the advice was backwards | ADR-056 |
 
 Six of these made the model look worse than it was. The seventh was the correction to that
 pattern, published in the same release that introduced it, and it overshot: it credited a
@@ -43,6 +44,28 @@ The ninth is different from all of them, and is kept because of it: **nothing wa
 wrong.** A prediction was announced before being taken, it favoured the thing being built,
 and it was false. Section headings were expected to select relevant pages better than
 counting keyword mentions; they selected slightly worse. The figures below say how much.
+
+**The twelfth was published in a release, by the correction process itself, and lasted hours.**
+The eleventh's fix made ADR-052's measurement possible; the measurement was taken, tabled, put
+in a decision record, a changelog and a git tag, and it was wrong. Enforcing the shape did not
+give zero quotations. It gave seventy-six, and **this project's own parser returned none of
+them**, because `json.loads` refuses a document with one unclosed brace. Re-parsed, the same
+recorded answers give **32 verified quotations against the line format's 15, at the same
+fidelity** - and the advice shipped with the figure, *do not turn it on*, was backwards.
+
+Two things made it, and both are on the list of questions below.
+
+**The asymmetry was seen and filed as a property of the world.** "A truncated JSON answer is
+worth nothing where a truncated line answer is worth almost everything" is true, was written
+down, and was treated as a fact about formats rather than as a defect in the JSON path. It was
+a defect in the JSON path. *Ask what the check could not see* would have caught it and was not
+asked, in the record that exists to ask it.
+
+**And "content quality did not degrade" came from reading one entry.** The first entry of the
+enforced answer was identical to the unconstrained one, word for word. Entry sixty was a table
+caption repeated. Through entry thirty the fidelity genuinely holds at 93%; the sentence was
+right about what it looked at and wrong about what it claimed. **Checking the first item and
+concluding about the set.**
 
 **The eleventh is not a figure about a model at all. It is a feature counted as delivered
 that did not exist.** ADR-052's schema was built, released, described in the changelog and
@@ -198,7 +221,31 @@ three-way label right 6 times, the binary "should somebody look at this" right 8
 raises no false alarm on the 3 readings that were fine. Both its errors came with correct
 reasoning attached to the wrong label. The reporting leads with the binary for that reason.
 
-**A schema the engine enforces delivers the shape and loses the answer.** ADR-052 said
+**A schema the engine enforces gives twice the verified quotations, and never stops.**
+Corrected from what v1.4.0 published (ADR-056); the figures are the same recorded answers,
+re-parsed once the truncation defect was fixed, with deduplication applied as a real run
+applies it:
+
+| | asked for the format | shape enforced |
+|---|---|---|
+| claims returned | 19 | **76** |
+| after deduplication | 16 | **35** |
+| **found in the document** | **15** | **32** |
+| rate | 93% | **91%** |
+| the four runs took | 5 min | 24 min |
+
+**The schema does not degrade the answer; running on does.** Through entry thirty the enforced
+answer holds 28 of 30 in the document - the line format's fidelity, at more than the volume.
+From about entry fifty it produces nothing at all, repeating one table caption, which is why
+deduplication takes seventy-six down to thirty-five. The grammar admits another array element
+at every point, so nothing pushes the model to close the array, and it spends most of
+twenty-four minutes restating a caption. **That** is the defect, and it is unfixed.
+
+`enforce_shape` still ships off for everything. One document, one model and one skill is not a
+reason to change a default, and this record has now been wrong about this same measurement
+once already.
+
+**What v1.4.0 published, kept for the record:** ADR-052 said
 constraining decoding might cost content quality and had to be measured before anyone believed
 it. Measured on `extract_claims`, one paper, a 14B at temperature zero - four measured runs in
 each condition plus a warm-up each, every run within a condition byte-identical:
@@ -221,6 +268,10 @@ model to close the array, and the same content costs five times the tokens along
 yields every complete block before the cut. A truncated JSON answer yields nothing: one
 unclosed brace and the document is unparseable. The fallback kept "for engines that cannot
 enforce" turns out to be the robust format, and the enforced one the brittle one.
+
+*The asymmetry in that last paragraph is real and the conclusion drawn from it was the
+mistake: it describes a defect in this project's parser, not a property of JSON. Reading it
+as the second is what published the zero.*
 
 **Similarity is the wrong question where the content lives in the words that differ.** The
 two most alike quotations in the corpus that are not identical agree on 0.86 of their
@@ -248,6 +299,10 @@ advance here were wrong, and both were wrong in the direction of the thing being
 section headings were to select better, and the corpus was to hold near-duplicates across
 documents. That is not an argument against predicting. It is an argument for writing the
 prediction down where it can embarrass you.
+
+**Ask whether a surprising zero is the world or the instrument.** A rate of exactly none is
+almost always the measuring end. Six of the corrections above are that, and the most recent is
+a zero that was a parser refusing to read what it had been given.
 
 **Ask what in the program sets it.** A feature is a figure too - "this is delivered" is a
 claim - and twice here it was wrong while its tests were green. Both times the tests built

@@ -139,6 +139,38 @@ class CheckedClaim(BaseModel):
         )
 
 
+def _complete_entries_in(text: str) -> list[object] | None:
+    """Every entry of a shaped answer that arrived whole, from a document cut short.
+
+    A truncated JSON answer parses to nothing at all: one unclosed brace and the whole
+    document is lost, where a truncated line-oriented answer yields every complete block
+    before the cut. That asymmetry was measured and it is not small - an answer stopped at
+    the token cap gave 19 claims as lines and **0** as JSON, four runs out of four (ADR-052).
+
+    So the entries are walked one value at a time with `raw_decode`, which reports where each
+    ended. Nothing is repaired and nothing is guessed: the entry that was cut is dropped
+    whole, along with anything after it.
+    """
+    opens = text.find(chr(34) + "entries" + chr(34))
+    bracket = text.find("[", opens) if opens >= 0 else -1
+    if bracket < 0:
+        return None
+    decoder = json.JSONDecoder()
+    entries: list[object] = []
+    at = bracket + 1
+    while True:
+        while at < len(text) and (text[at].isspace() or text[at] == ","):
+            at += 1
+        if at >= len(text) or text[at] != "{":
+            break
+        try:
+            entry, at = decoder.raw_decode(text, at)
+        except ValueError:
+            break
+        entries.append(entry)
+    return entries or None
+
+
 def _from_json(text: str, fields: tuple[str, ...], quote_field: str) -> tuple[Claim, ...] | None:
     """Read an answer the engine was made to shape, or return nothing and let lines be tried.
 
@@ -152,10 +184,14 @@ def _from_json(text: str, fields: tuple[str, ...], quote_field: str) -> tuple[Cl
     try:
         loaded = json.loads(stripped)
     except ValueError:
-        return None
-    entries = loaded.get("entries") if isinstance(loaded, dict) else None
-    if not isinstance(entries, list):
-        return None
+        entries = _complete_entries_in(stripped)
+        if entries is None:
+            return None
+    else:
+        found = loaded.get("entries") if isinstance(loaded, dict) else None
+        if not isinstance(found, list):
+            return None
+        entries = found
 
     describes = next((name for name in fields if name != quote_field), fields[0] if fields else "")
     claims: list[Claim] = []

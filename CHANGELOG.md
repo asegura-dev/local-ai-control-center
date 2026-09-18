@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A shaped answer the engine cut short parsed to nothing, and that put a wrong figure in
+  v1.4.0** (ADR-056). `json.loads` returns nothing for a document with one unclosed brace, so
+  an answer carrying **seventy-six complete entries** yielded none of them. v1.4.0 published
+  that as *"19 quotations asking for the format, 0 enforcing it"* and advised against turning
+  the schema on. **The zero was this parser, not the model.**
+
+  A shaped answer that will not parse is now walked entry by entry with
+  `json.JSONDecoder.raw_decode`, and every entry that arrived whole is kept. Nothing is
+  repaired and nothing is guessed: the cut entry is dropped whole, along with anything after
+  it. A document that parses is parsed as one, exactly as before, and recovering nothing still
+  falls back to the line parser. Truncation is audited and reported as it always was, so a cut
+  answer does not start looking complete.
+
+  **Corrected, same recorded answers, deduplication applied as a real run applies it:**
+
+  | | asked for the format | shape enforced |
+  |---|---|---|
+  | claims returned | 19 | **76** |
+  | after deduplication | 16 | **35** |
+  | **found in the document** | **15** | **32** |
+  | rate | 93% | **91%** |
+  | the four runs took | 5 min | 24 min |
+
+  More than twice the verified quotations at the same fidelity, and the advice shipped with
+  the old figure was backwards. **The schema does not degrade the answer; running on does** -
+  through entry thirty the enforced answer holds 28 of 30 in the document, and from about
+  entry fifty it produces nothing but one table caption repeated, which is what deduplication
+  removes. The defect the first measurement named correctly is the one that remains: the
+  grammar admits another array element at every point, so the answer never ends.
+
+  `enforce_shape` still ships off for everything. One document, one model and one skill is not
+  a reason to change a default - the more so having been wrong about this measurement once.
+
 ## [1.4.0] - 2026-09-18
 
 ### Added

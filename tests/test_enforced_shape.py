@@ -15,6 +15,7 @@ from local_ai_control_center.core.skill import (
 )
 
 NL = chr(10)
+Q = chr(34)
 
 
 def _plan(**overrides: object) -> SkillPlan:
@@ -140,3 +141,111 @@ def test_naming_a_skill_that_answers_in_prose_enforces_nothing(tmp_path: Path) -
     )
     assert plan.enforce_shape, "the configuration named it"
     assert plan.output_schema is None, "and it still gets no schema"
+
+
+def _shaped(entries: str, closed: bool = True) -> str:
+    """A shaped answer, whole or cut off mid-entry the way the engine cuts one."""
+    return "{" + NL + Q + "entries" + Q + ": [" + entries + ("]}" if closed else "")
+
+
+def test_an_answer_cut_short_still_yields_every_entry_that_arrived_whole() -> None:
+    """The measurement that forced this: 0 claims from an answer carrying 76 (ADR-056).
+
+    One unclosed brace and `json.loads` returns nothing for the entire document, where the
+    line format hands back every complete block before the cut.
+    """
+    whole = (
+        "{"
+        + Q
+        + "claim"
+        + Q
+        + ": "
+        + Q
+        + "first"
+        + Q
+        + ", "
+        + Q
+        + "quote"
+        + Q
+        + ": "
+        + Q
+        + "the first words"
+        + Q
+        + "},"
+        + "{"
+        + Q
+        + "claim"
+        + Q
+        + ": "
+        + Q
+        + "second"
+        + Q
+        + ", "
+        + Q
+        + "quote"
+        + Q
+        + ": "
+        + Q
+        + "the second words"
+        + Q
+        + "},"
+    )
+    cut = (
+        "{"
+        + Q
+        + "claim"
+        + Q
+        + ": "
+        + Q
+        + "third"
+        + Q
+        + ", "
+        + Q
+        + "quote"
+        + Q
+        + ": "
+        + Q
+        + "the thi"
+    )
+    claims = parse_claims(_shaped(whole + cut, closed=False))
+    assert [c.claim for c in claims] == ["first", "second"], "the cut entry is dropped whole"
+
+
+def test_recovery_changes_nothing_about_an_answer_that_arrived_whole() -> None:
+    """The ordinary path stays the ordinary path: a whole document is parsed as one."""
+    body = (
+        "{"
+        + Q
+        + "claim"
+        + Q
+        + ": "
+        + Q
+        + "only"
+        + Q
+        + ", "
+        + Q
+        + "quote"
+        + Q
+        + ": "
+        + Q
+        + "its words"
+        + Q
+        + "}"
+    )
+    claims = parse_claims(_shaped(body))
+    assert [(c.claim, c.quote) for c in claims] == [("only", "its words")]
+
+
+def test_a_cut_answer_with_no_whole_entry_falls_back_to_lines() -> None:
+    """Nothing recovered must not mean nothing parsed: the line path still runs.
+
+    Enforcement improves a path that works and never replaces it, and that holds for the
+    recovery too (ADR-052).
+    """
+    assert parse_claims(_shaped("{" + Q + "claim" + Q + ": " + Q + "cut immed", closed=False)) == ()
+
+
+def test_text_that_only_looks_like_json_is_still_read_as_lines() -> None:
+    """A model that ignored the schema is parsed the way it always was."""
+    claims = parse_claims("CLAIM: a point" + NL + "QUOTE: its words" + NL + "PAGE: 3")
+    assert [(c.claim, c.quote, c.page) for c in claims] == [("a point", "its words", 3)]

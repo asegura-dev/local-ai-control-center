@@ -66,6 +66,16 @@ visible nonsense and zero claims; under a schema it produces well-formed fields 
 empty or wrong. Well-formed and wrong is harder to notice than malformed and wrong, and that
 is worth watching for rather than assuming away.
 
+## Measured (v1.4.0), and **corrected in v1.4.1** - read ADR-056 first
+
+**The figures in this section are wrong and are kept as published.** The zero below was this
+project's parser refusing a truncated document, not the model failing to answer: the same
+answer carries seventy-six complete entries, and re-parsed it gives **32 verified quotations
+against the line format's 15, at the same fidelity**. The advice this section ends with is
+backwards. ADR-056 has the corrected table and how the mistake was made.
+
+What survives from below: the answer never ends, and it costs 24 minutes against 5.
+
 ## Measured (v1.4.0)
 
 This record said constraining might cost content quality and had to be measured. It was, as
@@ -86,6 +96,10 @@ the spread is zero and the comparison is between two numbers rather than two dis
 exactly the declared fields, and its first entry carries the same claim and the same quotation
 as the unconstrained one, word for word. The fear this record named did not happen.
 
+*(True of the first entry, which is all that was checked before writing it. Through entry
+thirty the fidelity holds at 93%; by entry sixty the model is repeating a table caption.
+Checking the first item and concluding about the set - ADR-056.)*
+
 **What failed is that the answer never ended.** Unconstrained, the model wrote 1,621 tokens
 and stopped. Constrained, it was still listing entries at 8,192 and was cut mid-string. The
 grammar admits another array element at every point, so nothing pushes the model toward
@@ -101,8 +115,14 @@ unparseable. The parser fell back to lines, found no `CLAIM:`, and returned noth
 engines that cannot enforce a schema. The measurement says it is also the format that
 degrades gracefully, and the enforced one is the brittle one.
 
+*(This is the sentence that cost the figure. The asymmetry is real; reading it as a property
+of JSON rather than as a defect to fix is what published a zero. `raw_decode` recovers every
+entry that arrived whole, and the brittleness was the parser's - ADR-056.)*
+
 **`enforce_shape` stays off, and for `extract_claims` on a 14B the honest advice is not to
-turn it on.** The decision to make it per-skill and measured rather than global was right, and
+turn it on.** *(Wrong. See ADR-056: with the parser fixed it is the better of the two on this
+skill and model. `enforce_shape` does stay off by default, for a different reason - one
+document is not a licence to change a default.)* The decision to make it per-skill and measured rather than global was right, and
 this is the first skill it was measured on. Whether a schema with a bounded array, or a
 parser that recovers complete entries from truncated JSON, changes the answer is open and not
 yet measured - the second is the more principled of the two, because it needs no number.

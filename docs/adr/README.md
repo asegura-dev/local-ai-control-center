@@ -1,6 +1,6 @@
 # Decision records
 
-Fifty-five records, in the order they were decided. The number is the identity: it is how
+Fifty-six records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -340,3 +340,9 @@ A quotation wholly inside another is the same passage read twice, and the longer
 [`ADR-055-a-feature-nothing-could-switch-on.md`](ADR-055-a-feature-nothing-could-switch-on.md)
 
 The schema ADR-052 decided was built, released and cited, and nothing in the program could set it: no flag, no configuration key, no declaration. Six tests passed because they built the plan object directly, which the program never does - the second instance of that shape after `ask_corpus`. Adds the configuration key, ties the schema to block-shaped output by construction, and records that coverage of a type is not coverage of a path.
+
+### 056 - what arrived whole
+
+[`ADR-056-what-arrived-whole.md`](ADR-056-what-arrived-whole.md)
+
+Corrects a figure v1.4.0 published hours earlier. A shaped answer cut at the token cap parsed to nothing, because one unclosed brace defeats `json.loads` - so an answer carrying seventy-six entries was published as zero, with advice not to use the feature. Entries that arrived whole are now recovered with `raw_decode`, nothing repaired and nothing guessed, and the corrected figures give 32 verified quotations against the line format's 15 at the same fidelity. Records that the zero was the instrument, and that "content quality did not degrade" came from reading one entry.
