@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
+from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.grounding import parse_claims
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction
-from local_ai_control_center.core.skill import SkillPlan
+from local_ai_control_center.core.skill import (
+    ExtractClaimsSkill,
+    SkillPlan,
+    SummarizeFileSkill,
+)
 
 NL = chr(10)
 
@@ -15,6 +21,7 @@ def _plan(**overrides: object) -> SkillPlan:
     base: dict[str, object] = {
         "action": IntendedAction(name="x", summary="s", required=frozenset()),
         "prompt_template": "t",
+        "verify_quotes": True,
     }
     base.update(overrides)
     return SkillPlan.model_validate(base)
@@ -105,3 +112,31 @@ def test_the_schema_travels_to_the_provider() -> None:
     # The mock accepts and ignores it, which is the contract for a provider that cannot.
     completion = MockProvider().complete("a prompt", 0.0, plan.output_schema)
     assert completion.text
+
+
+def test_the_configuration_can_actually_turn_this_on(tmp_path: Path) -> None:
+    """Through `plan`, which is the only path the program takes.
+
+    This is the test that was missing. Every other one here builds a `SkillPlan` directly,
+    and they all passed while nothing in the program could set `enforce_shape` at all -
+    no flag, no configuration key, no declaration. The feature shipped unreachable
+    (ADR-055).
+    """
+    skill = ExtractClaimsSkill()
+    asked = Config(workspace_root=tmp_path, enforce_shape=("extract_claims",))
+    assert skill.plan(("p.md",), asked).output_schema is not None
+    assert skill.plan(("p.md",), Config(workspace_root=tmp_path)).output_schema is None
+
+
+def test_naming_a_skill_that_answers_in_prose_enforces_nothing(tmp_path: Path) -> None:
+    """There is no block shape to enforce, so there is no schema to send.
+
+    By construction rather than by omission: a plan that does not verify quotations has no
+    fields anybody parses, and forcing one into `{entries: [...]}` would break the answer
+    it was meant to improve.
+    """
+    plan = SummarizeFileSkill().plan(
+        ("p.md",), Config(workspace_root=tmp_path, enforce_shape=("summarize_file",))
+    )
+    assert plan.enforce_shape, "the configuration named it"
+    assert plan.output_schema is None, "and it still gets no schema"

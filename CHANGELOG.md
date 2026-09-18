@@ -78,6 +78,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kept** - which is not an argument for a higher threshold but for not having one.
 
 ### Fixed
+- **The schema the engine enforces could not be switched on by anything** (ADR-055). ADR-052
+  decided it, it was built, released, described here and cited from a decision record - and
+  `enforce_shape` had no command-line flag, no configuration key, and no field in a skill
+  declaration. All seven places that build a plan left it false, so `output_schema` always
+  returned nothing and no schema was ever sent to any engine.
+
+  Six tests covered it and all six passed, because **they built the plan object directly**.
+  The program never builds it by hand: it calls `plan`, and `plan` was the part with nothing
+  in it. This is the second time - `ask_corpus` was tested through a skill that constructs it,
+  was absent from the registry, and failed on its first real launch with the suite green.
+
+  The configuration now names the skills, one per line, empty by default:
+
+  ```yaml
+  enforce_shape:
+    - extract_claims
+  ```
+
+  Every skill's `plan` sets it from there. A skill that answers in prose gets no schema **by
+  construction** - `output_schema` requires `verify_quotes`, which is true for exactly the
+  three skills that return parsed blocks - so naming `summarize_file` is inert rather than
+  damaging, and there is no list to keep in step with anything. The missing test goes through
+  `plan` and fails against the code as released.
+
+  Nothing about ADR-052's promised measurement is prejudged by this. It simply becomes
+  possible: it could not be run before.
+
 - **The generation timeout budgeted for writing and nothing for reading.** It derived from
   `answer_reserve` alone, so a full answer at the slowest measured rate used the entire
   budget and left zero for processing the prompt. A run with a 15,205-token prompt on a

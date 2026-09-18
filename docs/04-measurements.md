@@ -12,7 +12,7 @@ rejected can.**
 Everything below was measured against a real bibliography on real hardware. Where a figure
 was published and later corrected, both are shown, because the correction is the finding.
 
-## Ten wrong figures, and which way each one leaned
+## Eleven wrong figures, and which way each one leaned
 
 | Reported | What it actually was | Fixed in |
 |---|---|---|
@@ -25,6 +25,7 @@ was published and later corrected, both are shown, because the correction is the
 | **Zero fabrications in 237 quotations** | **48 of 237, of which 44 are absent in any form tried** | ADR-042 |
 | Choosing sections by their headings would raise relevance | It did not: 46% on topic against 51% for the cruder method it replaced | measured, below |
 | The corpus has near-duplicate quotations between documents | It has none. Every repeat in it is inside one document, and there are six | ADR-054 |
+| A schema the engine enforces, shipped and documented | Nothing in the program could switch it on. Six tests passed by building the object the program never builds | ADR-055 |
 
 Six of these made the model look worse than it was. The seventh was the correction to that
 pattern, published in the same release that introduced it, and it overshot: it credited a
@@ -42,6 +43,20 @@ The ninth is different from all of them, and is kept because of it: **nothing wa
 wrong.** A prediction was announced before being taken, it favoured the thing being built,
 and it was false. Section headings were expected to select relevant pages better than
 counting keyword mentions; they selected slightly worse. The figures below say how much.
+
+**The eleventh is not a figure about a model at all. It is a feature counted as delivered
+that did not exist.** ADR-052's schema was built, released, described in the changelog and
+cited from a decision record, and `enforce_shape` had no flag, no configuration key and no
+field in a skill declaration. All seven places that build a plan left it false, so no schema
+was ever sent. Six tests covered it and passed, because **they built the plan object
+directly** - and the program never builds it by hand; it calls `plan`, which was the part
+with nothing in it.
+
+It is the second instance of that shape. `ask_corpus` was tested through a skill that
+constructs it directly, was absent from the registry, and failed on its first real launch with
+the suite green. **Coverage of a type is not coverage of a path**, and the question neither
+suite asked is one sentence long: *what in the program sets this?* If the answer is "a test",
+the feature is not there (ADR-055).
 
 The tenth is the ninth's twin and it cost more, because it had been written into a plan as a
 premise rather than as a prediction. The plan's next piece was approximate deduplication, on
@@ -209,6 +224,11 @@ advance here were wrong, and both were wrong in the direction of the thing being
 section headings were to select better, and the corpus was to hold near-duplicates across
 documents. That is not an argument against predicting. It is an argument for writing the
 prediction down where it can embarrass you.
+
+**Ask what in the program sets it.** A feature is a figure too - "this is delivered" is a
+claim - and twice here it was wrong while its tests were green. Both times the tests built
+the component the program never builds by hand. If nothing but a test reaches a switch, the
+switch is not there.
 
 **Ask whether a premise in a plan was ever a measurement.** The second of those was not
 phrased as a prediction. It was stated as a fact about the corpus, in the sentence justifying

@@ -1,6 +1,6 @@
 # Decision records
 
-Fifty-four records, in the order they were decided. The number is the identity: it is how
+Fifty-five records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -334,3 +334,9 @@ The first check here that is a judgement rather than a measurement, and it says 
 [`ADR-054-the-same-passage-read-twice.md`](ADR-054-the-same-passage-read-twice.md)
 
 A quotation wholly inside another is the same passage read twice, and the longer one is kept - exact, unthresholded, no new module. Records the approximate deduplication that was planned and dropped: the corpus has zero near-duplicates between documents, the whole exact comparison takes 133 ms, and its most alike non-identical pair differs by one word that happens to be the name of a different drug.
+
+### 055 - a feature nothing could switch on
+
+[`ADR-055-a-feature-nothing-could-switch-on.md`](ADR-055-a-feature-nothing-could-switch-on.md)
+
+The schema ADR-052 decided was built, released and cited, and nothing in the program could set it: no flag, no configuration key, no declaration. Six tests passed because they built the plan object directly, which the program never does - the second instance of that shape after `ask_corpus`. Adds the configuration key, ties the schema to block-shaped output by construction, and records that coverage of a type is not coverage of a path.

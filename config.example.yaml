@@ -34,6 +34,17 @@ workspace_in_repository: false
 # value is a clear error rather than a guessed default.
 model: qwen2.5:3b
 
+# Skills whose output shape the engine is made to produce, named one per line.
+# Empty by default, which means nothing is constrained. Constraining decoding stops
+# the model from emitting anything that does not fit the skill's declared fields -
+# the difference between asking for a format and getting one. It can also fight the
+# way a model composes, and a format that arrives perfectly with worse content inside
+# is a loss that reads as a win, so turn it on for a skill after measuring that skill.
+# Naming a skill that answers in prose does nothing: there is no block shape to
+# enforce, and forcing one would break the answer.
+# enforce_shape:
+#   - extract_claims
+
 # The language the model is asked to answer in. English by default: small local
 # models follow instructions and write more reliably in it than in languages they
 # saw less of during training. Set it to whatever the reader needs - the value is

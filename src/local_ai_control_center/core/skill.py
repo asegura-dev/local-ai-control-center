@@ -103,6 +103,11 @@ class SkillPlan(BaseModel):
     Off by default, and turned on per skill after measuring it. Constraining decoding can
     fight the way a model composes, and a format that arrives perfectly with worse content
     inside would be a loss reported as a win (ADR-052).
+
+    Set from the configuration by every skill's `plan`, which is the only way it is ever
+    true. It was reachable from nothing at all for a release: the tests that covered it
+    built this object directly, so they passed against a path the program never takes -
+    the same way `ask_corpus` was tested through a skill that constructs it (ADR-055).
     """
 
     @property
@@ -116,7 +121,7 @@ class SkillPlan(BaseModel):
         An array of entries, each an object, because every skill here returns a list of
         blocks rather than a single answer.
         """
-        if not self.enforce_shape or not self.fields:
+        if not self.enforce_shape or not self.fields or not self.verify_quotes:
             return None
         properties = {name: {"type": "string"} for name in self.fields}
         return {
@@ -220,7 +225,11 @@ class SummarizeFileSkill(Skill):
             "factual: add nothing the documents do not contain.\n\n"
             f"{fenced_documents(requests)}"
         )
-        return SkillPlan(action=action, prompt_template=prompt_template)
+        return SkillPlan(
+            action=action,
+            prompt_template=prompt_template,
+            enforce_shape=config.enforces_shape(self.name),
+        )
 
 
 class CritiqueFileSkill(Skill):
@@ -270,7 +279,11 @@ class CritiqueFileSkill(Skill):
             "costs the author more to check than a real one saves.\n\n"
             f"{fenced_documents(requests)}"
         )
-        return SkillPlan(action=action, prompt_template=prompt_template)
+        return SkillPlan(
+            action=action,
+            prompt_template=prompt_template,
+            enforce_shape=config.enforces_shape(self.name),
+        )
 
 
 class ExtractClaimsSkill(Skill):
@@ -341,7 +354,12 @@ class ExtractClaimsSkill(Skill):
             + chr(10)
             + "PAGE: ..."
         )
-        return SkillPlan(action=action, prompt_template=prompt_template, verify_quotes=True)
+        return SkillPlan(
+            action=action,
+            prompt_template=prompt_template,
+            verify_quotes=True,
+            enforce_shape=config.enforces_shape(self.name),
+        )
 
 
 class AssessSourceSkill(Skill):
@@ -421,6 +439,7 @@ class AssessSourceSkill(Skill):
             prompt_template=prompt_template,
             uses_context=True,
             verify_quotes=True,
+            enforce_shape=config.enforces_shape(self.name),
         )
 
 
@@ -478,7 +497,12 @@ class ReviseFileSkill(Skill):
             + chr(10)
             + fenced_documents(requests)
         )
-        return SkillPlan(action=action, prompt_template=prompt_template, destination=destination)
+        return SkillPlan(
+            action=action,
+            prompt_template=prompt_template,
+            destination=destination,
+            enforce_shape=config.enforces_shape(self.name),
+        )
 
 
 def grant_for(skill: Skill, config: Config) -> Permissions:
@@ -566,4 +590,5 @@ class AskCorpusSkill(Skill):
             verify_quotes=True,
             fields=("point", "quote", "source"),
             quote_field="quote",
+            enforce_shape=config.enforces_shape(self.name),
         )

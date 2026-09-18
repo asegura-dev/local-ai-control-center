@@ -15,7 +15,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Fifty-four records front to back is a history. These are the threads through them, for
+Fifty-five records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -129,6 +129,7 @@ not to reach for an approximate algorithm to find them.
 | 052 | [a-shape-the-engine-enforces](adr/ADR-052-a-shape-the-engine-enforces.md) | Structure is obeyed and instruction is negotiated, and every skill still asked for its format in prose. A skill may now declare a schema the engine constrains decoding to, generated from the fields it already names. The line parser stays for engines that cannot enforce, it is off by default, and whether constraining costs content quality is to be measured rather than assumed. |
 | 053 | [whether-the-reading-follows-from-the-words](adr/ADR-053-whether-the-reading-follows-from-the-words.md) | 548 verified quotations each carry a reading nobody checked, and one of them attributed choline PET/CT's figures to PSMA while passing every mechanical control. A port judges whether a quotation entails its claim - named a judgement rather than a measurement, marking rather than removing, and graded against labels written before it ran. |
 | 054 | [the-same-passage-read-twice](adr/ADR-054-the-same-passage-read-twice.md) | A repeat across passes is rarely word for word: it is the same sentence with wider boundaries, which equality misses. Drops a quotation wholly inside another and keeps the longer, exactly and without a threshold. Records the approximate deduplication that was planned and dropped - the corpus has zero near-duplicates across documents, the exact comparison of all 213,531 pairs takes 133 ms, and its most alike non-identical pair differs by one word that is the name of a different drug. |
+| 055 | [a-feature-nothing-could-switch-on](adr/ADR-055-a-feature-nothing-could-switch-on.md) | The schema ADR-052 decided shipped unreachable: no flag, no configuration key, no declaration set it, so `output_schema` always returned nothing. Six tests passed by building the plan object the program never builds by hand - the second instance after `ask_corpus`. Names the skills in the configuration, refuses prose a schema by construction, and puts the missing test on the path instead of the type. |
 
 ## Guides (`docs/guides/`)
 

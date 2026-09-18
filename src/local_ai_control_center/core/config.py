@@ -154,6 +154,19 @@ class Config(BaseModel):
             "routing is a rule you wrote, never a choice a model makes (ADR-051)."
         ),
     )
+    enforce_shape: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Skills whose output shape the engine should be made to produce, named one "
+            "per line. Off for everything by default. Constraining decoding stops a model "
+            "from emitting anything that does not fit, which is the difference between "
+            "asking for a format and getting one - but it can fight the way a model "
+            "composes, and a format that arrives perfectly with worse content inside "
+            "would be a loss reported as a win. Turn it on per skill after measuring "
+            "that skill, not before (ADR-052). Naming a skill that answers in prose does "
+            "nothing: there is no block shape to enforce."
+        ),
+    )
     workspace_in_repository: bool = Field(
         default=False,
         description=(
@@ -257,6 +270,22 @@ class Config(BaseModel):
         a skill and leaves `model` empty is, because then something else has no engine.
         """
         return self.models.get(skill) or self.model
+
+    def enforces_shape(self, skill: str) -> bool:
+        """Whether this skill's answer should be constrained to its declared fields.
+
+        Named rather than global, because whether constraining helps is a property of the
+        skill and has to be measured one at a time.
+        """
+        return skill in self.enforce_shape
+
+    @field_validator("enforce_shape")
+    @classmethod
+    def _shaped_skills_are_named(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        """Refuse a blank entry, which would read as a skill and mean nothing."""
+        if any(not name.strip() for name in value):
+            raise ValueError("enforce_shape has a blank entry. Name a skill or remove it.")
+        return tuple(name.strip() for name in value)
 
     @field_validator("models")
     @classmethod

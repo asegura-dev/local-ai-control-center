@@ -186,6 +186,7 @@ class FileSkill(Skill):
             verify_quotes=self._declared.verifies,
             fields=tuple(field.name for field in self._declared.fields),
             quote_field=self._declared.quoted_field,
+            enforce_shape=config.enforces_shape(self.name),
         )
 
 
