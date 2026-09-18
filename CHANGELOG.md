@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-09-18
+
+### Fixed
+- **ADR-027's own example contradicted its own sentence.** The record says *"every destination
+  is written down"* and four lines below showed `server_url_env: NTFY_SERVER` - a destination
+  arriving through the environment, which ADR-030 forbids in the very next record. The
+  contradiction sat in one code block for thirty-three records and was not noticed until the
+  assurance pass. Corrected in place and kept as written, the way ADR-004 and ADR-046 keep
+  theirs.
+
+  Checked the rest of the documentation rather than assuming it: the Linux and Windows server
+  guides cover installing ntfy **on the server** and never touch the LACC-side configuration,
+  so they needed nothing. `config.example.yaml`, the setup guide, the assurance chapter and
+  both indexes were already updated with the change itself in 1.6.0.
+
+- **`tools/record_coverage.py` listed two deliberate citations as if they were stale.** A
+  record that corrects itself still names what it corrected, and one about a removal names
+  what was removed. Both carry a reason now, so they stop appearing in a report meant to be
+  skimmed.
+
 ## [1.6.0] - 2026-09-18
 
 ### Added
