@@ -97,6 +97,15 @@ class SkillPlan(BaseModel):
     A declaration chooses the label. It cannot choose how the checking is done.
     """
 
+    answer_is_entries_only: bool = False
+    """Whether the whole answer is the labelled blocks, with no prose around them.
+
+    What decides whether a shape can be enforced at all, and it is not the same question as
+    `verify_quotes`. `assess_source` checks its quotations and answers with three headings of
+    prose **and then** a list of blocks; forcing that into `{"entries": [...]}` would delete
+    the part a reader actually reads. A skill says here that it has nothing to lose (ADR-057).
+    """
+
     enforce_shape: bool = False
     """Whether the engine should be made to produce exactly these fields.
 
@@ -121,7 +130,7 @@ class SkillPlan(BaseModel):
         An array of entries, each an object, because every skill here returns a list of
         blocks rather than a single answer.
         """
-        if not self.enforce_shape or not self.fields or not self.verify_quotes:
+        if not self.enforce_shape or not self.fields or not self.answer_is_entries_only:
             return None
         properties = {name: {"type": "string"} for name in self.fields}
         return {
@@ -158,6 +167,48 @@ class SkillPlan(BaseModel):
     impossible to reproduce - which for a record meant to be citable is the more serious of
     the two (ADR-033). A skill declares otherwise only when its task genuinely needs it.
     """
+
+
+def asked_shape(labels: tuple[tuple[str, str], ...], each: str, enforced: bool) -> tuple[str, str]:
+    """How to ask for the answer's shape, and how to restate it after the document.
+
+    Two forms, because the engine may be enforcing one of them. Asking for labelled lines
+    while a grammar forbids them is not harmless redundancy - it is an instruction the model
+    is physically prevented from obeying, and LACC shipped exactly that: the prompt was
+    **byte-identical** whether or not a schema was sent, so a constrained run was told to
+    write `CLAIM:` and could not. It never stopped, and ran to the token cap (ADR-057).
+
+    Returns the block that describes the shape and the line that restates it at the end.
+    The restatement is not decoration: stating a format thousands of tokens before the point
+    of generation cost two thirds of the claims (ADR-037).
+    """
+    line = chr(10)
+    if not enforced:
+        skeleton = line.join(f"{name.upper()}: {describe}" for name, describe in labels)
+        closing = line.join(f"{name.upper()}: ..." for name, _ in labels)
+        return (
+            "Use this format, and nothing else:"
+            + line * 2
+            + skeleton
+            + line * 2
+            + f"One block per {each}, separated by a blank line. No preamble, no numbering, "
+            "no commentary.",
+            "in the format above:" + line + closing,
+        )
+    quoted = chr(34)
+    keys = line.join(f"{quoted}{name}{quoted}: {describe}" for name, describe in labels)
+    return (
+        "Answer as one JSON object with an " + quoted + "entries" + quoted + " array. Every "
+        "entry has these keys:"
+        + line * 2
+        + keys
+        + line * 2
+        + "Write nothing outside the JSON. Close the array once the material has no more "
+        + each
+        + "s to report - a list that runs on past what the material says is worse than a "
+        "short one.",
+        "as the JSON object described above. Close the array when you are done.",
+    )
 
 
 class Skill(ABC):
@@ -311,6 +362,16 @@ class ExtractClaimsSkill(Skill):
             required=self.required,
             targets=tuple(Path(item) for item in requests),
         )
+        enforced = config.enforces_shape(self.name)
+        opening, closing = asked_shape(
+            (
+                ("claim", "what the document asserts"),
+                ("quote", "the exact words from the document"),
+                ("page", "the page number"),
+            ),
+            "claim",
+            enforced,
+        )
         prompt_template = (
             "You are extracting what a document asserts, for someone who will cite it."
             + chr(10)
@@ -322,18 +383,7 @@ class ExtractClaimsSkill(Skill):
             "copied character for character, and the page they appear on. A quotation you "
             "adjust, tidy or translate is no longer a quotation."
             + chr(10)
-            + "Use this format, and nothing else:"
-            + chr(10)
-            + chr(10)
-            + "CLAIM: what the document asserts"
-            + chr(10)
-            + "QUOTE: the exact words from the document"
-            + chr(10)
-            + "PAGE: the page number"
-            + chr(10)
-            + chr(10)
-            + "One block per claim, separated by a blank line. No preamble, no numbering, "
-            "no commentary."
+            + opening
             + chr(10)
             + "If the document does not support a claim, do not make it. Every quotation "
             "is checked against the document, and one that cannot be found is reported as "
@@ -346,19 +396,15 @@ class ExtractClaimsSkill(Skill):
             # and identical across runs where the original varied (ADR-037).
             + chr(10)
             + chr(10)
-            + "Now list every claim the document makes, in the format above:"
-            + chr(10)
-            + "CLAIM: ..."
-            + chr(10)
-            + "QUOTE: ..."
-            + chr(10)
-            + "PAGE: ..."
+            + "Now list every claim the document makes, "
+            + closing
         )
         return SkillPlan(
             action=action,
             prompt_template=prompt_template,
             verify_quotes=True,
-            enforce_shape=config.enforces_shape(self.name),
+            answer_is_entries_only=True,
+            enforce_shape=enforced,
         )
 
 
@@ -559,6 +605,16 @@ class AskCorpusSkill(Skill):
             required=self.required,
         )
         break_ = chr(10)
+        enforced = config.enforces_shape(self.name)
+        opening, _ = asked_shape(
+            (
+                ("point", "what the passages support"),
+                ("quote", "the exact words from a passage above"),
+                ("source", "the document named beside that passage"),
+            ),
+            "point",
+            enforced,
+        )
         template = (
             "Below are passages taken from a set of documents. Every one of them has already "
             "been checked: the words are really in the document named beside it."
@@ -574,21 +630,16 @@ class AskCorpusSkill(Skill):
             "the question, say so and stop - that is a useful answer and an invented one is "
             "not."
             + break_ * 2
-            + "For every point you make, give the words that establish it:"
+            + "For every point you make, give the words that establish it."
             + break_ * 2
-            + "POINT: what the passages support"
-            + break_
-            + "QUOTE: the exact words from a passage above"
-            + break_
-            + "SOURCE: the document named beside that passage"
-            + break_ * 2
-            + "One block per point, separated by a blank line. No preamble."
+            + opening
         )
         return SkillPlan(
             action=action,
             prompt_template=template,
             verify_quotes=True,
+            answer_is_entries_only=True,
             fields=("point", "quote", "source"),
             quote_field="quote",
-            enforce_shape=config.enforces_shape(self.name),
+            enforce_shape=enforced,
         )

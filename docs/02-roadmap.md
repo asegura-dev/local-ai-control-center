@@ -366,6 +366,32 @@ most central, nnU-Net and the EAU and NCCN guidelines among them. The library-sc
 deferred to v2 below is not a nicety: without it a bibliography is read only in the parts
 that happen to fit.
 
+## Four defects of one shape, and what found them
+
+ADR-055 found a feature nothing could switch on. ADR-056 found a parser discarding an answer
+it had been handed. Both passed their tests; both were described accurately in a document and
+inaccurately in the program. So the code was swept for the same shape, and two more turned up,
+plus one that the fix for the first exposed.
+
+| | |
+|---|---|
+| the prompt asked for a format the grammar forbade | the same `prompt_sha256` under both conditions (ADR-057) |
+| a skill answering in prose *and* blocks could be shape-enforced | a schema would have deleted the prose (ADR-057) |
+| deduplication covered one of four paths that produce checked claims | and a single answer repeats too: 3 of 19 measured (ADR-058) |
+| ntfy's docstring promised basic credentials | helper tested, called by nothing, no field to reach it (ADR-058) |
+
+**None of these was a wrong belief about a model.** Every one was the program failing to do
+what its own record said it did, while the suite stayed green.
+
+**What found them is worth naming, because it was not a test.** ADR-055 added a check that
+every setting can be set, and it would have caught neither of the last two: a control applied
+in three fewer places than it should be is not a setting, and a sentence in a docstring is
+not one either. Reading found them - specifically, asking of each control *"what does this
+cover, and is that what its record claims?"*
+
+There is no automated form of that question yet, and this document should not pretend there
+is one.
+
 ## A feature that was counted as delivered and was not there
 
 Going to run the measurement ADR-052 promised - *does constraining decoding cost content

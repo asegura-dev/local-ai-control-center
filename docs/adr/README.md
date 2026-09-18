@@ -1,6 +1,6 @@
 # Decision records
 
-Fifty-six records, in the order they were decided. The number is the identity: it is how
+Fifty-eight records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -346,3 +346,15 @@ The schema ADR-052 decided was built, released and cited, and nothing in the pro
 [`ADR-056-what-arrived-whole.md`](ADR-056-what-arrived-whole.md)
 
 Corrects a figure v1.4.0 published hours earlier. A shaped answer cut at the token cap parsed to nothing, because one unclosed brace defeats `json.loads` - so an answer carrying seventy-six entries was published as zero, with advice not to use the feature. Entries that arrived whole are now recovered with `raw_decode`, nothing repaired and nothing guessed, and the corrected figures give 32 verified quotations against the line format's 15 at the same fidelity. Records that the zero was the instrument, and that "content quality did not degrade" came from reading one entry.
+
+### 057 - the prompt and the grammar disagreed
+
+[`ADR-057-the-prompt-and-the-grammar-disagreed.md`](ADR-057-the-prompt-and-the-grammar-disagreed.md)
+
+The prompt was byte-identical whether or not a schema was sent, so a constrained run was instructed to write `CLAIM:` lines by a prompt while the grammar forbade every character of them - very likely why it never stopped. Both forms now come from one description of the fields. Also replaces ADR-055's test for whether a shape may be enforced: `assess_source` verifies its quotations and answers with prose *and* blocks, and a schema would delete the prose.
+
+### 058 - controls that did not cover what they claimed
+
+[`ADR-058-controls-that-did-not-cover-what-they-claimed.md`](ADR-058-controls-that-did-not-cover-what-they-claimed.md)
+
+Two findings from sweeping for the shape ADR-055 and ADR-056 showed twice in two days. Deduplication was applied on one of the four paths that produce checked claims - the one ADR-045 happened to be thinking about - while a single answer repeats passages too, three of nineteen on the measured paper. And ntfy's docstring promised basic credentials whose helper was tested, called by nothing, and had no configuration field. Records that the reachability test from ADR-055 would have caught neither.

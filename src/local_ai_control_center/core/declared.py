@@ -22,7 +22,7 @@ from .config import Config
 from .fence import CONTENT_PLACEHOLDER
 from .permissions import Capability
 from .preview import IntendedAction
-from .skill import Skill, SkillPlan
+from .skill import Skill, SkillPlan, asked_shape
 
 _DECLARABLE: frozenset[Capability] = frozenset({"read_files"})
 """What a declared skill may ask for.
@@ -186,6 +186,7 @@ class FileSkill(Skill):
             verify_quotes=self._declared.verifies,
             fields=tuple(field.name for field in self._declared.fields),
             quote_field=self._declared.quoted_field,
+            answer_is_entries_only=True,
             enforce_shape=config.enforces_shape(self.name),
         )
 
@@ -199,10 +200,16 @@ def prompt_for(declared: DeclaredSkill, config: Config) -> str:
     own prompt would not know to do that, which is why they do not write this part.
     """
     break_ = chr(10)
-    labels = break_.join(
-        f"{field.name.upper()}: {field.describe or field.name}"
-        + ("" if field.required else "   (optional)")
-        for field in declared.fields
+    opening, _ = asked_shape(
+        tuple(
+            (
+                field.name,
+                (field.describe or field.name) + ("" if field.required else "   (optional)"),
+            )
+            for field in declared.fields
+        ),
+        "entry",
+        config.enforces_shape(declared.name),
     )
     quoting = declared.quoted_field
     fidelity = (
@@ -230,12 +237,7 @@ def prompt_for(declared: DeclaredSkill, config: Config) -> str:
         + f"Answer in {config.output_language}."
         + fidelity
         + document
-        + "Use this format, and nothing else:"
-        + break_ * 2
-        + labels
-        + break_ * 2
-        + "One block per entry, separated by a blank line. No preamble, no numbering, no "
-        + "commentary."
+        + opening
     )
 
 

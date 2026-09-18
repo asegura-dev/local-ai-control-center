@@ -15,7 +15,6 @@ from pydantic import ValidationError
 
 from local_ai_control_center.adapters.ntfy import (
     NtfyNotifier,
-    basic_authorization,
     notifier_from_config,
 )
 from local_ai_control_center.core.config import Config
@@ -118,11 +117,6 @@ def test_a_long_body_is_cut_rather_than_rejected() -> None:
     post = _Recorder()
     NtfyNotifier("http://desk", "lacc", post=post).send(Notification(title="t", body="x" * 10_000))
     assert len(post.body) < 4096
-
-
-def test_basic_credentials_encode_as_a_header_value() -> None:
-    """For a server behind basic auth rather than a token."""
-    assert basic_authorization("user", "pass") == "Basic dXNlcjpwYXNz"
 
 
 def test_nothing_is_built_while_notifications_are_off(tmp_path: Path) -> None:

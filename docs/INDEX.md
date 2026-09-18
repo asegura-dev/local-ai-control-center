@@ -15,7 +15,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Fifty-six records front to back is a history. These are the threads through them, for
+Fifty-eight records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -131,6 +131,8 @@ not to reach for an approximate algorithm to find them.
 | 054 | [the-same-passage-read-twice](adr/ADR-054-the-same-passage-read-twice.md) | A repeat across passes is rarely word for word: it is the same sentence with wider boundaries, which equality misses. Drops a quotation wholly inside another and keeps the longer, exactly and without a threshold. Records the approximate deduplication that was planned and dropped - the corpus has zero near-duplicates across documents, the exact comparison of all 213,531 pairs takes 133 ms, and its most alike non-identical pair differs by one word that is the name of a different drug. |
 | 055 | [a-feature-nothing-could-switch-on](adr/ADR-055-a-feature-nothing-could-switch-on.md) | The schema ADR-052 decided shipped unreachable: no flag, no configuration key, no declaration set it, so `output_schema` always returned nothing. Six tests passed by building the plan object the program never builds by hand - the second instance after `ask_corpus`. Names the skills in the configuration, refuses prose a schema by construction, and puts the missing test on the path instead of the type. |
 | 056 | [what-arrived-whole](adr/ADR-056-what-arrived-whole.md) | A shaped answer cut at the token cap parsed to nothing - one unclosed brace defeats `json.loads` - so an answer carrying 76 entries was published in v1.4.0 as zero, with advice not to use the feature. Recovers every entry that arrived whole with `raw_decode`, repairing and guessing nothing. Corrected: 32 verified quotations against the line format's 15, at the same fidelity, and the advice was backwards. |
+| 057 | [the-prompt-and-the-grammar-disagreed](adr/ADR-057-the-prompt-and-the-grammar-disagreed.md) | The prompt was byte-identical whether or not a schema was sent, so a constrained run was told to write `CLAIM:` lines while the grammar forbade them - an instruction the model could not obey, and very likely why it never stopped. Builds both forms from one description of the fields, and replaces ADR-055's condition: `assess_source` checks its quotations and answers with prose *and* blocks, which a schema would delete. |
+| 058 | [controls-that-did-not-cover-what-they-claimed](adr/ADR-058-controls-that-did-not-cover-what-they-claimed.md) | A sweep for the shape found twice in two days. Deduplication covered one of the four paths that produce checked claims, though a single answer repeats passages too - three of nineteen measured. ntfy's docstring promised basic credentials with a tested helper nothing called and no configuration field to reach it. Notes that ADR-055's reachability test would have caught neither: reading did. |
 
 ## Guides (`docs/guides/`)
 

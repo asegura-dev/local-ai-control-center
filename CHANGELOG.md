@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The prompt asked for a format the grammar forbade** (ADR-057). With the shape enforced,
+  the prompt sent to the engine was **byte-identical** to the unenforced one - the audit
+  records the same `prompt_sha256` under both conditions. So a constrained run was instructed
+  *"Use this format, and nothing else: CLAIM: ... QUOTE: ... PAGE: ..."* while the grammar
+  forbade every character of it, and was seeded with `CLAIM: ...` after the document.
+
+  An instruction the model is physically prevented from obeying, and very likely why the
+  enforced answer never stopped: a model's sense of being finished is tied to the shape it was
+  asked for. Both forms are now built from one description of the skill's fields, so they
+  cannot drift, and the enforced form describes the JSON object and asks for the array to be
+  closed. **The unenforced prompt is unchanged byte for byte**, verified against the audit -
+  same digest, same answer, same nineteen quotations.
+
+  **Measured, four runs each, every run within a condition byte-identical:**
+
+  | | lines | schema, prompt contradicting it | schema, prompt agreeing |
+  |---|---|---|---|
+  | **why it stopped** | `stop` | **`length`** | **`stop`** |
+  | answer tokens | 1,621 | 8,192, unfinished | **2,006** |
+  | one run took | 58 s | 290 s | **73 s** |
+  | after deduplication | 16 | 35 | **20 - no repeats** |
+  | found in the document | 15 | **32** | 18 |
+  | rate | 93% | 91% | 90% |
+
+  The contradiction was the cause, and removing it fixed the termination completely. It did
+  **not** transform the quotation count: eighteen verified against fifteen, at three points
+  lower fidelity and a quarter more time. The broken configuration still returns the most
+  verified quotations - thirty-two - because a model that cannot stop keeps extracting, and
+  much of that was real until it began repeating a table caption. Thirteen more for four times
+  the clock, from an answer that has to be salvaged, is not a trade worth taking.
+
+  Found by accident: **determinism holds within a warmed engine and not across a model load.**
+  At temperature zero the warm-up answer differed from the four that followed - different
+  digest, 2,030 tokens against 2,006. Two single runs can differ for that reason alone, which
+  is what `lacc measure`'s warm-up is for.
+
+- **A skill whose answer is prose *and* blocks could be shape-enforced** (ADR-057).
+  `assess_source` reports what is new, what overlaps and what contradicts, and then a list of
+  blocks. ADR-055 used `verify_quotes` to decide whether a schema could be sent, and
+  `assess_source` verifies - so enforcing it would have forced the whole answer into
+  `{"entries": [...]}` and deleted the prose. A skill now declares `answer_is_entries_only`,
+  and naming one that does not is inert.
+
+- **Deduplication covered one of the four paths that produce checked claims** (ADR-058). Only
+  the passes path, because that is the path ADR-045 had in mind. But a single answer repeats
+  passages too - measured, **three of nineteen** on one paper, and six across the
+  654-quotation corpus, every one of which reached the corpus because `collect` runs the
+  ordinary path. It now applies to the ordinary run, to `measure` and to `ask`. Counts drop
+  slightly and everywhere: the measured paper reports sixteen where it reported nineteen, and
+  `measure` and `run` now agree, which they did not.
+
+### Removed
+- **ntfy's basic-credential helper, which nothing could reach** (ADR-058). The docstring said
+  *"Authenticates with a bearer token when one is configured, or basic credentials."* The
+  helper existed and had a test. Nothing called it, and there was no configuration field for a
+  username, so no user could have used it while the docstring promised they could. Removed
+  rather than wired: adding an untested authentication path to make a sentence true is worse
+  than correcting the sentence. ntfy authenticates with a bearer token, and now says only
+  that.
+
 ## [1.4.1] - 2026-09-18
 
 ### Fixed

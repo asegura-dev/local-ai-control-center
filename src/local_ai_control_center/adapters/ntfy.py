@@ -15,7 +15,6 @@ the egress guard in `conftest` still forbids reaching the network, and it stays 
 
 from __future__ import annotations
 
-import base64
 import os
 import unicodedata
 import urllib.error
@@ -81,9 +80,14 @@ def _clipped(text: str, limit: int) -> bytes:
 class NtfyNotifier(Notifier):
     """Publish to an ntfy topic on a server the user hosts.
 
-    Authenticates with a bearer token when one is configured, or basic credentials.
-    Everything sensitive is read from the environment: the configuration names the
-    variable, it does not hold the value.
+    Authenticates with a bearer token when one is configured. Everything sensitive is read
+    from the environment: the configuration names the variable, it does not hold the value.
+
+    Basic credentials are **not** supported. A helper for them lived here, was tested, and
+    was called by nothing - there was no configuration field for a username either, so no
+    user could have reached it, while this docstring said otherwise. Removed rather than
+    wired: an untested authentication path added to satisfy a sentence is worse than the
+    sentence being true (ADR-058).
     """
 
     def __init__(
@@ -141,12 +145,6 @@ class NtfyNotifier(Notifier):
         if 200 <= status < 300:
             return Delivery(transport=self.name, delivered=True, detail=f"HTTP {status}")
         return Delivery(transport=self.name, delivered=False, detail=f"HTTP {status}")
-
-
-def basic_authorization(username: str, password: str) -> str:
-    """Return a Basic credential header value, for servers that want one."""
-    raw = f"{username}:{password}".encode()
-    return f"Basic {base64.b64encode(raw).decode('ascii')}"
 
 
 def _post_with_urllib(url: str, body: bytes, headers: Mapping[str, str], timeout: float) -> int:

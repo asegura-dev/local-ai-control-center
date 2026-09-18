@@ -779,6 +779,51 @@ def test_quotations_are_checked_against_what_the_cycle_read(tmp_path: Path) -> N
     assert detail["quotations"] == 2
 
 
+def test_one_answer_that_quotes_a_passage_twice_yields_it_once(tmp_path: Path) -> None:
+    """Deduplication covered the passes path and not this one, for a year (ADR-058).
+
+    A single answer repeats a passage too - measured, three of nineteen on a real paper -
+    and which code path read the document is not a reason for a corpus to hold the same
+    sentence twice.
+    """
+    _note(tmp_path, "The study analysed 240 cases across three hospitals.")
+    workspace = Workspace.ensure(tmp_path)
+    config = Config(workspace_root=tmp_path)
+    audit = AuditLog(workspace, config)
+    block = (
+        "CLAIM: Three hospitals took part."
+        + chr(10)
+        + "QUOTE: across three hospitals"
+        + chr(10)
+        + "PAGE: 1"
+    )
+    wider = (
+        "CLAIM: Two hundred and forty cases, across three hospitals."
+        + chr(10)
+        + "QUOTE: 240 cases across three hospitals"
+        + chr(10)
+        + "PAGE: 1"
+    )
+
+    result = run_action(
+        _reading_action(),
+        _TEMPLATE,
+        Permissions(read_files=True),
+        config,
+        workspace,
+        _AnsweringProvider(block + chr(10) * 2 + block + chr(10) * 2 + wider),
+        audit,
+        "run-1",
+        _accept,
+        verify_quotes=True,
+    )
+
+    quotations = [checked.claim.quote for checked in result.checked_claims]
+    assert quotations == ["240 cases across three hospitals"], (
+        "the repeat is dropped, and the narrower quotation inside the wider one with it"
+    )
+
+
 def test_nothing_is_checked_unless_the_skill_asks(tmp_path: Path) -> None:
     """Checking is declared, not inferred from what an answer happens to look like."""
     _note(tmp_path, "una nota corta")

@@ -44,7 +44,12 @@ from local_ai_control_center.core.declared import (
     load_declared_skills,
 )
 from local_ai_control_center.core.fence import CONTENT_PLACEHOLDER
-from local_ai_control_center.core.grounding import Claim, check_answer, check_claim
+from local_ai_control_center.core.grounding import (
+    Claim,
+    check_answer,
+    check_claim,
+    without_repeats,
+)
 from local_ai_control_center.core.headings import headings_in, matching
 from local_ai_control_center.core.passes import PageRangeError
 from local_ai_control_center.core.permissions import grant
@@ -1183,11 +1188,13 @@ def measure(
             checked = (
                 result.checked_claims
                 if material is None
-                else check_answer(
-                    result.completion.text if result.completion else "",
-                    material,
-                    plan.fields,
-                    plan.quote_field,
+                else without_repeats(
+                    check_answer(
+                        result.completion.text if result.completion else "",
+                        material,
+                        plan.fields,
+                        plan.quote_field,
+                    )
                 )
             )
             # Counted by whether the quotation is in the document. `holds` also requires a
@@ -1675,7 +1682,9 @@ def _check_against_what_was_sent(
     """
     if result.completion is None:
         return
-    checked = check_answer(result.completion.text, material, plan.fields, plan.quote_field)
+    checked = without_repeats(
+        check_answer(result.completion.text, material, plan.fields, plan.quote_field)
+    )
     if not checked:
         console.print(
             "[yellow]No quotations to check.[/yellow] The answer did not use the format, so "

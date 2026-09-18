@@ -221,7 +221,40 @@ three-way label right 6 times, the binary "should somebody look at this" right 8
 raises no false alarm on the 3 readings that were fine. Both its errors came with correct
 reasoning attached to the wrong label. The reporting leads with the binary for that reason.
 
-**A schema the engine enforces gives twice the verified quotations, and never stops.**
+**The enforced answer never stopped because the prompt forbade it from finishing.** With a
+schema on, the prompt was byte-identical to the unenforced one - the audit records the same
+digest - so the model was told *"Use this format, and nothing else: CLAIM: ..."* while the
+grammar forbade every character of it. Fixing the contradiction, on the same skill, paper and
+model, four measured runs each (ADR-057):
+
+| | lines | schema, prompt contradicting it | schema, prompt agreeing |
+|---|---|---|---|
+| **why it stopped** | `stop` | **`length` - the cap** | **`stop`** |
+| answer tokens | 1,621 | 8,192, unfinished | **2,006** |
+| one run took | 58 s | 290 s | **73 s** |
+| after deduplication | 16 | 35 | **20 - no repeats at all** |
+| found in the document | 15 | **32** | 18 |
+| rate | 93% | 91% | 90% |
+
+**The termination is fixed and the quotation count is not transformed.** Eighteen verified
+against fifteen is a modest gain at three points lower fidelity and a quarter more time. The
+marked change is repetition: twenty of twenty survive deduplication where the line format
+loses three of nineteen.
+
+**The broken configuration still returns the most verified quotations** - thirty-two - because
+a model that cannot stop keeps extracting, and much of the extra was real until it began
+repeating a table caption. Thirteen more quotations for four times the wall clock, from an
+answer that has to be salvaged, is not a trade worth taking. **How exhaustive to be is a
+different question from whether the prompt should contradict the grammar**, and ADR-046 poses
+the first one properly.
+
+**Determinism holds within a warmed engine and not across a model load.** Found by accident:
+at temperature zero the warm-up answer differed from the four measured runs that followed it -
+different digest, 2,030 tokens against 2,006, nineteen verified rather than eighteen. Two
+single runs can differ for this reason alone, which is what the warm-up in `lacc measure`
+exists for.
+
+**Superseded: what an earlier draft of this chapter said about the schema.**
 Corrected from what v1.4.0 published (ADR-056); the figures are the same recorded answers,
 re-parsed once the truncation defect was fixed, with deduplication applied as a real run
 applies it:

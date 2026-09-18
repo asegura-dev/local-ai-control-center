@@ -9,6 +9,7 @@ from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.grounding import parse_claims
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction
 from local_ai_control_center.core.skill import (
+    AssessSourceSkill,
     ExtractClaimsSkill,
     SkillPlan,
     SummarizeFileSkill,
@@ -23,6 +24,7 @@ def _plan(**overrides: object) -> SkillPlan:
         "action": IntendedAction(name="x", summary="s", required=frozenset()),
         "prompt_template": "t",
         "verify_quotes": True,
+        "answer_is_entries_only": True,
     }
     base.update(overrides)
     return SkillPlan.model_validate(base)
@@ -132,9 +134,8 @@ def test_the_configuration_can_actually_turn_this_on(tmp_path: Path) -> None:
 def test_naming_a_skill_that_answers_in_prose_enforces_nothing(tmp_path: Path) -> None:
     """There is no block shape to enforce, so there is no schema to send.
 
-    By construction rather than by omission: a plan that does not verify quotations has no
-    fields anybody parses, and forcing one into `{entries: [...]}` would break the answer
-    it was meant to improve.
+    By construction rather than by omission: a plan whose whole answer is not the blocks has
+    nothing to force into `{entries: [...]}` that would not break the answer.
     """
     plan = SummarizeFileSkill().plan(
         ("p.md",), Config(workspace_root=tmp_path, enforce_shape=("summarize_file",))
@@ -249,3 +250,37 @@ def test_text_that_only_looks_like_json_is_still_read_as_lines() -> None:
     """A model that ignored the schema is parsed the way it always was."""
     claims = parse_claims("CLAIM: a point" + NL + "QUOTE: its words" + NL + "PAGE: 3")
     assert [(c.claim, c.quote, c.page) for c in claims] == [("a point", "its words", 3)]
+
+
+def test_a_skill_whose_answer_is_prose_and_blocks_cannot_be_enforced(tmp_path: Path) -> None:
+    """`assess_source` checks quotations and would still be destroyed by a schema.
+
+    It answers with three headings of prose - what is new, what overlaps, what contradicts -
+    and **then** a list of blocks. Forcing that into `{entries: [...]}` deletes the part a
+    reader reads, so verifying quotations cannot be the test for whether a shape may be
+    enforced (ADR-057).
+    """
+    plan = AssessSourceSkill().plan(
+        ("p.md",), Config(workspace_root=tmp_path, enforce_shape=("assess_source",))
+    )
+    assert plan.verify_quotes, "it does check its quotations"
+    assert not plan.answer_is_entries_only, "and its answer is not only the blocks"
+    assert plan.output_schema is None
+
+
+def test_the_prompt_asks_for_the_shape_the_engine_will_enforce(tmp_path: Path) -> None:
+    """The bug this all comes from: the prompt was byte-identical either way.
+
+    A constrained run was told to write `CLAIM:` lines by a prompt while a grammar forbade
+    them - an instruction the model could not obey. It never stopped (ADR-057).
+    """
+    skill = ExtractClaimsSkill()
+    asking = skill.plan(("p.md",), Config(workspace_root=tmp_path)).prompt_template
+    forcing = skill.plan(
+        ("p.md",), Config(workspace_root=tmp_path, enforce_shape=("extract_claims",))
+    ).prompt_template
+
+    assert asking != forcing, "the prompt must not be identical whether or not it is enforced"
+    assert "CLAIM: what the document asserts" in asking
+    assert "CLAIM:" not in forcing, "it cannot ask for a format the grammar forbids"
+    assert Q + "entries" + Q in forcing and Q + "claim" + Q in forcing

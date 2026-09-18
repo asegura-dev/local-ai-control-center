@@ -549,7 +549,10 @@ def run_action(
 
     checked: tuple[CheckedClaim, ...] = ()
     if verify_quotes:
-        checked = check_answer(completion.text, read.contents, fields, quote_field)
+        # Deduplicated here as well as in the passes path. A single answer repeats a passage
+        # too - measured, three of nineteen on one paper - and which code path read the
+        # document is not a reason for a corpus to hold the same sentence twice (ADR-058).
+        checked = without_repeats(check_answer(completion.text, read.contents, fields, quote_field))
         held = sum(1 for claim in checked if claim.holds)
         # How often the model misplaced a passage it quoted correctly. It is not shown to
         # the reader, who wants the right page rather than a note about someone else's
