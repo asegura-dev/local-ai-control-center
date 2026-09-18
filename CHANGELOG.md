@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-18
+
 ### Fixed
 - **A shaped answer the engine cut short parsed to nothing, and that put a wrong figure in
   v1.4.0** (ADR-056). `json.loads` returns nothing for a document with one unclosed brace, so
