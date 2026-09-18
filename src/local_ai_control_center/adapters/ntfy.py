@@ -102,8 +102,12 @@ class NtfyNotifier(Notifier):
         """Create the notifier for one server and topic.
 
         Raises ``NotifierMisconfigured`` when the server is not an ``http`` or ``https``
-        URL. The address comes from the environment, and the environment is not a place
-        to discover that LACC will post a body to an arbitrary scheme.
+        URL, or when the topic is empty.
+
+        The configuration refuses an address that is not a URL before this runs (ADR-060),
+        so on that path this is a second line rather than the only one. It stays because
+        this class is public and constructible: nothing should be able to hand it a scheme
+        and have LACC post a body to it.
         """
         parsed = urllib.parse.urlparse(server_url)
         if parsed.scheme.lower() not in _ALLOWED_SCHEMES or not parsed.netloc:
@@ -158,16 +162,19 @@ def _post_with_urllib(url: str, body: bytes, headers: Mapping[str, str], timeout
 def notifier_from_config(config: Config, post: Post | None = None) -> Notifier | None:
     """Build the configured notifier, or ``None`` when there is nothing to build.
 
-    Returns ``None`` unless notifications are enabled, network access is permitted, and
-    the environment actually holds a server and a topic. Each of those is a separate way
-    of saying "not configured", and none of them is an error: a run that cannot notify is
-    still a run that worked.
+    Returns ``None`` unless notifications are enabled, network access is permitted, the
+    configuration names a server, and the environment holds a topic. Each of those is a
+    separate way of saying "not configured", and none of them is an error: a run that
+    cannot notify is still a run that worked.
+
+    The address comes from the configuration and the topic from the environment, which is
+    the split ADR-030 draws: destinations are written down, secrets are named (ADR-060).
     """
     settings = config.notifier.ntfy
     if not settings.enabled or not config.network_access:
         return None
 
-    server = os.environ.get(settings.server_url_env, "").strip()
+    server = settings.server_url.strip()
     topic = os.environ.get(settings.topic_env, "").strip()
     if not server or not topic:
         return None

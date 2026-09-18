@@ -2244,10 +2244,16 @@ def _report_where_the_settings_came_from(config: Config, config_path: Path) -> N
     screenshot, and in whatever the terminal logs to (ADR-030).
     """
     settings = config.notifier.ntfy
-    named = (settings.server_url_env, settings.topic_env, settings.token_env)
-    found = [name for name in named if os.environ.get(name, "").strip()]
+    found = [
+        name
+        for name in (settings.topic_env, settings.token_env)
+        if os.environ.get(name, "").strip()
+    ]
     if found:
         console.print(f"[dim]Found {', '.join(found)} in the environment.[/dim]")
+    if settings.server_url:
+        # The address, unlike the secrets, is safe to print: it is in the file already.
+        console.print(f"[dim]Sending to {settings.server_url}, named in the configuration.[/dim]")
 
 
 @notify_app.command("test")
@@ -2274,18 +2280,18 @@ def notify_test(
 
     if notifier is None:
         settings = config.notifier.ntfy
-        missing = [
-            name
-            for name in (settings.server_url_env, settings.topic_env)
-            if not os.environ.get(name, "").strip()
-        ]
         console.print(
             "[yellow]No notifier configured.[/yellow] Notifications need `network_access: true`, "
-            "`notifier.ntfy.enabled: true`, and the named variables set."
+            "`notifier.ntfy.enabled: true`, a `server_url`, and the named variables set."
         )
-        if missing:
+        if not settings.server_url:
             console.print(
-                f"Nothing found for: {', '.join(missing)}. Put them in "
+                "No [bold]server_url[/bold] in the configuration. The address is a destination "
+                "and is written there, not in the environment."
+            )
+        if not os.environ.get(settings.topic_env, "").strip():
+            console.print(
+                f"Nothing found for: {settings.topic_env}. Put it in "
                 f"[bold]{config_path.parent / DOTENV_FILENAME}[/bold] or in your environment."
             )
         raise typer.Exit(code=1)

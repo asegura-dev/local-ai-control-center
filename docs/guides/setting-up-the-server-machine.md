@@ -122,7 +122,7 @@ engine_host: http://100.101.102.103:11434  # destination
 notifier:
   ntfy:
     enabled: true
-    server_url_env: NTFY_SERVER
+    server_url: http://100.101.102.103:8080   # destination
     topic_env: NTFY_TOPIC
     token_env: NTFY_TOKEN
 ```
@@ -132,15 +132,24 @@ statements on purpose: one is permission, the other is a destination. LACC conta
 machine only when the configuration makes both, so nothing it was not told about is ever
 reached.
 
+**Both addresses are written here, and neither can arrive any other way.** A `.env`
+supplies secrets and never destinations: if an address could come through the environment,
+an installer, a script or a stray file could redirect what leaves this machine, and it
+would look like a normal run while it did (ADR-030, ADR-060).
+
 ### 2.2 Secrets go in a `.env` beside it, never in the configuration
 
-Create `configs/.env` with the three values you wrote down:
+Create `configs/.env` with the two secrets you wrote down. The server address is not
+here - it went into the configuration above, because it says where something goes rather
+than proving who you are:
 
 ```
-NTFY_SERVER=http://100.101.102.103:8080
 NTFY_TOPIC=lacc-tesis-7h3k9x
 NTFY_TOKEN=tk_...
 ```
+
+The topic is a secret on a public ntfy server, where knowing it is what lets somebody read
+what you publish. That is why it stays in this file and the address does not.
 
 That is all. No `export`, no `setx`, no new terminal.
 

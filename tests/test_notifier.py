@@ -161,7 +161,7 @@ def test_the_configuration_names_the_variables_it_reads(
         notifier={
             "ntfy": {
                 "enabled": True,
-                "server_url_env": "MY_SERVER",
+                "server_url": "https://ntfy.example",
                 "topic_env": "MY_TOPIC",
                 "token_env": "MY_TOKEN",
             }
@@ -175,15 +175,16 @@ def test_the_configuration_names_the_variables_it_reads(
     assert post.headers["Authorization"] == "Bearer tk_secret"
 
 
-def test_a_misconfigured_server_in_the_environment_says_so(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A wrong value is told to the user rather than silently ignored."""
-    monkeypatch.setenv("NTFY_SERVER", "ftp://desk")
-    monkeypatch.setenv("NTFY_TOPIC", "lacc")
-    config = _config(tmp_path, network_access=True, notifier={"ntfy": {"enabled": True}})
+def test_a_scheme_the_notifier_cannot_use_is_refused_at_construction() -> None:
+    """The configuration refuses a non-URL first (ADR-060), so this is the second line.
+
+    It stays because the class is public: nothing should be able to hand it a scheme and
+    have LACC post a body to it.
+    """
     with pytest.raises(NotifierMisconfigured):
-        notifier_from_config(config)
+        NtfyNotifier("ftp://desk", "lacc")
+    with pytest.raises(NotifierMisconfigured):
+        NtfyNotifier("https://desk", "   ")
 
 
 def test_a_title_outside_ascii_is_folded_rather_than_raised() -> None:

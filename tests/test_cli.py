@@ -480,9 +480,10 @@ def test_missing_settings_say_which_ones_and_where_to_put_them(
         encoding="utf-8",
     )
     result = runner.invoke(app, ["notify", "test", "-c", str(config)])
+    flowed = " ".join(result.stdout.split())
     assert result.exit_code == 1
-    assert "NTFY_SERVER" in result.stdout
-    assert ".env" in result.stdout
+    assert "server_url" in flowed, "the address is missing from the file, and it says so"
+    assert "NTFY_TOPIC" in flowed and ".env" in flowed, "the secret is missing, and where"
 
 
 def test_measure_refuses_a_skill_that_writes(tmp_path: Path) -> None:

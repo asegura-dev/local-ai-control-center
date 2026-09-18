@@ -106,7 +106,11 @@ network_access: false
 notifier:
   ntfy:
     enabled: false
-    server_url_env: NTFY_SERVER
+    # The address is a destination, so it is written here rather than named. A .env
+    # supplies secrets and never destinations (ADR-030, ADR-060): if an address could
+    # arrive through the environment, an installer or a stray file could redirect what
+    # leaves this machine.
+    server_url: https://ntfy.example.com
     topic_env: NTFY_TOPIC
     token_env: NTFY_TOKEN
     priority: 3

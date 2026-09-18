@@ -52,21 +52,65 @@ that meeting it says something rather than merely being a nuisance."""
 
 
 class NtfySettings(BaseModel):
-    """How to reach an ntfy server, without holding its secrets.
+    """How to reach an ntfy server: the destination written down, the secrets named.
 
-    Every secret is named rather than written: the value comes from the environment
-    variable this points at. A token in a configuration file is a token in a backup
-    (ADR-027).
+    **The split is the point.** A destination is written here, in the file the user wrote,
+    because ADR-030 decides that a `.env` supplies secrets and never destinations - if an
+    address could arrive through the environment, an installer or a stray file could
+    redirect what leaves this machine. A secret is named rather than written, because a
+    token in a configuration file is a token in a backup (ADR-027).
+
+    The topic stays a secret rather than moving with the address: on a public ntfy server
+    the topic **is** the access control, and anyone who knows it can read what is published
+    (ADR-060).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     enabled: bool = False
-    server_url_env: str = "NTFY_SERVER"
+    server_url: str = ""
     topic_env: str = "NTFY_TOPIC"
     token_env: str = "NTFY_TOKEN"
 
-    @field_validator("server_url_env", "topic_env", "token_env")
+    server_url_env: str | None = None
+    """Where the address used to come from. Accepted only to refuse it by name.
+
+    Removing the field outright would have produced `extra fields not permitted`, which
+    says nothing about what to do. This says it (ADR-060).
+    """
+
+    @field_validator("server_url_env")
+    @classmethod
+    def _the_address_is_not_a_secret(cls, value: str | None) -> str | None:
+        """Refuse the old field, and say what replaces it."""
+        if value is None:
+            return None
+        raise ValueError(
+            "server_url_env is gone: the ntfy address is a destination, and destinations "
+            "are written in this file rather than arriving through the environment "
+            "(ADR-030, ADR-060). Replace it with `server_url: https://your-server` and "
+            "remove the variable from your .env. The topic and the token stay named."
+        )
+
+    @field_validator("server_url")
+    @classmethod
+    def _an_address_or_nothing(cls, value: str) -> str:
+        """Refuse a variable name written where the address belongs.
+
+        The mirror of the mistake the next validator exists for, and the same reasoning:
+        a plausible misreading that produces silence is a design problem. Somebody moving
+        an existing configuration will reach for `NTFY_SERVER` here out of habit.
+        """
+        address = value.strip()
+        if address and not address.startswith(("http://", "https://")):
+            raise ValueError(
+                f"server_url is {address!r}, which is not an address. Write the ntfy "
+                "server itself, like `https://ntfy.example.com` - this is the destination, "
+                "not the name of a variable holding it."
+            )
+        return address
+
+    @field_validator("topic_env", "token_env")
     @classmethod
     def _must_name_a_variable(cls, value: str, info: ValidationInfo) -> str:
         """Refuse a value written where the name of a variable belongs.

@@ -1,6 +1,6 @@
 # Decision records
 
-Fifty-nine records, in the order they were decided. The number is the identity: it is how
+Sixty records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -364,3 +364,10 @@ Two findings from sweeping for the shape ADR-055 and ADR-056 showed twice in two
 [`ADR-059-checking-that-a-control-covers-what-it-claims.md`](ADR-059-checking-that-a-control-covers-what-it-claims.md)
 
 Three standing checks, each derived from a defect that happened: nothing public is defined that only a test reaches, controls that must travel together do, and neither answer format loses everything when it is cut. Building the first immediately found two more - `AskingJudge`, the judge of readings with a published grade, was constructed by nothing at all, and `require` was dead while its docstring called itself the execution path. The judge is wired as `lacc ask --judge`. Names the inventory and the one-time audit as phases two and three, and explains why the ranking that was tried is a reading queue rather than a detector.
+
+
+### 060 - the address is not a secret
+
+[`ADR-060-the-address-is-not-a-secret.md`](ADR-060-the-address-is-not-a-secret.md)
+
+ADR-030 says a `.env` supplies secrets and never destinations, and calls it load-bearing - while the ntfy server URL arrived through `server_url_env`, by the one route that record forbids. Splits the field by what each part is: the address moves into the configuration beside `engine_host`, the token stays named, and the topic stays named too because on a public ntfy server the topic *is* the access control. The old field is kept only to refuse it with a message that says what replaces it. Found by reading PRINCIPLES a line at a time, because no mechanical check asks whether a field is a secret or a destination.

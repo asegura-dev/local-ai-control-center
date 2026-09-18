@@ -166,8 +166,8 @@ def test_a_value_written_where_a_variable_name_belongs_is_refused(tmp_path: Path
     design problem, not a user error.
     """
     for field, value in [
-        ("server_url_env", "http://100.76.182.73:8080"),
         ("topic_env", "lacc-tesis"),
+        ("token_env", "tk-live-value"),
     ]:
         with pytest.raises(ValidationError):
             Config(
@@ -203,9 +203,9 @@ def test_ordinary_variable_names_are_accepted(tmp_path: Path) -> None:
     """The defaults, and anything else spelled the way variables are spelled."""
     config = Config(
         workspace_root=tmp_path,
-        notifier={"ntfy": {"server_url_env": "MY_SERVER", "topic_env": "LACC_TOPIC_2"}},
+        notifier={"ntfy": {"token_env": "MY_TOKEN", "topic_env": "LACC_TOPIC_2"}},
     )
-    assert config.notifier.ntfy.server_url_env == "MY_SERVER"
+    assert config.notifier.ntfy.token_env == "MY_TOKEN"
 
 
 def test_a_dotenv_supplies_the_variables_the_configuration_names(
@@ -318,3 +318,38 @@ def test_the_mapping_does_not_invent_a_model_where_there_is_none() -> None:
     config = Config(workspace_root=Path("."), models={"draft": "qwen2.5:32b"})
     assert config.model_for("draft") == "qwen2.5:32b"
     assert config.model_for("extract_claims") == ""
+
+
+def test_the_address_written_where_a_variable_name_used_to_go_is_refused(tmp_path: Path) -> None:
+    """The old field is accepted only so it can be refused by name (ADR-060).
+
+    Removing it outright produces `extra fields not permitted`, which says nothing about
+    what to do with a working setup.
+    """
+    with pytest.raises(ValidationError) as caught:
+        Config(
+            workspace_root=tmp_path,
+            notifier={"ntfy": {"enabled": True, "server_url_env": "NTFY_SERVER"}},
+        )
+    message = str(caught.value)
+    assert "server_url" in message and "destination" in message
+
+
+def test_a_variable_name_written_where_the_address_goes_is_refused(tmp_path: Path) -> None:
+    """The mirror mistake, made by anybody moving a configuration out of habit."""
+    with pytest.raises(ValidationError) as caught:
+        Config(
+            workspace_root=tmp_path,
+            notifier={"ntfy": {"enabled": True, "server_url": "NTFY_SERVER"}},
+        )
+    assert "not an address" in str(caught.value)
+
+
+def test_the_address_lives_in_the_file_and_the_secrets_do_not(tmp_path: Path) -> None:
+    """The split ADR-030 draws, now drawn in the right place (ADR-060)."""
+    config = Config(
+        workspace_root=tmp_path,
+        notifier={"ntfy": {"enabled": True, "server_url": "https://ntfy.example"}},
+    )
+    assert config.notifier.ntfy.server_url == "https://ntfy.example"
+    assert config.notifier.ntfy.topic_env == "NTFY_TOPIC", "the topic is still named"

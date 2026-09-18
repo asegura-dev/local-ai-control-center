@@ -23,7 +23,7 @@ was written and needs re-checking like any other measurement.
 | Only hosts the configuration names are reached | `ollama_host()` refuses any non-loopback host; a remote engine needs `network_access` **and** an address written in the YAML | **held by test** |
 | An environment variable can never widen reach | `OLLAMA_HOST` is honoured only when it resolves to loopback, and refused otherwise | **held** |
 | A `.env` cannot override a variable already set | The loader writes only where the name is absent from the environment | **held** |
-| `.env` supplies secrets, never destinations | **The ntfy server URL arrives through `server_url_env`** | **gap** |
+| `.env` supplies secrets, never destinations | The ntfy address is a `server_url` in the configuration; the topic and token stay named (ADR-060) | **held by test** |
 | No arbitrary code execution | No `eval`, `exec`, `pickle`, `subprocess` or `os.system` anywhere in the source; both YAML loads are `safe_load` | **held** |
 | A document cannot forge a fence | Fence markers are fixed strings holding no user text (ADR-038), tested against a real model | **held by test** |
 | Text a reader cannot see is reported | Detection of invisible render modes and off-page positioning (ADR-040) | **held by test** |
@@ -72,28 +72,28 @@ was written and needs re-checking like any other measurement.
 | A selection says what it discarded | `set_aside` is mandatory on a selection and reported before the answer (ADR-050) | **held by test** |
 | No step decides the next | Routing is a table the user wrote; a model never chooses what runs (ADR-045, ADR-051) | **held** |
 
-## The gap
+## The gap, and how it closed
 
-**The ntfy destination arrives through the environment.** ADR-030 decides that a `.env`
+**The ntfy destination arrived through the environment.** ADR-030 decides that a `.env`
 supplies secrets and *"never supplies destinations or permissions"*, and calls that the
-load-bearing half of the decision. `server_url_env` names an environment variable holding the
-server URL, so a `.env` file - or any environment variable - decides where a notification goes.
+load-bearing half. `server_url_env` named an environment variable holding the server URL, so a
+`.env` file - or any environment variable - decided where a notification went.
 
-What travels there bounds the damage, and it was designed with that in mind. A notification
+What travelled bounded the damage, and it was designed with that in mind. A notification
 carries the skill's name, the outcome, the elapsed time, counts, and the audit head digest. A
 traverse reports *"16 of 24 documents, 431 of 508 quotations in their source"* and never which
-documents or which quotations, on the stated reasoning that **how many is less disclosure than
-which ones**. No quotation, no document name and no file content has ever left this way.
+ones, on the stated reasoning that **how many is less disclosure than which ones**. No
+quotation, no document name and no file content ever left this way.
 
-So what leaks is metadata about research activity rather than research, to somebody who can
-already set environment variables on the machine. It remains the thing ADR-030 says must not
-be possible, in the record that calls it load-bearing.
+**Closed in ADR-060**, by splitting the field according to what each part is: the address is a
+destination and now sits in the configuration beside `engine_host`; the token stays named; and
+the topic stays named too, because on a public ntfy server the topic **is** the access control
+and moving it into a shareable file would trade one exposure for another.
 
-**The fix that matches the principle** splits the field by what each part is. The server URL
-is a destination and belongs in the YAML beside `engine_host`. The topic and the token are
-secrets and stay named in the configuration with their values in the environment - on a
-public ntfy server the topic *is* the access control, which is why it does not move. It costs
-anyone with a working setup a move of one value from `.env` to `lacc.yaml`.
+The way it survived is the part worth keeping. Every mechanical check here asks a question
+about code - can this be reached, is it called, does it cover its call sites. This was a
+question about **meaning**: whether a field called `server_url_env` is a secret or a
+destination. Nothing was going to notice that but reading.
 
 ## One piece of dead surface, which is not a hole
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-18
+
 ### Added
 - **`docs/05-assurance.md`: every promise this project makes, and what holds it up.** A full
   pass over `PRINCIPLES.md` and the decision records across cybersecurity, traceability,
@@ -19,25 +21,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   override a variable already set; the cycle's only read site resolves through the workspace
   boundary on the line above the open; writing happens in three places and no others.
 
+### Changed
+- **The ntfy address moved out of the environment and into the configuration** (ADR-060).
+  **This breaks an existing setup by one line, on purpose, and says so by name.**
+
+  ADR-030 decides that a `.env` supplies secrets and *"never supplies destinations or
+  permissions"*, and calls that the load-bearing half of the decision. `server_url_env` named
+  an environment variable holding the ntfy server URL, so a `.env` file - or any environment
+  variable, set by an installer, a script or a mistake - decided where a notification went, by
+  the one route that record forbids.
+
+  What travelled bounded the damage and was designed to: a notification carries the skill's
+  name, the outcome, elapsed time, counts and the audit head digest, never which documents or
+  which quotations. **No quotation, document name or file content ever left this way.** What
+  could leak is metadata about research activity, to somebody who could already set
+  environment variables on the machine.
+
+  The field is split by what each part is:
+
+  ```yaml
+  notifier:
+    ntfy:
+      enabled: true
+      server_url: https://ntfy.example.com   # a destination, written here
+      topic_env: NTFY_TOPIC                  # a secret, named here and valued in .env
+      token_env: NTFY_TOKEN
+  ```
+
+  **The topic does not move with the address.** It reads like a destination and behaves like a
+  credential: on a public ntfy server, knowing a topic is what lets somebody read what is
+  published to it.
+
+  `server_url_env` is still accepted, only so it can be refused by name - deleting it outright
+  produces *"extra fields not permitted"*, which is true and useless. The error says what
+  replaces it, where the value goes, and what stays put. A variable name written where the
+  address belongs is refused too, because that is the likelier mistake for anyone moving a
+  working configuration out of habit.
+
+  To migrate: move `NTFY_SERVER` out of your `.env` and into `server_url` in the configuration.
+
 ### Known limits
-- **The ntfy destination arrives through the environment, which ADR-030 forbids.** That record
-  decides a `.env` supplies secrets and *"never supplies destinations or permissions"*, calling
-  it the load-bearing half - and `server_url_env` names an environment variable holding the
-  server URL, so a `.env` decides where a notification goes.
-
-  What travels bounds it, and was designed to: a notification carries the skill's name, the
-  outcome, elapsed time, counts and the audit head digest. A traverse reports *"16 of 24
-  documents, 431 of 508 quotations in their source"* and never which ones, on the stated
-  reasoning that how many is less disclosure than which. **No quotation, document name or file
-  content has ever left this way.** What leaks is metadata about research activity, to somebody
-  who can already set environment variables on the machine.
-
-  The fix that matches the principle splits the field by what each part is: the server URL is a
-  destination and belongs in the YAML beside `engine_host`; the topic and the token are secrets
-  and stay in the environment - on a public ntfy server the topic *is* the access control. It
-  is written down before it is changed because it costs anyone with a working setup a move of
-  one value out of `.env`.
-
 - **`run_commands` is a declared capability that nothing implements.** No skill requires it, it
   cannot be granted through the configuration, and it would grant nothing if it could.
   Reserved rather than reachable, and recorded so nobody reads the capability list and
