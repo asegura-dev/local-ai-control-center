@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`tools/record_coverage.py`: what every record names, and where the code uses it**
+  (ADR-059, phase two). Prints per decision record the symbols it cites and every reference
+  site, plus what a record names that the source never mentions. **It detects nothing.** A
+  symbol low in its output is not a defect. It exists to make one question finite - *what
+  does the record claim this does, and does the code do it everywhere it should?* - which is
+  the question that found deduplication running on one of four call sites, and which no test
+  would have asked.
+
+  Fifty-nine records, 222 record-to-symbol links. Module names, packages from
+  `pyproject.toml` and symbols living in the suite are filtered out of the "never mentioned"
+  list, and three citations of deliberately removed code are listed with a reason each. The
+  report is not committed: one in the repository would be stale by the next commit, and a
+  stale inventory reads exactly like a current one.
+
+### Fixed
+- **ADR-004 described a permission guard that was never in the execution path** - found by
+  the inventory above on its first run. The record that defines this project's permission
+  model says a companion `require` raises so that *"an ignored return value should never
+  become an unnoticed grant"*, and names it again in its trade-off as the thing that recovers
+  the safety. Nothing ever called it, and it was removed in v1.5.0.
+
+  The gate is real: `preview_action` computes the check and the cycle refuses on
+  `preview.allowed` before any effect, with the missing capabilities audited, and a test
+  holds that a refused preview stops the run without reaching the confirmation. What keeps an
+  ignored return value from becoming an unnoticed grant is that there is exactly one place a
+  run proceeds and it refuses there - not a second function shape. Both paragraphs are kept
+  as written with the correction marked where each claim appears, because a record that
+  quietly rewrites what it got wrong is worth less than one that shows it.
+
+- **ADR-046 named `_GENERATE_TIMEOUT_SECONDS`**, which is `_MINIMUM_GENERATE_TIMEOUT` now and
+  a floor rather than a fixed ceiling. Annotated in place; the paragraph describes what was
+  there before that record changed it.
+
 ## [1.5.0] - 2026-09-18
 
 ### Added

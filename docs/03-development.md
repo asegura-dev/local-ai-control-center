@@ -97,6 +97,26 @@ one rather than refusing, and says it is guessing from the folder's name.
 The virtual environment has its own version of this problem, for different reasons; see
 [the guide](guides/virtualenv-outside-a-sync-folder.md).
 
+## The record-to-code inventory
+
+    .un.ps1 run python tools/record_coverage.py
+
+Prints, for every decision record, the symbols it names and where the source uses them, plus
+what a record names that the source never mentions. **It detects nothing**, and a symbol low
+in its output is not a defect. It exists to make one question finite (ADR-059):
+
+> What does the record claim this does, and does the code do it in every place it should?
+
+That question found deduplication running on one of the four call sites it belonged on, and
+no test would have. The report is not committed: one in the repository would be stale by the
+next commit, and a stale inventory reads exactly like a current one.
+
+Module names, packages named in `pyproject.toml`, and symbols that live in the suite are
+filtered out of the "never mentioned" list, because a record citing `cycle` or `pypdf` is
+citing something real. What is left is a renamed symbol, a plan deliberately not built, or
+prose that happens to look like code - and the reader tells them apart. On its first run it
+found `require` named throughout ADR-004 after the function had been removed.
+
 ## Documentation discipline
 
 Documentation is treated as part of the code, not an afterthought. The rule is

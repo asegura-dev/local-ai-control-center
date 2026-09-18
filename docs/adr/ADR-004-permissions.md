@@ -1,6 +1,9 @@
 # ADR-004 - Permissions: restrictive by default, with configuration as a ceiling
 
-- **Status:** Accepted - implemented (v0.3.0)
+- **Status:** Accepted - implemented (v0.3.0). **Amended in v1.5.0: `require` never
+  existed in the execution path and has been removed** (ADR-059). Section 4 and the
+  trade-off below describe it as though it did; they are kept as written, with the
+  correction marked where each claim appears.
 - **Date:** 2026-07-17
 - **Context:** ADR-002 and ADR-003 gave LACC a validated configuration and an
   enforced workspace boundary, but nothing yet decides *whether an action is
@@ -56,6 +59,14 @@ what is missing. The pair exists so the preview path can inspect a decision safe
 while the execution path cannot proceed past a denial by accident - an ignored
 return value should never become an unnoticed grant.
 
+> **This half was never true and `require` is gone (v1.5.0, ADR-059).** Nothing ever
+> called it. The execution path has always used the inspecting form: `preview_action`
+> computes the check, and the cycle refuses on `preview.allowed` before any effect
+> happens, recording the missing capabilities in the audit trail. That is a real gate
+> and it is tested - a refused preview stops the run without reaching the confirmation
+> - but it is the returned-value shape this paragraph warns about, and the paragraph
+> was reassuring readers about a guard that was not there.
+
 ## Trade-off
 
 Making configuration a ceiling couples the permission module to the configuration
@@ -69,6 +80,13 @@ Returning a result rather than raising is the more useful shape for previews, bu
 carries the risk of a caller ignoring it. Providing `require` alongside `check`
 recovers the safety without losing the usefulness: the execution path uses the
 raising form, the preview path uses the inspecting form.
+
+> **The risk named here is real and the mitigation claimed here was not taken.** Both
+> paths use the inspecting form. What actually keeps an ignored return value from
+> becoming an unnoticed grant is that there is exactly one place where a run proceeds,
+> and it refuses there - not a second function shape. Sixteen months of records cited
+> this paragraph as the answer; the inventory in ADR-059 is what surfaced that the
+> function it names is not in the source (v1.5.0).
 
 ## Consequences
 

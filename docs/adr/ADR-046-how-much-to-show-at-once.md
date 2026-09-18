@@ -34,6 +34,8 @@ more fabrication in absolute terms, and the check is what separates them. In agg
 rose, 76% → 89%.
 
 A second thing surfaced while measuring. **`_GENERATE_TIMEOUT_SECONDS` is a fixed 300**, and
+(it is `_MINIMUM_GENERATE_TIMEOUT` now, and a floor rather than a ceiling - this paragraph
+describes what was there before this record changed it)
 passes on ordinary documents were observed taking 252 seconds. A generation that exceeds it
 is reported as `Cannot reach Ollama` - a network fault, for something that is not one. The
 fault classification added days earlier would call it a timeout and send someone to check a

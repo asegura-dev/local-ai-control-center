@@ -71,16 +71,27 @@ control nobody calls is worse than silence.
   person can run.
 - `require` is gone and `permissions.py` says what the gate actually is.
 
-## Phases two and three, named and not built
+## Phases two and three
 
-**Two - an inventory from each record to the code it names.** Measured: **52 of 58 records
-name at least one real symbol**, 97 distinct. A generated report listing, per record, the
-symbols it mentions and every place they are used. It detects nothing. It turns *read the
-codebase looking for gaps* into a finite list, and against ADR-054 it would have shown
-`without_repeats` used in one place beside a record saying a corpus must not hold the same
-sentence twice.
+**Two - an inventory from each record to the code it names.** ~~Not built.~~ **Built:**
+`tools/record_coverage.py`, 59 records and 222 record-to-symbol links. It detects nothing; it
+turns *read the codebase looking for gaps* into a finite list.
 
-**Three - one pass over all 58 records**, asking of each: what does this claim, where is it in
+**It found one on its first run, in the record that defines the permission model.** ADR-004
+says a companion `require` raises so that *"an ignored return value should never become an
+unnoticed grant"*, and names it again in its trade-off as what recovers the safety. Nothing
+ever called it, and it had been removed hours earlier by the check above - so the most
+safety-relevant record in the project was describing a guard that is not there, and had been
+since v0.3.0. Both paragraphs are corrected in place and kept as written.
+
+Its "never mentioned" list needs filtering to be readable: module names, packages from
+`pyproject.toml`, and symbols living in the suite are all legitimate citations. Three
+citations of deliberately removed code are listed with a reason each, because a record that
+corrects itself still names what it corrected and would otherwise sit in the report forever -
+which is how a reader learns to skip a section. What survives the filter is fourteen rows of
+prose that looks like code, and a reader tells them apart in a minute.
+
+**Three - one pass over all 59 records**, asking of each: what does this claim, where is it in
 the code, does it cover that. Five defects in three days is a rate, not bad luck, and it says
 there are more. With the inventory this is hours of reading rather than a project.
 
