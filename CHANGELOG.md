@@ -29,11 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   purpose is to mark claims for a person could not say afterwards **which** claim got which
   verdict, which is the useful part the moment the terminal scrolls.
 
-  It records a row per reading now: the digests of the quotation and the claim, and the
-  verdict, with the judge's reasoning under `audit_level: full` like any other content. Its
-  calls remain absent from `provider_called`, and that is now stated rather than left to be
-  discovered - the adapter builds those prompts and the audit lives above it, so what is
-  recorded is what was judged and what came back.
+  It records a row per reading now: the digests of the quotation, the claim and **what was
+  actually asked**, plus the verdict, with the judge's reasoning under `audit_level: full`
+  like any other content. A `Judgement` reports what it was asked, including when it could not
+  answer - the failing calls being the ones worth reconstructing.
+
+  **The obvious fix was the wrong one.** A provider wrapper auditing every engine call would
+  make the rule structural, and would break ADR-020: that record carries the cycle's token
+  estimate beside the engine's measurement, the estimate differs per call - a document read in
+  passes has one per pass - and a wrapper built once per run cannot have it. Trading a true
+  claim for a false one is not a fix. Instead `REACHES_THE_ENGINE` now lists all three places
+  the source calls an engine and what records each, and a fourth fails the suite. It cannot
+  check that a site audits *well*; it makes adding one without deciding how impossible, which
+  is the step that was skipped.
 
 - **ADR-004 described a permission guard that was never in the execution path** - found by
   the inventory above on its first run. The record that defines this project's permission

@@ -274,3 +274,51 @@ def test_the_pairing_check_notices_a_site_that_forgets() -> None:
         if "without_repeats" not in _calls_in(node)
     ]
     assert [getattr(node, "name", "") for node in forgetful] == [alone]
+
+
+REACHES_THE_ENGINE = {
+    ("cycle.py", "_ask"): "records provider_called, with the estimate beside the measurement",
+    ("asking.py", "judge"): "reports what it asked, and the caller records the digest",
+    ("ollama.py", "check_engine"): "a fixed probe string holding nothing of the user's",
+}
+"""Every place the source calls an engine, and what writes it down.
+
+An engine call carries whatever the user was working on, and PRINCIPLES says every
+significant execution is audited. That held in two of three places for a day: the judge made
+one call per claim, each carrying a quotation and a reading, and nothing recorded any of them
+(ADR-059).
+
+An entry is a claim that this call site leaves a trail. A new one fails this test, which is
+the point: the argument for how it is recorded happens before it ships, not after.
+"""
+
+
+def _engine_call_sites(trees: dict[pathlib.Path, ast.Module]) -> set[tuple[str, str]]:
+    """`(file, enclosing function)` for every `.complete(...)` in the source."""
+    sites: set[tuple[str, str]] = set()
+    for path, tree in trees.items():
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for inner in ast.walk(node):
+                if (
+                    isinstance(inner, ast.Call)
+                    and isinstance(inner.func, ast.Attribute)
+                    and inner.func.attr == "complete"
+                ):
+                    sites.add((path.name, node.name))
+    return sites
+
+
+def test_every_place_that_reaches_the_engine_is_accounted_for() -> None:
+    """A call the user's words go into, and nothing says it happened, is not acceptable.
+
+    This does not check that a site audits well - it cannot. It checks that nobody adds one
+    without saying how it is recorded, which is the step that was skipped.
+    """
+    unaccounted = sorted(_engine_call_sites(_sources()) - set(REACHES_THE_ENGINE))
+    assert not unaccounted, (
+        "These call an engine and REACHES_THE_ENGINE does not say what records them: "
+        + ", ".join(f"{where}:{what}()" for where, what in unaccounted)
+        + "."
+    )

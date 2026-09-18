@@ -1711,15 +1711,16 @@ def _judge_the_readings(
 
     flagged = [(c, v) for c, v in verdicts if v.worth_a_look]
     undecided = sum(1 for _, v in verdicts if v.verdict == "undecided")
-    # One record for the batch, carrying a row per reading. The judge's calls do not
-    # appear as `provider_called`: the adapter builds those prompts and the audit lives
-    # above it, so what is recorded is what was judged and what came back rather than a
-    # prompt this layer never sees. Digests always, the judge's words only under `full`,
-    # the same rule every other content follows (ADR-059).
+    # One record for the batch, carrying a row per reading: what was judged, what was
+    # asked, and what came back, all by digest. These calls are deliberately not
+    # `provider_called` - that record carries the cycle's per-call token estimate beside
+    # the engine's measurement (ADR-020), and nothing outside the cycle has the estimate.
+    # Digests always, the judge's words only under `full`, the rule every content follows.
     judged_rows = [
         {
             "quote_sha256": digest_of(claim.claim.quote),
             "claim_sha256": digest_of(claim.claim.claim),
+            "asked_sha256": digest_of(verdict.asked),
             "verdict": verdict.verdict,
         }
         for claim, verdict in verdicts

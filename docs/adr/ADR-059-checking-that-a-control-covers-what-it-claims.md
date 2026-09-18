@@ -114,10 +114,23 @@ batch event said only how many and which verdicts.
 
 The narrow loss is the one that matters: a check whose whole purpose is to mark claims for a
 person could not say afterwards **which** claim got which verdict. It records a row per
-reading now - the digests of the quotation and the claim, and the verdict - with the judge's
-reasoning under `full` like any other content. Its calls are still not `provider_called`, and
-that is stated rather than papered over: the adapter builds those prompts and the audit lives
-above it, so what is recorded is what was judged and what came back.
+reading now - the digests of the quotation, the claim and **what was actually asked**, plus
+the verdict - with the judge's reasoning under `full` like any other content.
+
+**The obvious fix was the wrong one and is worth recording as such.** A provider wrapper that
+audits every engine call would make the rule structural, which is what this project reaches
+for. It would also break ADR-020, which says every `provider_called` record carries the
+estimate beside the engine's measurement: the estimate is the cycle's, it differs per call -
+a document read in passes has one per pass - and a wrapper built once per run cannot have it.
+Trading a true claim for a false one is not a fix.
+
+So the judge's calls stay out of `provider_called` **and a test now says why**.
+`REACHES_THE_ENGINE` lists all three places the source calls an engine and what records each,
+and a fourth fails the suite. That is the structural half: it cannot make a call site audit
+well, and it makes adding one without deciding how impossible, which is the step that was
+skipped. The port carries the last piece - a `Judgement` reports what it was asked, including
+when it could not answer, because the failing calls are the ones worth being able to
+reconstruct.
 
 ## Trade-off
 

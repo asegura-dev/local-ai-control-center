@@ -35,6 +35,19 @@ class Judgement(BaseModel):
     detail: str = ""
     """Why, in the judge's words, for a person deciding whether to believe it."""
 
+    asked: str = ""
+    """Exactly what the judge put to whatever answered it.
+
+    So a trail can record the digest of what was sent, which is otherwise the one thing
+    about these calls that varies and is not written down: the quotation and the claim are
+    recorded by the caller, and a change to the judge's own wording would leave no trace at
+    all. A judgement that cannot say what it was asked is a weaker record than the rest of
+    this project keeps (ADR-059).
+
+    Empty is allowed, for a judge that does not compose a prompt - a model run locally
+    against a pair of sentences has nothing of this shape to report.
+    """
+
     @property
     def supported(self) -> bool:
         """Whether the reading was judged to follow.

@@ -99,7 +99,14 @@ def test_a_judged_reading_leaves_its_digests_and_not_its_words(tmp_path: Path) -
     so this pins that a shape change does not quietly start publishing content.
     """
     log = _log(tmp_path)
-    rows = [{"quote_sha256": "a" * 64, "claim_sha256": "b" * 64, "verdict": "neither"}]
+    rows = [
+        {
+            "quote_sha256": "a" * 64,
+            "claim_sha256": "b" * 64,
+            "asked_sha256": "c" * 64,
+            "verdict": "neither",
+        }
+    ]
     log.record(
         "run-1",
         "readings_judged",

@@ -54,6 +54,24 @@ def test_each_verdict_is_carried_back(verdict: str) -> None:
     assert judged.detail == "because"
 
 
+def test_a_judgement_says_what_it_asked() -> None:
+    """So the trail can record the digest of what was sent, not only of what went in.
+
+    The quotation and the claim are recorded by the caller either way. What would otherwise
+    leave no trace at all is a change to the judge's own wording, which is exactly the kind
+    of change that moves a rate (ADR-059).
+    """
+    judged = AskingJudge(_Answers(_said("follows"))).judge("a claim", "a quotation")
+    assert "a claim" in judged.asked and "a quotation" in judged.asked
+
+
+def test_a_judge_that_could_not_answer_still_says_what_it_asked() -> None:
+    """The failing calls are the ones worth being able to reconstruct."""
+    judged = AskingJudge(_Answers(explode=True)).judge("a claim", "a quotation")
+    assert judged.verdict == "undecided"
+    assert "a quotation" in judged.asked
+
+
 def test_only_follows_counts_as_supported() -> None:
     """`undecided` is not approval. A judge that could not answer has not said it is fine."""
     for verdict in ("contradicts", "neither", "undecided"):

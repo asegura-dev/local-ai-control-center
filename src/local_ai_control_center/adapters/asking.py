@@ -69,18 +69,27 @@ class AskingJudge(Judge):
         """
         if not claim.strip() or not quotation.strip():
             return Judgement(verdict="undecided", detail="Nothing to judge.")
+        asked = _ASKED.format(quotation=quotation.strip(), claim=claim.strip())
         try:
-            answer = self._provider.complete(
-                _ASKED.format(quotation=quotation.strip(), claim=claim.strip()), 0.0, _SCHEMA
-            )
+            answer = self._provider.complete(asked, 0.0, _SCHEMA)
         except Exception as error:  # noqa: BLE001 - one claim, not the traverse (ADR-053)
-            return Judgement(verdict="undecided", detail=f"The judge could not answer: {error}")
+            return Judgement(
+                verdict="undecided", detail=f"The judge could not answer: {error}", asked=asked
+            )
 
         try:
             said = json.loads(answer.text.strip())
         except ValueError:
-            return Judgement(verdict="undecided", detail="The judge did not answer in shape.")
+            return Judgement(
+                verdict="undecided", detail="The judge did not answer in shape.", asked=asked
+            )
         verdict = str(said.get("verdict", "")).strip().lower()
         if verdict not in _VERDICTS:
-            return Judgement(verdict="undecided", detail=f"Unknown verdict: {verdict!r}")
-        return Judgement(verdict=verdict, detail=str(said.get("why", "")).strip())  # type: ignore[arg-type]
+            return Judgement(
+                verdict="undecided", detail=f"Unknown verdict: {verdict!r}", asked=asked
+            )
+        return Judgement(
+            verdict=verdict,  # type: ignore[arg-type]
+            detail=str(said.get("why", "")).strip(),
+            asked=asked,
+        )
