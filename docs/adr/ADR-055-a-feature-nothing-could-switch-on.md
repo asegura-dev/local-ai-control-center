@@ -52,6 +52,13 @@ schema - forcing prose into `{"entries": [...]}` would break the answer it was m
 improve. This is a structural refusal rather than an omission: there is no list of skills to
 keep in step with anything.
 
+**A test asks the question of the whole program, not of this one field.** Every field with
+a default, on every model the program builds in code rather than reads from a file, must be
+set somewhere in the source. Eighty-seven fields qualify and all of them pass; `enforce_shape`
+was the only one that did not, and a third instance now fails the suite rather than shipping.
+It guards itself too - a second test feeds it the defect as released and asserts it is
+reported - because a check that cannot fail is decoration.
+
 **The test that was missing goes through `plan`.** A skill, a configuration, and the
 assertion that the schema arrives - and that without the configuration it does not. It fails
 against the code as released, which is the only useful property a regression test has.
@@ -59,6 +66,8 @@ against the code as released, which is the only useful property a regression tes
 ## Consequences
 
 - ADR-052's promised measurement becomes possible. It could not be run before this.
+- `tests/test_reachable.py` joins `tests/test_layering.py` as a rule the suite enforces
+  rather than a habit the author remembers.
 - The three block-shaped skills and any declared skill can be enforced; the three prose
   skills cannot, and naming them is inert rather than an error.
 - `enforce_shape` remains off for everything by default. Nothing about the measurement is
