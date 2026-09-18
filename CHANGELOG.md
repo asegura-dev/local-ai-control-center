@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-18
+
 ### Added
 - **`lacc ask --judge`: the judge of readings, reachable at last** (ADR-059). ADR-053 built a
   port and an adapter for asking whether a quotation supports the reading made of it, graded
