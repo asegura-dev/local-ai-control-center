@@ -351,6 +351,38 @@ seconds of engine time had produced an answer, and `audit_level: standard` was c
 keeping content to recover it with. Two of the three were invisible to every check here - the
 prompt was well-formed and the run reported success (ADR-062).
 
+**Five questions, three of them traps.** The first deliberate test of what the assembled tool
+can do, against the real corpus with retrieval, quotation checking and the judge all on. The
+traps matter more than the baseline: a tool that answers well and cannot tell when it has
+nothing is not one a thesis can cite.
+
+| | what it probed | what happened |
+|---|---|---|
+| baseline | sensitivity of PSMA PET/CT for nodal staging | 3 of 3 quotations verified |
+| **nothing in the corpus** | cost-effectiveness and reimbursement in Mexico | **said so, invented nothing** |
+| **false premise** | *why* transformers outperform CNNs here | **refused the premise** |
+| synthesis | where studies disagree | 3 points from 3 documents |
+| **the choline trap** | pooled sensitivity of PSMA for pelvic nodes | **named the wrong tracer and declared the absence** |
+
+**The trap is the one worth recording.** The corpus holds *"pooled sensitivity and specificity
+of **choline** PET/CT for pelvic LN metastases were 62% … and 92%"*, and a 14B on this same
+corpus once wrote *"PSMA PET/CT had a pooled sensitivity of 62%"* above it - the failure that
+caused ADR-053 to exist. Asked directly this time, it answered that the figures belong to
+choline **instead of** PSMA, and that the passages do not contain what was asked.
+
+**What it does badly is consistent and has a name.** On both questions the corpus could answer
+fully, quotations verified 3 of 3 and the judge flagged 2 of 3. The quotation says *"more
+sensitive in N-staging"*; the sentence around it says *"pelvic nodal staging"*. Real, checkable,
+and narrower than the source supports.
+
+**That is the failure a quotation check cannot see**, because the quotation is always real. It
+is the same shape as the under-cited drafts (ADR-062) and as the third point of an earlier run
+the judge also caught. The practical rule it implies: **the quotations can be copied; the
+sentences around them have to be rewritten.**
+
+Five questions is five questions. What can be said is that the three failure modes worth
+fearing did not occur once, and that the one that did occurred in both cases where it could.
+
 ## How to read a figure from this project
 
 **Ask what the check could not see.** Six of the seven wrong figures above were the check
