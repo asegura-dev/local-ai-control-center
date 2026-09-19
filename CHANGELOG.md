@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-19
+
 ### Added
 - **A flagged reading is shown what might support it** (ADR-063). `draft` asks for prose of
   three to six sentences resting on *"one exact sentence"*, which cannot hold them, so every

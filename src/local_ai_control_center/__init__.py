@@ -5,6 +5,6 @@ workflows. The command-line entry point lives in the `cli` module; this package
 root exposes the version.
 """
 
-__version__ = "1.6.1"
+__version__ = "1.7.0"
 
 __all__ = ["__version__"]
