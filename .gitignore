@@ -45,3 +45,6 @@ Thumbs.db
 
 # Scratch file used for manual provider testing
 notas.txt
+
+# The book: written in the repository, not published from it.
+/docs/book/

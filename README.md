@@ -113,6 +113,17 @@ append-only, hash-chained audit log.
   approved against a diff. Nothing LACC writes replaces a file that already existed.
 - `lacc ingest <document>` turns a PDF or Word file into Markdown you can open and
   correct, preserving page markers so quotations stay checkable.
+- `lacc collect <skill> <documents> --into <file>` runs one skill across a whole
+  bibliography, one document at a time, and `lacc corpus` assembles several of those
+  into one file of checked quotations. A document too large for the window is refused
+  by name with its token count, never half-read in silence.
+- `lacc ask "<question>" --from <corpus>` answers from passages that were already
+  checked against the documents they name, and checks the answer's own quotations
+  against what it was shown. It says how many passages it set aside before it asks
+  anything: an answer drawn from a selection is an answer about that selection.
+- `--judge` adds a second opinion on whether each reading follows from the quotation
+  under it, and shows passages that might support the ones it flags. This is a model
+  judging a model - weaker than the quotation check, and reported as such.
 - `lacc preview` shows what would happen without doing it, `lacc profile` reports what
   the machine offers, `lacc verify` walks the audit chain, and `lacc notify test`
   checks notification settings before you rely on them.
@@ -131,6 +142,14 @@ permissions, a provider port with a deterministic mock and a real Ollama
 implementation, the hash-chained audit log, execution previews, the execution cycle,
 skills, document conversion, quotation checking, a notifier port, and the
 command-line interface.
+
+Six ports now, each with an implementation and none of them assumed: the provider, the
+document converter, the notifier, a retriever that must declare what it set aside, a
+judge of whether a reading follows from its quotation, and an embedder. Naming an
+`embedding_model` lets a question be answered by meaning as well as by shared words -
+measured on a real corpus, a question asked in Spanish against English quotations
+reached eight relevant passages of the first eight, where word matching reached about
+three. It is off unless named, and the word ranking is never removed.
 
 By default LACC contacts nothing but a local engine. It reaches another machine only
 when the configuration both permits network access and names the host - so the model

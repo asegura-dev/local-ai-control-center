@@ -48,13 +48,26 @@ imports. It is now visible:
 |---|---|
 | `core/` | The rules: configuration contracts, permissions, previews, plans, the fence, quotation checking, the workspace boundary. Depends on nothing outside itself. |
 | `ports/` | An abstract class and the contracts that cross it. Nothing else. |
-| `adapters/` | Implementations of those ports: Ollama, a mock, PDF and Word, ntfy. |
+| `adapters/` | Implementations of those ports: Ollama, a mock, PDF and Word, ntfy, word and dense retrieval, an asking judge, an embedder, and the vector cache beside a corpus. |
 | `system/` | Machine-facing code that is not behind a port: the audit trail, the profiler. |
 | top level | `cycle.py`, the application service, and `cli.py`, the driving adapter. |
 
+**Six ports, and each one had to earn the abstraction.** `Provider` turns a prompt into an
+answer; `Converter` turns a document into text; `Notifier` says a run finished; `Retriever`
+chooses which passages go into a prompt and must declare what it set aside (ADR-050);
+`Judge` says whether a reading follows from the quotation under it, and says plainly that
+this is an opinion rather than a check (ADR-053); `Embedder` turns text into a vector so a
+question can be answered by meaning as well as by shared words (ADR-061).
+
+`Retriever` is worth noting as the one that paid off twice: it was written with a word
+ranking behind it and the record said an embedding model *"may well do better; nobody here
+has measured that it does, and a port means the measurement can decide rather than the
+fashion"*. Two months later dense retrieval arrived as a second implementation and needed no
+change to the port at all.
+
 **`adapters` and `system` are separate because a port is not free.** An abstraction earns
 its place when there are two real implementations: Provider has Ollama and a mock, Converter
-has PDF and Word, Notifier has ntfy and its test double. An audit trail and a hardware
+has PDF and Word, Notifier has ntfy and its test double, Retriever has words and meaning. An audit trail and a hardware
 profile have one each, so they stay concrete. Putting them under `adapters` would imply a
 port that does not exist and invite someone to add one for symmetry.
 
