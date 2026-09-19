@@ -1,6 +1,6 @@
 # Decision records
 
-Sixty records, in the order they were decided. The number is the identity: it is how
+Sixty-two records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -371,3 +371,16 @@ Three standing checks, each derived from a defect that happened: nothing public 
 [`ADR-060-the-address-is-not-a-secret.md`](ADR-060-the-address-is-not-a-secret.md)
 
 ADR-030 says a `.env` supplies secrets and never destinations, and calls it load-bearing - while the ntfy server URL arrived through `server_url_env`, by the one route that record forbids. Splits the field by what each part is: the address moves into the configuration beside `engine_host`, the token stays named, and the topic stays named too because on a public ntfy server the topic *is* the access control. The old field is kept only to refuse it with a message that says what replaces it. Found by reading PRINCIPLES a line at a time, because no mechanical check asks whether a field is a secret or a destination.
+
+
+### 061 - choosing by meaning as well as by words
+
+[`ADR-061-choosing-by-meaning-as-well-as-by-words.md`](ADR-061-choosing-by-meaning-as-well-as-by-words.md)
+
+An `Embedder` port and a dense retriever behind the `Retriever` port ADR-050 already built for this, fused with the word ranking by Reciprocal Rank Fusion - a published constant rather than a weight to tune. Measured on the real corpus: embedding costs 48 seconds and searching all 654 vectors costs 137 milliseconds, so the design is a cache and an exhaustive search rather than an index. A question in Spanish against the English corpus reaches eight relevant passages of the first eight where words reached about three. Says plainly what was not measured, and that a 32k budget admits a third of the corpus whatever the ranking says.
+
+### 062 - the question, the terminal, and the answer that was already paid for
+
+[`ADR-062-the-question-the-terminal-and-the-answer.md`](ADR-062-the-question-the-terminal-and-the-answer.md)
+
+Three defects between a question and its answer, found by one real use. A declared skill's prompt never carried the question, so a request for a summary of convolutional networks returned one about radiation dosimetry. A greater-or-equal sign raised `UnicodeEncodeError` while printing and ended the run after the answer had been produced. And the trail could not recover it, because `standard` is right not to record content. Each is minor; together they turn a paid-for answer into nothing and report success.

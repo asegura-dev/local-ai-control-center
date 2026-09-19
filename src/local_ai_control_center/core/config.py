@@ -198,6 +198,19 @@ class Config(BaseModel):
             "routing is a rule you wrote, never a choice a model makes (ADR-051)."
         ),
     )
+    embedding_model: str = Field(
+        default="",
+        description=(
+            "An embedding model on the same engine, for choosing passages by meaning "
+            "rather than by shared words. Empty by default, which leaves selection to the "
+            "word ranking exactly as before. Named rather than defaulted, like every other "
+            "model: vectors made by one model mean nothing against another's, so guessing "
+            "one would silently make a stored set incomparable. Measured with `bge-m3`, "
+            "chosen because it is multilingual - a question asked in Spanish reached two "
+            "relevant passages of 654 by words and eight of the first eight by meaning "
+            "(ADR-061). Install it with `ollama pull bge-m3`."
+        ),
+    )
     enforce_shape: tuple[str, ...] = Field(
         default=(),
         description=(

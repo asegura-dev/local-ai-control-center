@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Choosing passages by meaning as well as by words** (ADR-061). An `Embedder` port with an
+  Ollama adapter, a dense retriever behind the `Retriever` port ADR-050 already built for it,
+  and Reciprocal Rank Fusion to combine the two - a constant from the paper rather than a
+  weight to tune. Off unless `embedding_model` names one; the word ranking stays the default.
+
+  Measured on the real corpus of 654 quotations with `bge-m3`: **embedding costs 48 seconds
+  warm and 91 cold; searching all 654 vectors exhaustively in pure Python costs 137
+  milliseconds.** So the design is a cache beside the corpus and an exact exhaustive search,
+  not an index - optimising the 137 ms while ignoring the 48 s would be building for a cost
+  that is not there. A second question runs end to end in 2.8 seconds.
+
+  **Where it is decisive is across languages.** A question in Spanish against the English
+  corpus: about three of the first eight on topic by words, with a ten-year survival figure
+  among the top hits, against **eight of eight** by meaning.
+
+  Said plainly: in English it is better on one question and that is a story, not a rate. And
+  with a 32k window the budget admits **218 of 654 passages**, so at this size retrieval
+  decides order and discards rather than membership. Fusion is not measured against either
+  ranking alone.
+
+### Fixed
+- **A declared skill never received the question it was asked** (ADR-062). `prompt_for` built
+  the prompt from the author's instructions, the passages and the format, and never the
+  requests - so the question chose which passages were sent and then stopped. Asked for a
+  summary of what convolutional networks contribute to nodal detection, `draft` returned a
+  paragraph about **radiation dosimetry**. It carries the question now, after the document and
+  beside the format, for the reason ADR-037 measured. The three built-in corpus skills were
+  unaffected, which is why nothing had caught it.
+
+- **A character the terminal could not encode ended the run** (ADR-062). A Windows console
+  runs on a legacy code page, so `console.print` raised `UnicodeEncodeError` on a
+  greater-or-equal sign - in a corpus of medical papers - **after** sixty seconds of engine
+  time had produced an answer, and before the quotations were checked or the readings judged.
+  Under `audit_level: standard` it was not recoverable either, because content is deliberately
+  not recorded there.
+
+  The console is UTF-8 now, and printing an answer can no longer end a run: a failure degrades
+  to ASCII, says the text was altered, and lets everything after it run. The audit level is
+  **not** changed to compensate - recording content by default to survive a display bug would
+  trade a privacy guarantee for a workaround.
+
+- **The dense retriever discarded its own ranking** (ADR-061). `_fill` returned its choices in
+  corpus order, with a docstring inventing a reason for it. A model reads a prompt from the
+  top, and the fusion reads each ranking's positions out of `chosen` - so Reciprocal Rank
+  Fusion was combining the word ranking with the order the corpus happened to be assembled in.
+  Found by a test that had first been written to pass for the wrong reason: it listed the
+  passages nearest-first, so corpus order and ranked order agreed and the assertion proved
+  nothing. It hands the corpus in reverse now.
+
+### Known limits
+- **`draft` asks for prose that one quotation cannot support.** The declared skill wants three
+  to six sentences resting on *"one exact sentence from the passages"*. A five-sentence
+  paragraph cannot rest on one, so every draft is under-cited by construction and the judge
+  flags all of it - 2 of 2 on a real run, both `neither`, both correct. Every figure in those
+  paragraphs was afterwards found **in the corpus**: this is missing citation, not invention.
+  The fix changes how a person writes with the tool, so it is recorded rather than taken.
+
 ## [1.6.1] - 2026-09-18
 
 ### Fixed

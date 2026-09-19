@@ -1383,3 +1383,36 @@ def test_measuring_from_a_corpus_refuses_another_skill(tmp_path: Path) -> None:
     )
     assert result.exit_code == 1
     assert "--from measures ask_corpus" in " ".join(result.stdout.split())
+
+
+def test_a_terminal_that_cannot_show_a_character_does_not_end_the_run() -> None:
+    """The answer had already cost sixty seconds when printing it ended the run.
+
+    A Windows console runs on a legacy code page, and Rich writes through it, so one
+    character outside cp1252 raised `UnicodeEncodeError` **while printing**. Everything
+    after that call is the part that matters - the quotations checked, the readings judged,
+    the discards reported - and all of it was lost. Under `audit_level: standard` the
+    answer was not recoverable either, because content is deliberately not recorded there
+    (ADR-062).
+    """
+    from local_ai_control_center import cli
+
+    refused = []
+
+    class _CannotEncode:
+        def print(self, text: object, *args: object, **kwargs: object) -> None:
+            rendered = str(text)
+            if any(ord(character) > 255 for character in rendered):
+                raise UnicodeEncodeError("charmap", rendered, 0, 1, "cannot encode")
+            refused.append(rendered)
+
+    original = cli.console
+    cli.console = _CannotEncode()  # type: ignore[assignment]
+    try:
+        cli._show("Sensitivity was " + chr(0x2265) + " 82% in the cohort.")
+    finally:
+        cli.console = original
+
+    assert refused, "it must print something rather than raise"
+    assert "82%" in refused[0], "the answer survives, minus what could not be shown"
+    assert any("replaced" in line for line in refused), "and it says the text was altered"

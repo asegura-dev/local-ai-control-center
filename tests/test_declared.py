@@ -158,3 +158,38 @@ def test_two_declarations_sharing_a_name_are_refused(tmp_path: Path) -> None:
     _write(tmp_path / "skills", "b.yaml", body)
     with pytest.raises(DeclarationError, match="share a name"):
         load_declared_skills(config)
+
+
+def test_what_was_asked_reaches_the_model(tmp_path: Path) -> None:
+    """It did not, for two releases, and the effect was invisible (ADR-062).
+
+    The question chose which passages were sent and then went no further, so the model
+    received the passages and the author's generic instructions. Asked in so many words for
+    a summary of convolutional networks, a draft came back about radiation dosimetry - not a
+    model wandering off, but nobody having told it the subject.
+    """
+    declared = DeclaredSkill(
+        name="draft",
+        summary="draft a passage",
+        instructions="You are drafting a passage of a literature review.",
+        over="corpus",
+        fields=(DeclaredField(name="paragraph"), DeclaredField(name="quote", quotation=True)),
+    )
+    asked = "What do convolutional networks contribute to nodal detection?"
+    built = prompt_for(declared, Config(workspace_root=tmp_path), (asked,))
+    assert asked in built
+    # Beside the format and after the document, for the reason ADR-037 measured: an
+    # instruction thousands of tokens behind the point of generation is barely attended to.
+    assert built.index(CONTENT_PLACEHOLDER) < built.index(asked)
+
+
+def test_a_skill_asked_nothing_is_built_as_it_always_was(tmp_path: Path) -> None:
+    """A declared skill over a document takes no question, and gains no empty heading."""
+    declared = DeclaredSkill(
+        name="note",
+        summary="note something",
+        instructions="Say what the document establishes.",
+        fields=(DeclaredField(name="point"),),
+    )
+    built = prompt_for(declared, Config(workspace_root=tmp_path), ())
+    assert "What was asked" not in built

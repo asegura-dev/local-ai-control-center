@@ -16,7 +16,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Sixty records front to back is a history. These are the threads through them, for
+Sixty-two records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -136,6 +136,8 @@ not to reach for an approximate algorithm to find them.
 | 058 | [controls-that-did-not-cover-what-they-claimed](adr/ADR-058-controls-that-did-not-cover-what-they-claimed.md) | A sweep for the shape found twice in two days. Deduplication covered one of the four paths that produce checked claims, though a single answer repeats passages too - three of nineteen measured. ntfy's docstring promised basic credentials with a tested helper nothing called and no configuration field to reach it. Notes that ADR-055's reachability test would have caught neither: reading did. |
 | 059 | [checking-that-a-control-covers-what-it-claims](adr/ADR-059-checking-that-a-control-covers-what-it-claims.md) | Three standing checks, each from a defect that happened: nothing public is defined that only a test reaches, paired controls travel together, and neither answer format loses everything when cut. Building the first found two more - `AskingJudge`, graded and published, was constructed by nothing, and `require` was dead while calling itself the execution path. Wires the judge as `lacc ask --judge`; names the record-to-code inventory and a one-time audit of all 58 records as the phases not yet built. |
 | 060 | [the-address-is-not-a-secret](adr/ADR-060-the-address-is-not-a-secret.md) | ADR-030 forbids a `.env` supplying destinations and calls it load-bearing, while the ntfy server URL arrived exactly that way. The address moves into the configuration beside `engine_host`; the token and the topic stay named, the topic because on a public ntfy server it *is* the access control. The old field is kept only to refuse it by name. Found by reading PRINCIPLES a line at a time - no mechanical check asks whether a field is a secret or a destination. |
+| 061 | [choosing-by-meaning-as-well-as-by-words](adr/ADR-061-choosing-by-meaning-as-well-as-by-words.md) | An `Embedder` port and a dense retriever behind the `Retriever` ADR-050 built for it, fused with the word ranking by Reciprocal Rank Fusion. Measured: embedding the corpus costs 48 s and searching all 654 vectors costs 137 ms, so the design is a cache and an exhaustive search rather than an index. A Spanish question reaches eight of eight against an English corpus where words reached about three. Names what was not measured. |
+| 062 | [the-question-the-terminal-and-the-answer](adr/ADR-062-the-question-the-terminal-and-the-answer.md) | Three defects between a question and its answer, found by one real use: a declared skill's prompt never carried the question, so a request about convolutional networks returned radiation dosimetry; a greater-or-equal sign ended the run while printing, after the answer was produced; and `standard` was right not to keep it. Each minor, together enough to turn a paid-for answer into nothing and report success. |
 
 ## Guides (`docs/guides/`)
 

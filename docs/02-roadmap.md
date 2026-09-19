@@ -468,6 +468,31 @@ the work, and it was invisible for exactly that reason - nothing in a plan looks
 figure. **A plan is where unmeasured claims hide.** The question that catches them is asked
 of sentences, not of tables: *has anyone looked?*
 
+## Retrieval, built - and what using it found
+
+The wall named throughout this document: 654 quotations do not fit a window, and eight of 24
+documents never entered one. Choosing by meaning is built (ADR-061), measured, and honest
+about its size: decisive across languages - eight relevant of the first eight against about
+three by words - better in English on one question, which is a story, and blunted at this
+corpus size because a 32k budget admits a third of the corpus whatever the ranking says.
+
+**Then the tool was asked a question somebody actually wanted answered, and that found three
+defects 587 tests had not** (ADR-062). A declared skill's prompt never carried the question.
+A greater-or-equal sign ended a run while printing it, after the answer had been paid for.
+The trail could not recover it, correctly. Two of the three were invisible to every check
+here: the prompt was well-formed and the run reported success.
+
+**That is the argument for the phase this document keeps deferring.** Six days of building
+checks found six defects of one shape; one real use found three more of a shape no check
+looks for, because a check asks whether the code does what it says and a use asks whether
+what it says is what somebody needed.
+
+The fourth defect is unfixed and is a choice rather than a bug: `draft` asks for prose of
+three to six sentences resting on one quotation, which cannot hold it, so every paragraph is
+under-cited by construction and the judge flags all of it. Every figure in those paragraphs is
+in the corpus - missing citation, not invention. How to resolve it changes how a person
+writes, so it waits for the person.
+
 ## What this roadmap is not
 
 Not a release schedule, and not a promise. It is a statement of direction meant to

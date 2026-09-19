@@ -45,6 +45,18 @@ model: qwen2.5:3b
 # enforce_shape:
 #   - extract_claims
 
+# An embedding model on the same engine, for choosing passages by meaning rather
+# than only by shared words. Empty by default: selection stays exactly as it was.
+# Named rather than defaulted, like every other model - vectors made by one model
+# mean nothing against another's, so a guess would silently make a stored set
+# incomparable. Measured with bge-m3, chosen because it is multilingual: a question
+# asked in Spanish reached about three relevant passages of eight by words and eight
+# of eight by meaning, on a corpus written in English (ADR-061).
+# Install it on the engine with `ollama pull bge-m3`.
+# The vectors are cached in a file beside the corpus. Embedding 654 quotations takes
+# 48 seconds; reading them back takes 72 milliseconds, which is why the file exists.
+# embedding_model: bge-m3
+
 # The language the model is asked to answer in. English by default: small local
 # models follow instructions and write more reliably in it than in languages they
 # saw less of during training. Set it to whatever the reader needs - the value is

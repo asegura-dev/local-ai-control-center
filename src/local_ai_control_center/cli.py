@@ -8,8 +8,10 @@ a skill, previews it, asks for confirmation (defaulting to no), and executes;
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
+import sys
 import time
 from enum import StrEnum
 from pathlib import Path
@@ -22,12 +24,14 @@ from rich.table import Table
 from rich.text import Text
 
 from local_ai_control_center.adapters.asking import AskingJudge
+from local_ai_control_center.adapters.dense import DenseRetriever, FusedRetriever
 from local_ai_control_center.adapters.documents import (
     HiddenText,
     converter_for,
     embedded_metadata,
     embedded_outline,
 )
+from local_ai_control_center.adapters.embedding import OllamaEmbedder
 from local_ai_control_center.adapters.mock import MockProvider
 from local_ai_control_center.adapters.ntfy import notifier_from_config
 from local_ai_control_center.adapters.ollama import (
@@ -35,6 +39,7 @@ from local_ai_control_center.adapters.ollama import (
     check_engine,
     resolve_engine_host,
 )
+from local_ai_control_center.adapters.vectors import SUFFIX as VECTOR_SUFFIX
 from local_ai_control_center.adapters.words import WordRetriever
 from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
@@ -86,9 +91,10 @@ from local_ai_control_center.cycle import (
     write_new_file,
 )
 from local_ai_control_center.ports.converter import ConversionError, Converter
+from local_ai_control_center.ports.embedder import EmbeddingError
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
 from local_ai_control_center.ports.provider import Provider, ProviderError
-from local_ai_control_center.ports.retriever import Passage, Selection
+from local_ai_control_center.ports.retriever import Passage, Retriever, Selection
 from local_ai_control_center.system.audit import (
     AnchorCheck,
     AuditLog,
@@ -121,7 +127,53 @@ app = typer.Typer(
     help="Local AI Control Center - run AI-assisted skills with control and audit.",
     no_args_is_help=True,
 )
-console = Console()
+
+
+def _console() -> Console:
+    """A console that can print what a paper contains.
+
+    A Windows terminal defaults to a legacy code page - cp1252 here - and Rich writes
+    through it, so a single character outside it raises `UnicodeEncodeError` **while
+    printing**. That is not cosmetic: it happened after a sixty-second answer had already
+    been produced, and it ended the run before the quotations were checked. The character
+    was a greater-or-equal sign, in a corpus of medical papers (ADR-062).
+
+    The stream is put into UTF-8 and told to replace what it still cannot encode. Replacing
+    is right here and would be wrong almost anywhere else in this project: this is the last
+    step before a person's eyes, the answer itself is already recorded, and a question mark
+    where a sign should be is a better outcome than no answer at all.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        # A stream that cannot be reconfigured - a pipe, a capture, a test harness - is
+        # left as it was. `_show` below is what keeps a failure from ending a run.
+        with contextlib.suppress(AttributeError, OSError, ValueError):
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    return Console()
+
+
+console = _console()
+
+
+def _show(text: str) -> None:
+    """Print an answer the engine produced, and never let printing lose it.
+
+    Everything after this call is the part that matters - the quotations are checked, the
+    readings are judged, the discards are reported - and all of it was lost to an exception
+    raised while writing to a terminal. A display is the one place in this program where
+    failing quietly is better than failing correctly (ADR-062).
+    """
+    try:
+        console.print(text)
+    except (UnicodeEncodeError, OSError):
+        plain = text.encode("ascii", "replace").decode("ascii")
+        try:
+            console.print(plain)
+            console.print(
+                "[yellow]Some characters could not be shown by this terminal and were "
+                "replaced. The answer itself is unchanged.[/yellow]"
+            )
+        except (UnicodeEncodeError, OSError):
+            console.print("[yellow]The answer could not be displayed by this terminal.[/yellow]")
 
 
 class ProviderChoice(StrEnum):
@@ -1533,7 +1585,8 @@ def _passages_for(
     )
     window = config.context_tokens or 0
     budget = (window - answer_reserve(window)) // 2 if window else 0
-    selection = WordRetriever().select(question, passages, budget)
+    resolved = workspace.resolve_within(corpus_file)
+    selection = _retriever_for(config, resolved).select(question, passages, budget)
     return selection, _as_material(selection)
 
 
@@ -1601,7 +1654,16 @@ def ask(
         Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
     )
     budget = (config.context_tokens - answer_reserve(config.context_tokens)) // 2
-    selection = WordRetriever().select(question, passages, budget)
+    try:
+        selection = _retriever_for(config, workspace.resolve_within(corpus_file)).select(
+            question, passages, budget
+        )
+    except EmbeddingError as error:
+        # Refused rather than quietly falling back to words: a selection made by a
+        # different method than the one configured is a different answer, and saying so
+        # after the fact is worse than not answering (ADR-061).
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
     _report_the_selection(selection)
     if not selection.chosen:
         raise typer.Exit(code=1)
@@ -1650,12 +1712,31 @@ def ask(
 
     _announce(resolved.name, result.outcome, time.monotonic() - started, config, audit, run_id)
     if result.completion is not None:
-        console.print(result.completion.text)
+        _show(result.completion.text)
     _check_against_what_was_sent(result, material, plan, audit, run_id, provider if judge else None)
     console.print(
         f"[dim]{selection.set_aside} of {selection.considered} passages were not sent. An "
         "answer drawn from a selection is an answer about that selection.[/dim]"
     )
+
+
+def _retriever_for(config: Config, corpus: Path | None) -> Retriever:
+    """The word ranking, or both rankings fused, depending on the configuration.
+
+    Word ranking stays the default. Naming an embedding model adds meaning to it rather
+    than replacing it: the two find different things, and the fused ranking holds both
+    (ADR-061). The vectors are remembered beside the corpus, which is what makes a second
+    question cost milliseconds instead of the forty-eight seconds the first one did.
+    """
+    words = WordRetriever()
+    if not config.embedding_model:
+        return words
+    # The same host rule as generation, and for the same reason: an environment variable
+    # may only ever point at this machine, and anywhere else has to be written down.
+    host = resolve_engine_host(config.engine_host, config.network_access)
+    embedder = OllamaEmbedder(config.embedding_model, host)
+    cache = corpus.with_suffix(corpus.suffix + VECTOR_SUFFIX) if corpus else None
+    return FusedRetriever(words, DenseRetriever(embedder, cache))
 
 
 def _report_the_selection(selection: Selection) -> None:
@@ -2169,7 +2250,10 @@ def _show_window_costs(profile: SystemProfile) -> None:
 def _report(result: RunResult) -> None:
     """Print the outcome of a run."""
     if result.outcome == "completed" and result.completion is not None:
-        console.print(Panel(result.completion.text, title="Result", expand=False))
+        try:
+            console.print(Panel(result.completion.text, title="Result", expand=False))
+        except (UnicodeEncodeError, OSError):
+            _show(result.completion.text)
     elif result.outcome == "refused":
         _exit_refused()
     elif result.outcome == "declined":

@@ -182,7 +182,7 @@ class FileSkill(Skill):
         )
         return SkillPlan(
             action=action,
-            prompt_template=prompt_for(self._declared, config),
+            prompt_template=prompt_for(self._declared, config, requests),
             verify_quotes=self._declared.verifies,
             fields=tuple(field.name for field in self._declared.fields),
             quote_field=self._declared.quoted_field,
@@ -191,13 +191,20 @@ class FileSkill(Skill):
         )
 
 
-def prompt_for(declared: DeclaredSkill, config: Config) -> str:
+def prompt_for(declared: DeclaredSkill, config: Config, requests: tuple[str, ...] = ()) -> str:
     """Build the prompt from a declaration: the author's words, LACC's shape.
 
     The instructions are restated **after** the document rather than before it, which is not
     a style choice - stating the format thousands of tokens from the point of generation
     tripled the claims a model returned when it was fixed (ADR-037). An author writing their
     own prompt would not know to do that, which is why they do not write this part.
+
+    **``requests`` is what the person asked, and it reaches the model.** For a skill over a
+    corpus that is the question, and it was dropped for two releases: it chose which passages
+    were sent and then went no further, so the model received the passages and the author's
+    generic instructions and drafted whatever it liked. Asked in so many words for a summary
+    of convolutional networks, a draft came back about radiation dosimetry - not a model
+    wandering off, but nobody having told it the subject (ADR-062).
     """
     break_ = chr(10)
     opening, _ = asked_shape(
@@ -231,12 +238,18 @@ def prompt_for(declared: DeclaredSkill, config: Config) -> str:
         document = break_ * 2 + CONTENT_PLACEHOLDER + break_ * 2
     else:
         document = break_ * 2
+    asked = break_.join(request.strip() for request in requests if request.strip())
+    # After the document, beside the format, for the reason ADR-037 measured: an
+    # instruction thousands of tokens behind the point of generation is one the model has
+    # largely stopped attending to.
+    subject = (break_ * 2 + "What was asked:" + break_ * 2 + asked + break_ * 2) if asked else ""
     return (
         declared.instructions.strip()
         + break_ * 2
         + f"Answer in {config.output_language}."
         + fidelity
         + document
+        + subject
         + opening
     )
 

@@ -313,6 +313,44 @@ identical sentences. The conventional near-duplicate threshold in corpus dedupli
 0.80. **The highest-similarity non-identical pair in this corpus is one that must be kept**,
 which is why deduplication here is exact containment and has no threshold at all (ADR-054).
 
+**Choosing by meaning reaches what words cannot, across languages, and less than hoped within
+one.** Measured on the real corpus of 654 quotations with `bge-m3` (ADR-061):
+
+| | |
+|---|---|
+| embedding the whole corpus, warm / cold | **48 s / 91 s** |
+| searching all 654 vectors exhaustively, pure Python | **137 ms** |
+| the cache beside the corpus | 2.7 MB, 72 ms to load |
+| a second question, end to end | **2.8 s** |
+
+**The cost is embedding, not searching**, and that decided the design: a cache and an exact
+exhaustive search rather than an index. Optimising 137 milliseconds while ignoring 48 seconds
+is building for a cost that is not there, which is the lesson ADR-054 already paid for.
+
+| a question in Spanish, English corpus | on topic, of the first eight |
+|---|---|
+| word ranking | **~3**, with a ten-year survival figure among the top hits |
+| meaning | **8** |
+
+**In English it is better on one question, and one question is a story.** It found as its
+first result a sentence the word ranking missed entirely; about seven of eight on topic
+against about six. Four runs would be a measurement.
+
+**And the budget blunts all of it at this size.** With a 32k window the selection admits
+**218 of 654 passages** - a third of the corpus enters whatever the ranking says - so
+retrieval decides order and discards rather than membership. It becomes decisive as the corpus
+grows, and saying otherwise now would be the thirteenth wrong figure.
+
+**Fusion is not measured against either ranking alone.** It is built and tested for mechanism
+and no figure says it wins.
+
+**One real use found three defects that 587 tests did not.** Asked for a summary of
+convolutional networks, `draft` returned radiation dosimetry: a declared skill's prompt never
+carried the question. A greater-or-equal sign then ended the run while printing, after sixty
+seconds of engine time had produced an answer, and `audit_level: standard` was correctly not
+keeping content to recover it with. Two of the three were invisible to every check here - the
+prompt was well-formed and the run reported success (ADR-062).
+
 ## How to read a figure from this project
 
 **Ask what the check could not see.** Six of the seven wrong figures above were the check
