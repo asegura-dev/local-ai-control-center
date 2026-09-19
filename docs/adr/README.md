@@ -1,6 +1,6 @@
 # Decision records
 
-Sixty-two records, in the order they were decided. The number is the identity: it is how
+Sixty-three records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -384,3 +384,10 @@ An `Embedder` port and a dense retriever behind the `Retriever` port ADR-050 alr
 [`ADR-062-the-question-the-terminal-and-the-answer.md`](ADR-062-the-question-the-terminal-and-the-answer.md)
 
 Three defects between a question and its answer, found by one real use. A declared skill's prompt never carried the question, so a request for a summary of convolutional networks returned one about radiation dosimetry. A greater-or-equal sign raised `UnicodeEncodeError` while printing and ended the run after the answer had been produced. And the trail could not recover it, because `standard` is right not to record content. Each is minor; together they turn a paid-for answer into nothing and report success.
+
+
+### 063 - write dense, and prune
+
+[`ADR-063-write-dense-and-prune.md`](ADR-063-write-dense-and-prune.md)
+
+`draft` asked for prose of three to six sentences resting on one quotation, which cannot hold them, so every paragraph was under-cited by construction and the judge flagged all of it. Three ways out were put to the author and the third was chosen: write dense, and let the judge mark what needs support. Builds the part that was missing from it - a flagged reading is shown two passages from what was already sent that might support it, ranked against the reading's own words, named candidates and never support. The skill stops promising what it cannot deliver.

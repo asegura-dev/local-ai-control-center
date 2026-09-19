@@ -8,6 +8,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A flagged reading is shown what might support it** (ADR-063). `draft` asks for prose of
+  three to six sentences resting on *"one exact sentence"*, which cannot hold them, so every
+  paragraph is under-cited by construction and the judge flags all of it. Three ways out were
+  put to the person whose thesis this is, and the chosen one was to write dense and let the
+  judge mark what needs support.
+
+  That needed a piece it did not have. A flag saying *"this is not supported by its
+  quotation"* sends a writer hunting through 654 quotations for the one that is. Now each
+  flagged reading is followed by **two passages from what was already sent**, ranked against
+  the reading's own words, with the sentence already quoted left out.
+
+  **They are named candidates and never support.** LACC has ranked some sentences; it has not
+  decided that any establishes the claim - the discipline ADR-034 set for `nearest_text`.
+  Nothing is added to the draft and nothing removed: substituting a citation on a similarity
+  score would be LACC editing a thesis.
+
+  The first real use showed the loop working - the flag on a claim about convolutional
+  networks arrived with the two sentences that would cite it - **and showed the same sentence
+  offered twice.** Candidates were deduplicated against the quotation and not against each
+  other, and a corpus holds the same sentence in more than one entry. Deduplicated on the
+  words now; it is the third time the distinction between a repeat within an answer and a
+  repeat across a corpus has cost something.
+
+### Changed
+- **`draft` stops promising what it cannot deliver.** Its quotation is described as the
+  passage the paragraph is *anchored to*, not the one it rests on, and the description points
+  at `--judge`. A field description that is structurally impossible to satisfy teaches a
+  reader to distrust the ones that are not.
+
+### Added
 - **Choosing passages by meaning as well as by words** (ADR-061). An `Embedder` port with an
   Ollama adapter, a dense retriever behind the `Retriever` port ADR-050 already built for it,
   and Reciprocal Rank Fusion to combine the two - a constant from the paper rather than a

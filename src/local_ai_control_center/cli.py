@@ -41,7 +41,7 @@ from local_ai_control_center.adapters.ollama import (
 )
 from local_ai_control_center.adapters.vectors import SUFFIX as VECTOR_SUFFIX
 from local_ai_control_center.adapters.words import WordRetriever
-from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve
+from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve, estimate_tokens
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
 from local_ai_control_center.core.corpus import CollectedClaim, about, parse_corpus
 from local_ai_control_center.core.declared import (
@@ -1654,10 +1654,9 @@ def ask(
         Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
     )
     budget = (config.context_tokens - answer_reserve(config.context_tokens)) // 2
+    chosen_by = _retriever_for(config, workspace.resolve_within(corpus_file))
     try:
-        selection = _retriever_for(config, workspace.resolve_within(corpus_file)).select(
-            question, passages, budget
-        )
+        selection = chosen_by.select(question, passages, budget)
     except EmbeddingError as error:
         # Refused rather than quietly falling back to words: a selection made by a
         # different method than the one configured is a different answer, and saying so
@@ -1713,7 +1712,16 @@ def ask(
     _announce(resolved.name, result.outcome, time.monotonic() - started, config, audit, run_id)
     if result.completion is not None:
         _show(result.completion.text)
-    _check_against_what_was_sent(result, material, plan, audit, run_id, provider if judge else None)
+    _check_against_what_was_sent(
+        result,
+        material,
+        plan,
+        audit,
+        run_id,
+        provider if judge else None,
+        selection.chosen,
+        chosen_by,
+    )
     console.print(
         f"[dim]{selection.set_aside} of {selection.considered} passages were not sent. An "
         "answer drawn from a selection is an answer about that selection.[/dim]"
@@ -1763,12 +1771,47 @@ def _as_material(selection: Selection) -> str:
     return (chr(10) * 2).join(blocks)
 
 
+def _might_support(
+    claim: str, quoted: str, passages: tuple[Passage, ...], retriever: Retriever
+) -> tuple[Passage, ...]:
+    """Passages from what was sent that might support ``claim``, best first (ADR-063).
+
+    **Candidates, never support.** LACC has ranked some sentences against the words of a
+    reading; it has not decided that any of them establishes it. The same discipline
+    `nearest_text` follows when a quotation is not found: report the match, and say plainly
+    that it is not a reconstruction of what the model meant (ADR-034).
+
+    The one already quoted is left out - a writer told to cite something knows about the
+    sentence they cited.
+    """
+    # Deduplicated on the words, not only against the quotation. A corpus holds the same
+    # sentence more than once - `without_repeats` drops repeats within one answer, not
+    # across the documents a selection draws from - and two candidates that are one
+    # sentence twice is half a tool. Found on the first real use (ADR-063).
+    seen = {quoted.strip()}
+    others: list[Passage] = []
+    for passage in passages:
+        words = passage.text.strip()
+        if words in seen:
+            continue
+        seen.add(words)
+        others.append(passage)
+    if not others:
+        return ()
+    # A budget large enough for everything: what is wanted here is the ranking, not a
+    # selection, and a passage dropped for space would be one the writer never sees.
+    whole = sum(estimate_tokens(passage.text) for passage in others) + len(others)
+    return retriever.select(claim, tuple(others), whole).chosen[:2]
+
+
 def _judge_the_readings(
     checked: tuple[CheckedClaim, ...],
     provider: Provider,
     plan: SkillPlan,
     audit: AuditLog,
     run_id: str,
+    passages: tuple[Passage, ...] = (),
+    retriever: Retriever | None = None,
 ) -> None:
     """Ask whether each verified quotation supports the reading made of it (ADR-053).
 
@@ -1839,6 +1882,18 @@ def _judge_the_readings(
         for claim, verdict in flagged:
             console.print(f"  [yellow]?[/yellow] {claim.claim.claim[:95]}")
             console.print(f"    [dim]{verdict.verdict}: {verdict.detail[:110]}[/dim]")
+            if retriever is None:
+                continue
+            for candidate in _might_support(
+                claim.claim.claim, claim.claim.quote, passages, retriever
+            ):
+                where = (
+                    f"{candidate.source}, p. {candidate.page}"
+                    if candidate.page
+                    else candidate.source
+                )
+                console.print(f"    [dim]could support it: {candidate.text[:95]}[/dim]")
+                console.print(f"    [dim]                  [{where}][/dim]")
     if undecided:
         console.print(f"[dim]{undecided} could not be judged, and that is not approval.[/dim]")
 
@@ -1850,6 +1905,8 @@ def _check_against_what_was_sent(
     audit: AuditLog,
     run_id: str,
     provider: Provider | None = None,
+    passages: tuple[Passage, ...] = (),
+    retriever: Retriever | None = None,
 ) -> None:
     """Check the answer's quotations against the passages it was given, not the documents.
 
@@ -1885,7 +1942,7 @@ def _check_against_what_was_sent(
             f"[green]All {len(checked)} quotations are in the passages that were sent.[/green]"
         )
         if provider is not None:
-            _judge_the_readings(checked, provider, plan, audit, run_id)
+            _judge_the_readings(checked, provider, plan, audit, run_id, passages, retriever)
         return
     console.print(
         f"[red]{len(invented)} of {len(checked)} quotations are not in what was sent.[/red] "
@@ -1895,7 +1952,7 @@ def _check_against_what_was_sent(
     for claim in invented:
         console.print(f"  [red]x[/red] {claim.claim.quote[:100]}")
     if provider is not None:
-        _judge_the_readings(checked, provider, plan, audit, run_id)
+        _judge_the_readings(checked, provider, plan, audit, run_id, passages, retriever)
 
 
 @app.command()

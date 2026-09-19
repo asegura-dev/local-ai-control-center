@@ -1416,3 +1416,69 @@ def test_a_terminal_that_cannot_show_a_character_does_not_end_the_run() -> None:
     assert refused, "it must print something rather than raise"
     assert "82%" in refused[0], "the answer survives, minus what could not be shown"
     assert any("replaced" in line for line in refused), "and it says the text was altered"
+
+
+def test_a_flagged_reading_is_shown_what_might_support_it() -> None:
+    """Pruning needs the candidates in hand, or it is a complaint (ADR-063).
+
+    A flag saying "this is not supported by its quotation" sends the writer hunting through
+    654 quotations for the one that is. This ranks what was **already sent** against the
+    reading's own words, leaves out the sentence already quoted, and names the result
+    candidates rather than support.
+    """
+    from local_ai_control_center import cli
+    from local_ai_control_center.adapters.words import WordRetriever
+    from local_ai_control_center.ports.retriever import Passage
+
+    quoted = Passage(text="the network outlined each lymph node", source="a.md")
+    supports = Passage(text="specificity for nodal metastases reached 92 percent", source="b.md")
+    unrelated = Passage(text="the authors thank the department", source="c.md")
+
+    candidates = cli._might_support(
+        "specificity for nodal metastases was high",
+        quoted.text,
+        (quoted, supports, unrelated),
+        WordRetriever(),
+    )
+
+    texts = [passage.text for passage in candidates]
+    assert quoted.text not in texts, "the sentence already cited is not offered back"
+    assert supports.text in texts
+    assert len(candidates) <= 2, "a short list to read, not a second selection"
+
+
+def test_the_same_sentence_is_never_offered_twice() -> None:
+    """Found on the first real use: both candidates were one sentence (ADR-063).
+
+    A corpus holds the same sentence more than once - `without_repeats` drops repeats within
+    one answer, not across the documents a selection draws from. Two candidates that are one
+    sentence twice is half a tool.
+    """
+    from local_ai_control_center import cli
+    from local_ai_control_center.adapters.words import WordRetriever
+    from local_ai_control_center.ports.retriever import Passage
+
+    twice = "the new method had worse predictive values for nodal metastases"
+    passages = (
+        Passage(text="the network outlined each lymph node", source="a.md"),
+        Passage(text=twice, source="b.md"),
+        Passage(text=twice, source="c.md"),
+    )
+    candidates = cli._might_support(
+        "predictive values for nodal metastases were worse",
+        "the network outlined each lymph node",
+        passages,
+        WordRetriever(),
+    )
+    texts = [passage.text for passage in candidates]
+    assert len(texts) == len(set(texts)), "two candidates must be two sentences"
+
+
+def test_nothing_is_offered_when_the_quoted_passage_is_all_there_was() -> None:
+    """No candidates rather than a candidate that is the same sentence again."""
+    from local_ai_control_center import cli
+    from local_ai_control_center.adapters.words import WordRetriever
+    from local_ai_control_center.ports.retriever import Passage
+
+    only = Passage(text="the network outlined each lymph node", source="a.md")
+    assert cli._might_support("anything at all", only.text, (only,), WordRetriever()) == ()
