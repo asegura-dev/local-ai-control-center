@@ -1,6 +1,6 @@
 # Decision records
 
-Sixty-three records, in the order they were decided. The number is the identity: it is how
+Sixty-four records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -391,3 +391,10 @@ Three defects between a question and its answer, found by one real use. A declar
 [`ADR-063-write-dense-and-prune.md`](ADR-063-write-dense-and-prune.md)
 
 `draft` asked for prose of three to six sentences resting on one quotation, which cannot hold them, so every paragraph was under-cited by construction and the judge flagged all of it. Three ways out were put to the author and the third was chosen: write dense, and let the judge mark what needs support. Builds the part that was missing from it - a flagged reading is shown two passages from what was already sent that might support it, ranked against the reading's own words, named candidates and never support. The skill stops promising what it cannot deliver.
+
+
+### 064 - what your papers cite
+
+[`ADR-064-what-your-papers-cite.md`](ADR-064-what-your-papers-cite.md)
+
+A bibliography of 24 papers is also 2,315 references, and a work several of them cite is one the field treats as load-bearing. Parsed from the list each document already carries - no model, because reference metadata is exactly what a model invents, and no network. Records the defect the measurement found: folding the section as a whole ran each DOI into the next reference, so every DOI came out distinct and the count of shared works was zero where the answer is eight. Names its own ceiling at nine per cent, since most bibliographies print no DOI, and reports "not among the ones identifiable by DOI" rather than "not held" because only 11 of 23 documents carry one.

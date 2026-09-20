@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`lacc references`: what more than one of your papers cites** (ADR-064). A bibliography of
+  24 papers is also 2,315 references, and a work several of them cite is one the field treats
+  as load-bearing. Parsed from the list each document already carries - **no model and no
+  network**. A model was the wrong tool by measurement: asked for reference metadata with an
+  instruction not to guess, it invented twelve journal names of twenty-four (ADR-047), and the
+  list is in the file, so there is nothing to generate.
+
+  The mangling is what this project already knows how to fix. References wrap across lines,
+  the typesetter splits words at the break, and a DOI arrives as `10. 1158/ 1055- 9965` or
+  split across a newline. The folding written for quotation checking recovers them unchanged.
+
+  On the real corpus: 21 of 24 papers parse, 225 of 2,315 references carry a recoverable DOI,
+  and **8 works are cited by more than one paper** - the most-cited by three. Two of the three
+  that do not parse print author-year bibliographies with no numbering; the third numbers with
+  a bare number, which would need the rule that a bibliography numbers consecutively, and that
+  is named and not built.
+
+  It says *"not among the ones identifiable by DOI"* rather than *"not held"*: only 11 of 23
+  documents carry a DOI in their own metadata, and calling the rest missing would be a false
+  negative dressed as a fact.
+
+### Fixed
+- **Folding a reference section as a whole ran each DOI into the reference after it**, found
+  while measuring before building. `10.1158/1055-9965.epi-15-0578` became
+  `…epi-15-0578.2.sungh` — reference two, author Sung H — because `_unspaced` removes newlines
+  along with every other space. Every DOI came out distinct and the count of works cited more
+  than once was zero where the answer is eight. Entries are segmented first and folded one at
+  a time.
+
 ## [1.7.0] - 2026-09-19
 
 ### Added

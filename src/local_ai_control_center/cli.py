@@ -61,6 +61,7 @@ from local_ai_control_center.core.headings import headings_in, matching
 from local_ai_control_center.core.passes import PageRangeError
 from local_ai_control_center.core.permissions import grant
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
+from local_ai_control_center.core.references import references_in, without_truncations
 from local_ai_control_center.core.run import Progress, ProgressFn, new_run_id
 from local_ai_control_center.core.skill import (
     AskCorpusSkill,
@@ -801,6 +802,92 @@ def _page_range(given: str | None) -> tuple[int, int] | None:
     if first > last:
         raise typer.BadParameter(f"Page {first} comes after page {last}.")
     return first, last
+
+
+@app.command()
+def references(
+    sources: Annotated[list[Path], typer.Argument(help="Documents inside the workspace.")],
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Report what more than one of these documents cites, and whether you hold it.
+
+    Parsed from the reference list each document already carries. **No model and no
+    network**: asked for reference metadata a model invents it - twelve journal names of
+    twenty-four, with an instruction in the same prompt not to (ADR-047) - and the list is
+    in the file, so there is nothing to generate.
+
+    A work several of your papers cite is one the field treats as load-bearing. This counts;
+    it does not judge. A work cited by three of them may be the thing all three disagree
+    with (ADR-064).
+    """
+    _, workspace = _load(config_path)
+    cited_by: dict[str, set[str]] = {}
+    held: set[str] = set()
+    parsed = silent = entries = 0
+
+    for source in sources:
+        try:
+            path = workspace.resolve_within(source)
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except (ValueError, OSError) as error:
+            console.print(f"[red]{error}[/red]")
+            continue
+        # What this document says about itself, so "do I have it?" is answered against a
+        # fact the file states rather than against a filename (ADR-047).
+        own = (
+            embedded_metadata(path.with_suffix(".pdf"))
+            if path.with_suffix(".pdf").exists()
+            else None
+        )
+        if own is not None and own.doi:
+            held.add(own.doi.lower())
+
+        found = references_in(text)
+        entries += len(found)
+        if found:
+            parsed += 1
+        else:
+            silent += 1
+            console.print(f"[dim]{source}: no numbered reference list found.[/dim]")
+        for entry in found:
+            if entry.doi:
+                cited_by.setdefault(entry.doi.lower(), set()).add(str(source))
+
+    whole = without_truncations(frozenset(cited_by))
+    shared = sorted(
+        ((doi, cited_by[doi]) for doi in whole if len(cited_by[doi]) > 1),
+        key=lambda pair: (-len(pair[1]), pair[0]),
+    )
+
+    console.print(
+        f"[green]{parsed} of {parsed + silent} documents parsed[/green]; {entries} references, "
+        f"{sum(len(v) for v in cited_by.values())} with a DOI."
+    )
+    if not shared:
+        console.print("Nothing here is cited by more than one of them.")
+        return
+
+    console.print(f"[bold]{len(shared)} works cited by more than one:[/bold]")
+    for doi, who in shared:
+        # "not among yours" rather than "not held". Only the documents whose own DOI could
+        # be read are comparable at all, and saying "not held" of a work sitting in the
+        # workspace without a DOI in its metadata would be a false negative dressed as a
+        # fact - the shape of error this project has corrected twelve times (ADR-064).
+        mark = (
+            "[green]you have this[/green]"
+            if doi in held
+            else "[yellow]not among the ones identifiable by DOI[/yellow]"
+        )
+        console.print(f"  {len(who)}x  {doi}  {mark}")
+        for name in sorted(who):
+            console.print(f"        [dim]<- {name}[/dim]")
+    console.print(
+        f"[dim]{len(held)} of the documents given carry a DOI in their own metadata, so only "
+        f"those could be matched against. Counted, not judged: a work several papers cite "
+        f"may be the one they disagree with.[/dim]"
+    )
 
 
 @app.command()
