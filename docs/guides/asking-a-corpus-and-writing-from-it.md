@@ -23,10 +23,9 @@ bibliography changes; the asking is the daily work.
     lacc corpus corpus.md other.md --into everything.md
 
 `collect` runs over each document alone, so one that is too large for the window is refused
-by name with its token count rather than silently half-read. **Read the refusals.** On the
-bibliography this was measured against, eight of 24 documents were refused - the largest and
-most central - and a corpus that covers 16 of 24 is a corpus that will not mention what is in
-the other eight. Those are read in passes:
+by name with its token count rather than silently half-read. **Read the refusals**, and then
+read those documents in passes - a corpus that does not mention a paper will not mention it
+when you ask, and nothing in the answer will say why:
 
     lacc run extract_claims big-guideline.md --in-passes --pages-per-pass 3
 

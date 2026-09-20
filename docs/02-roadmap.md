@@ -360,11 +360,16 @@ That is the number this project should be quoted on, and it is the reason the ch
 
 **Eight of 24 documents never entered the window at all.** They were refused for size, which
 is correct, and `collect` said so: each one occupies its own section of the corpus naming the
-token count, the budget and what to do about it. Nothing was hidden. What remains true is the
-consequence - the corpus covers 16 of 24 papers, and the eight missing are the largest and
-most central, nnU-Net and the EAU and NCCN guidelines among them. The library-scale work
+token count, the budget and what to do about it. Nothing was hidden. The library-scale work
 deferred to v2 below is not a nicety: without it a bibliography is read only in the parts
 that happen to fit.
+
+> **That was the state then, and it is no longer the state.** Reading in passes (ADR-045)
+> closed most of it, and the figure was still being quoted as current days later. Measured
+> against the corpus on 2026-09-20: **two documents have no quotation in it** - one paper of
+> 29,362 tokens, and the EAU guideline of 348,276, which four extracted sections cover with
+> 111 quotations. nnU-Net has 39, the NCCN guideline 63. A number from a record is a number
+> from the day it was taken.
 
 ## Four defects of one shape, and what found them
 
@@ -470,8 +475,8 @@ of sentences, not of tables: *has anyone looked?*
 
 ## Retrieval, built - and what using it found
 
-The wall named throughout this document: 654 quotations do not fit a window, and eight of 24
-documents never entered one. Choosing by meaning is built (ADR-061), measured, and honest
+The wall named throughout this document: 654 quotations do not fit a window, and the largest
+documents had to be read in passes to enter it at all. Choosing by meaning is built (ADR-061), measured, and honest
 about its size: decisive across languages - eight relevant of the first eight against about
 three by words - better in English on one question, which is a story, and blunted at this
 corpus size because a 32k budget admits a third of the corpus whatever the ranking says.

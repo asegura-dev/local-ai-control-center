@@ -383,6 +383,22 @@ sentences around them have to be rewritten.**
 Five questions is five questions. What can be said is that the three failure modes worth
 fearing did not occur once, and that the one that did occurred in both cases where it could.
 
+**A figure from a record is a figure from the day it was taken, and this project quoted a
+stale one for days.** *"Eight of 24 documents never entered the window"* was measured for
+ADR-042 and repeated as the current state long after reading in passes had closed most of it.
+Measured against the corpus on 2026-09-20:
+
+| | |
+|---|---|
+| documents with no quotation in the corpus | **2** |
+| of those, the EAU guideline | 348,276 tokens, covered by 4 extracted sections and 111 quotations |
+| nnU-Net, named for days as missing | **39 quotations** |
+| the NCCN guideline, likewise | **63 quotations** |
+
+Nothing was measured wrong. A true statement was carried forward past the work that made it
+false, which is a way of being wrong that no check here looks for: the number was right, the
+tense was not.
+
 ## How to read a figure from this project
 
 **Ask what the check could not see.** Six of the seven wrong figures above were the check
@@ -406,6 +422,10 @@ prediction down where it can embarrass you.
 **Ask whether a surprising zero is the world or the instrument.** A rate of exactly none is
 almost always the measuring end. Six of the corrections above are that, and the most recent is
 a zero that was a parser refusing to read what it had been given.
+
+**Ask when it was taken.** A figure in a record is from the day of the record. This project
+repeated *"eight of 24 documents never entered the window"* for days after the number had
+become two, because a true sentence in a decision record reads as a current one.
 
 **Ask what in the program sets it.** A feature is a figure too - "this is delivered" is a
 claim - and twice here it was wrong while its tests were green. Both times the tests built

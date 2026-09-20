@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-20
+
+### Fixed
+- **A true figure was carried forward past the work that made it false.** *"Eight of 24
+  documents never entered the window"* was measured for ADR-042 and then repeated as the
+  current state for days, in the roadmap, in a guide written yesterday, and in conversation.
+  Reading in passes had closed most of it.
+
+  Measured against the corpus on 2026-09-20: **two documents have no quotation in it** - one
+  paper of 29,362 tokens and the EAU guideline of 348,276, which four extracted sections cover
+  with 111 quotations. nnU-Net, named for days as missing, has **39**. The NCCN guideline has
+  **63**.
+
+  Nothing was measured wrong, which is what makes this a different failure from the twelve in
+  chapter 4. The number was right and the tense was not, and no check here looks for that.
+  Chapter 4 gains the question it implies: **ask when a figure was taken.**
+
 ### Added
 - **`lacc references`: what more than one of your papers cites** (ADR-064). A bibliography of
   24 papers is also 2,315 references, and a work several of them cite is one the field treats
