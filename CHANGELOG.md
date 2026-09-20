@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documents carry a DOI in their own metadata, and calling the rest missing would be a false
   negative dressed as a fact.
 
+  **It prints what each work is, not only its identifier.** A DOI tells a reader nothing, and
+  the entry is already parsed - so the whole reference is shown on one line, with the split
+  words rejoined and the link removed. On the real corpus the three-times-cited work reads as
+  *"Hofman MS, Lawrentschuk N, Francis RJ, et al. Prostate-specific membrane antigen PET-CT in
+  patients with high-risk prostate cancer before curative-intent…"*, and two of the others are
+  aPROMISE and qPSMA - automated quantification on PSMA PET/CT, which is the subject of the
+  thesis this was built for.
+
+  Which span is the title is **not** guessed: that depends on the publisher's citation style,
+  and guessing it is the plausible wrongness this module exists to avoid.
+
 ### Fixed
 - **Folding a reference section as a whole ran each DOI into the reference after it**, found
   while measuring before building. `10.1158/1055-9965.epi-15-0578` became

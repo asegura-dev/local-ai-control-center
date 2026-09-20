@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from local_ai_control_center.core.references import (
     Reference,
+    as_one_line,
     reference_section,
     references_in,
     without_truncations,
@@ -142,3 +143,30 @@ def test_a_reference_is_frozen() -> None:
     entry = Reference(text="1. Torre LA. 2016.")
     with pytest.raises(ValidationError):
         entry.text = "something else"  # type: ignore[misc]
+
+
+def test_an_entry_reads_as_one_line() -> None:
+    """A DOI tells you nothing about what a work is. The entry does (ADR-064).
+
+    The word the typesetter split is rejoined, the wrapping is flattened, and the link goes
+    because it is the one part already reported separately.
+    """
+    entry = Reference(
+        text="5. Hofman MS, Lawrentschuk N. Prostate-specific mem -"
+        + NL
+        + "brane antigen PET-CT before curative-intent surgery."
+        + NL
+        + "Lancet. 2020. https://doi.org/10.1016/s0140-6736",
+        doi="10.1016/s0140-6736",
+    )
+    line = as_one_line(entry)
+    assert "membrane antigen" in line, "the split word is rejoined"
+    assert NL not in line
+    assert "https" not in line
+
+
+def test_nothing_is_guessed_about_which_part_is_the_title() -> None:
+    """Which span is the title depends on the publisher, and guessing it is the plausible
+    wrongness this module exists to avoid. The whole entry survives."""
+    entry = Reference(text="7. Eiber M, Weirich G. Simultaneous PET/MRI. Eur Urol. 2016.")
+    assert as_one_line(entry) == "7. Eiber M, Weirich G. Simultaneous PET/MRI. Eur Urol. 2016."

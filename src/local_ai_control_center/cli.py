@@ -61,7 +61,11 @@ from local_ai_control_center.core.headings import headings_in, matching
 from local_ai_control_center.core.passes import PageRangeError
 from local_ai_control_center.core.permissions import grant
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
-from local_ai_control_center.core.references import references_in, without_truncations
+from local_ai_control_center.core.references import (
+    as_one_line,
+    references_in,
+    without_truncations,
+)
 from local_ai_control_center.core.run import Progress, ProgressFn, new_run_id
 from local_ai_control_center.core.skill import (
     AskCorpusSkill,
@@ -824,6 +828,7 @@ def references(
     """
     _, workspace = _load(config_path)
     cited_by: dict[str, set[str]] = {}
+    what: dict[str, str] = {}
     held: set[str] = set()
     parsed = silent = entries = 0
 
@@ -854,6 +859,10 @@ def references(
         for entry in found:
             if entry.doi:
                 cited_by.setdefault(entry.doi.lower(), set()).add(str(source))
+                # The first document to cite it supplies the words. They differ between
+                # citation styles and any of them tells a reader what the work is, which
+                # a DOI on its own does not.
+                what.setdefault(entry.doi.lower(), as_one_line(entry))
 
     whole = without_truncations(frozenset(cited_by))
     shared = sorted(
@@ -880,7 +889,8 @@ def references(
             if doi in held
             else "[yellow]not among the ones identifiable by DOI[/yellow]"
         )
-        console.print(f"  {len(who)}x  {doi}  {mark}")
+        console.print(f"  [bold]{len(who)}x[/bold]  {what.get(doi, doi)[:150]}")
+        console.print(f"        {doi}  {mark}")
         for name in sorted(who):
             console.print(f"        [dim]<- {name}[/dim]")
     console.print(

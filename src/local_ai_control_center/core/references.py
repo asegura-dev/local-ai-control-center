@@ -39,6 +39,15 @@ _ENOUGH_ENTRIES = 3
 _DOI = re.compile(r"10\.\d{4,9}/[-._;()/:a-z0-9]{3,60}")
 _YEAR = re.compile(r"\b(19[5-9]\d|20[0-4]\d)\b")
 
+_LINK = re.compile(r"https?:\S*")
+_SPACES = re.compile(r"\s+")
+_WRAPPED = re.compile(r"([^\W\d_])\s*-\s*\n\s*([^\W\d_])")
+"""A word the typesetter split at the end of a line, rejoined so it can be read.
+
+The rule `_normalized` already applies for quotation checking, for the same reason: a hyphen
+between two letters at a line break belongs to the page, not to the word.
+"""
+
 
 class Reference(BaseModel):
     """One entry of a reference list, as the document printed it."""
@@ -114,6 +123,21 @@ def references_in(text: str) -> tuple[Reference, ...]:
             )
         )
     return tuple(entries)
+
+
+def as_one_line(entry: Reference) -> str:
+    """The entry on one readable line, with the link removed.
+
+    **Not** a parse into author, title and journal. Which span is the title depends on the
+    publisher's citation style, and guessing it is exactly the plausible wrongness this
+    module exists to avoid - the whole entry, legible, is what lets a person see what a work
+    is, which was the point of counting them (ADR-064).
+
+    The URL goes because it is the one part already reported separately, as the DOI, and it
+    is the longest thing on the line.
+    """
+    rejoined = _WRAPPED.sub(lambda m: m.group(1) + m.group(2), entry.text)
+    return _SPACES.sub(" ", _LINK.sub("", rejoined)).strip()
 
 
 def without_truncations(dois: frozenset[str]) -> frozenset[str]:
