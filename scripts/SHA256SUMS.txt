@@ -1,0 +1,3 @@
+6c7b56a074e54ddb755cb0f1552ac93dda32262953273e3f00f7b7e2fa3397d4  lacc-window.bat
+03bc168d4da0a399de9ff6b42ae23b1f0f1bf99d2b4defe576224b9906cb92d2  serve-ollama.bat
+d119d6b310ffa4aeddeb57ab79ec70cbcbce484a82abcc897b6c0d3df12385ea  verify-scripts.bat

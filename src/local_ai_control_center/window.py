@@ -27,6 +27,7 @@ from tkinter import ttk
 import customtkinter as ctk
 
 from local_ai_control_center.features.appearance import Palette, Preferences, remember
+from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.overview import (
     Setting,
     configurations_in,
@@ -56,7 +57,7 @@ VERDICT_SAID = {
     "nothing": "not covered - which is not the same as wrong",
 }
 
-SECTIONS = ("Reviews", "Corpora", "Documents", "Documentation", "Configuration")
+SECTIONS = ("Reviews", "Corpora", "Documents", "Commands", "Documentation", "Configuration")
 
 
 def _text(
@@ -191,8 +192,16 @@ def _block(parent: ctk.CTkFrame, skin: Palette, block: Block) -> None:
 class Window(ctk.CTk):
     """Sections on the left, a list beside them, and what is selected on the right."""
 
-    def __init__(self, folder: Path, configs: Path, preferences: Preferences, saved: Path) -> None:
+    def __init__(
+        self,
+        folder: Path,
+        configs: Path,
+        preferences: Preferences,
+        saved: Path,
+        commands: tuple[Command, ...] = (),
+    ) -> None:
         super().__init__()
+        self.commands = commands
         self.folder = folder
         self.configs = configs
         self.preferences = preferences
@@ -380,6 +389,8 @@ class Window(ctk.CTk):
             self._list_files("corpus", "Corpora", "Choose one to count what it holds.")
         elif section == "Documents":
             self._list_files("document", "Documents", "Everything else in the workspace.")
+        elif section == "Commands":
+            self._list_commands()
         elif section == "Documentation":
             self._list_documentation()
         else:
@@ -426,10 +437,50 @@ class Window(ctk.CTk):
             self._show_review(path)
         elif self.section == "Corpora":
             self._show_corpus(path)
+        elif self.section == "Commands":
+            self._show_command(selected[0])
         elif self.section == "Documentation":
             self._show_page(path)
         else:
             self._show_document(path)
+
+    def _list_commands(self) -> None:
+        """Everything the CLI answers to, read from the application that registers it."""
+        for command in self.commands:
+            self.tree.insert("", "end", iid=f"command:{command.name}", text=f"  {command.name}")
+        self._said(
+            "Commands",
+            f"{len(self.commands)} of them, read from the CLI itself rather than listed here "
+            "- a second copy of this list would be a second thing to keep true.\n"
+            "The window runs none of them. Type them in a terminal.",
+        )
+
+    def _show_command(self, chosen: str) -> None:
+        """One command: what to type, what it does, and why it behaves that way."""
+        name = chosen.removeprefix("command:")
+        for command in self.commands:
+            if command.name != name:
+                continue
+            self._said(f"lacc {command.name}", command.summary)
+            body = _card(self.body, self.skin)
+            ctk.CTkLabel(
+                body,
+                text=command.usage,
+                anchor="w",
+                justify="left",
+                text_color=self.skin.accent,
+                font=ctk.CTkFont(family="Consolas", size=12),
+            ).pack(fill="x")
+            if command.parameters:
+                required = [p.shown for p in command.parameters if p.required]
+                optional = [p.shown for p in command.parameters if not p.required]
+                if required:
+                    _text(body, f"required: {', '.join(required)}", self.skin.dim, 11)
+                if optional:
+                    _text(body, f"optional: {', '.join(optional)}", self.skin.faint, 11)
+            for block in blocks_in(command.detail):
+                _block(self.body, self.skin, block)
+            return
 
     def _list_documentation(self) -> None:
         """Group this project's own records the way the folders group them."""
@@ -513,6 +564,16 @@ class Window(ctk.CTk):
             return
 
 
-def show(folder: Path, configs: Path, preferences: Preferences, saved: Path) -> None:
-    """Open the window and hand control to Tk until it closes."""
-    Window(folder, configs, preferences, saved).mainloop()
+def show(
+    folder: Path,
+    configs: Path,
+    preferences: Preferences,
+    saved: Path,
+    commands: tuple[Command, ...] = (),
+) -> None:
+    """Open the window and hand control to Tk until it closes.
+
+    The commands are passed in rather than read here, so that a view never imports another
+    view and the list has exactly one source: the application the CLI builds (ADR-072).
+    """
+    Window(folder, configs, preferences, saved, commands).mainloop()

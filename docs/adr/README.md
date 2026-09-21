@@ -1,6 +1,6 @@
 # Decision records
 
-Seventy records, in the order they were decided. The number is the identity: it is how
+Seventy-two records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -440,3 +440,16 @@ Most of what LACC produces belongs in a terminal. A review does not: it is a doc
 [`ADR-070-the-records-become-readable.md`](ADR-070-the-records-become-readable.md)
 
 Sixty-nine records, six chapters, the guides, and a book of eight chapters in `.gitignore` that nobody has read - the thing this project has most of was the one thing the tool could not show. A section in the window, reading the Markdown from the repository, grouped the way the folders group it. The folder is **found, never configured**: a setting naming where to read from would be a setting that could name anywhere, so it walks up from the package to see whether a repository is around it, and says so plainly when there is not. Markdown becomes blocks in a slice and the window gives blocks a font, because what a line *is* is a decision (ADR-066). Inline emphasis is flattened and heading structure kept, since structure is what makes a long record navigable. The parser is tested against every record in the repository rather than a fixture.
+
+
+### 071 - launchers, and their digests
+
+[`ADR-071-launchers-and-their-digests.md`](ADR-071-launchers-and-their-digests.md)
+
+Three `.bat` files in `scripts/`: one opens the window, one starts the engine with an 8-bit KV cache - the four gigabytes of VRAM that had been a pending task in the log for weeks - and one checks the other two against `SHA256SUMS.txt`. The decision is not the launchers, it is that **the test suite enforces the digests**: a checksum nobody checks is decoration, so the gate fails when a script changes without its digest changing in the same commit. What that proves is stated plainly rather than overclaimed - the files are the ones the digests were taken over, not that the digests are honest, since whoever could edit a script could edit the list beside it. Both are in Git, which is what makes it worth something. Git is told not to rewrite them, because a digest over a file whose line endings change on the next machine verifies nothing. The launchers are also tested for what they must **not** do: no download, and loopback by default.
+
+### 072 - the commands describe themselves
+
+[`ADR-072-the-commands-describe-themselves.md`](ADR-072-the-commands-describe-themselves.md)
+
+The window could show a workspace, its corpora and this project's records, but not what LACC can do. The list is **derived from the application, never written down twice** - a hand-written copy would be a second writer of the same thing, which is precisely what cost ADR-065 a corpus. `commands_of` reads the registered commands, the name Typer gives each, its docstring and its parameters; a command added appears, one renamed changes, one without a docstring fails a test. It does not import the CLI: the application is passed in, so a view never imports another view. Typer's naming is copied exactly including where it looks wrong, because the point is what the CLI answers to rather than what it ought to.

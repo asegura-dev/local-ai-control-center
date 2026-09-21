@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`scripts/`: three launchers, and digests the suite enforces** (ADR-071). One opens the
+  window, one starts the engine with `OLLAMA_KV_CACHE_TYPE=q8_0` - the roughly four gigabytes
+  of VRAM that had been a pending task in the log for weeks - and one checks the others
+  against `SHA256SUMS.txt`.
+
+  **The decision is not the launchers, it is that the gate enforces the digests.** A checksum
+  nobody checks is decoration, so a script that changes without its digest changing in the
+  same commit fails the suite. Shown to work: appending one line to a launcher makes both the
+  batch verifier and the gate report it by name.
+
+  What that proves is stated rather than overclaimed. The files on disk are the ones the
+  digests were taken over. It does **not** prove the digests are honest - whoever could edit a
+  script could edit the list beside it - and what makes it worth something is that both are in
+  Git. `.gitattributes` stops Git rewriting them, because a digest over a file whose line
+  endings change when it is cloned verifies nothing.
+
+  The launchers are also tested for what they must not do: no `curl`, no `Invoke-WebRequest`,
+  no `bitsadmin` - a launcher that fetched something would be a supply chain in a batch file -
+  and the engine one is asserted to bind loopback by default.
+
+- **A commands section in the window** (ADR-072). What LACC can do, with what to type, read
+  **from the application itself rather than listed**. A hand-written copy would be a second
+  writer of the same thing, which is exactly what cost ADR-065 a corpus: a command added
+  appears, one renamed changes, one without a docstring fails a test.
+
+  It does not import the CLI - the application is passed in, so a view never imports another
+  view and the slice keeps its rule of reaching only for core and ports. Typer's naming is
+  copied exactly, including where it comes out oddly, because the point is what the CLI
+  answers to rather than what it ought to. The window shows the line to type and runs nothing.
+
+### Added
 - **The window reads this project own documentation** (ADR-070). Seventy decision records,
   six chapters, the guides, and a book of eight chapters that sits in `.gitignore` and that
   nobody has read - the thing LACC has most of was the one thing it could not show.

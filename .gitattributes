@@ -1,0 +1,3 @@
+# Scripts are hashed, so Git must not rewrite their line endings: a digest over a file
+# that changes when it is cloned verifies nothing (ADR-071).
+scripts/** -text

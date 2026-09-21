@@ -103,6 +103,7 @@ from local_ai_control_center.features.appearance import (
 )
 from local_ai_control_center.features.ask import as_material, might_support
 from local_ai_control_center.features.bibliography import bibliography
+from local_ai_control_center.features.commands import commands_of
 from local_ai_control_center.features.corpus import (
     assembled,
     collected_markdown,
@@ -2242,7 +2243,7 @@ def window(
     preferences = preferences_from(saved)
     if not preferences.configuration:
         preferences = preferences.model_copy(update={"configuration": config_path.name})
-    show(workspace.root, config_path.parent, preferences, saved)
+    show(workspace.root, config_path.parent, preferences, saved, commands_of(app))
 
 
 @app.command()

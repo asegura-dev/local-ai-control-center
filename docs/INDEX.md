@@ -16,7 +16,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Seventy records front to back is a history. These are the threads through them, for
+Seventy-two records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -146,6 +146,8 @@ not to reach for an approximate algorithm to find them.
 | 068 | [the-check-turned-around](adr/ADR-068-the-check-turned-around.md) | Every check here verifies what a model wrote. `lacc review` asks it of what **you** wrote: does anything in your own corpus hold this paragraph up? Reads and reports, never rewrites. Uncovered is not false, said wherever it appears. Graded on five paragraphs answered in advance; the one disagreement was the prediction's fault. |
 | 069 | [a-window-that-reads](adr/ADR-069-a-window-that-reads.md) | A review is a document with a second document painted over it, and a terminal cannot show that. CustomTkinter, a window of its own, **nothing listening**. It reads and runs nothing - a review is read from the findings file the CLI leaves beside its report. Choosing a configuration changes which is read, never what is in it. Themes are data; a colour has no business in a frozen `Config`. |
 | 070 | [the-records-become-readable](adr/ADR-070-the-records-become-readable.md) | The thing this project has most of - seventy records, six chapters, the guides and a gitignored book - was the one thing it could not show. A section in the window that reads them. The folder is found by walking up from the package, never configured, because a setting naming a folder could name anywhere. Markdown becomes blocks in a slice; the window only picks a font. Parsed against every record here. |
+| 071 | [launchers-and-their-digests](adr/ADR-071-launchers-and-their-digests.md) | Three launchers, including the one that starts the engine with the 8-bit KV cache that had been a pending task for weeks. The decision is that **the suite enforces their digests**: a checksum nobody checks is decoration. What that proves is stated plainly - the files match the digests, not that the digests are honest. Also tested for what they must not do: no download, loopback by default. |
+| 072 | [the-commands-describe-themselves](adr/ADR-072-the-commands-describe-themselves.md) | The window can show what LACC does, derived from the application rather than listed - a hand-written copy would be a second writer of the same thing, which is what cost ADR-065 a corpus. It does not import the CLI; the application is passed in. Typer's naming is copied exactly, including where it looks wrong. |
 
 ## Guides (`docs/guides/`)
 
