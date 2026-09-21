@@ -120,6 +120,7 @@ from local_ai_control_center.features.review import (
     paragraphs_in,
     report,
 )
+from local_ai_control_center.features.status import EngineSeen, status_of
 from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.embedder import EmbeddingError
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
@@ -1040,10 +1041,23 @@ def resolve(
                 wanted.setdefault(doi, f"cited by {source.name}")
 
     if not wanted:
-        _show(
-            "[yellow]No DOI to resolve.[/yellow] None of these documents carries one, and "
-            "nothing here will invent it. That is the measured ceiling of this route."
-        )
+        # The first run of this found the reason the hard way: a document's own DOI lives in
+        # the PDF's metadata, and a workspace holds the Markdown that was converted from it.
+        # Saying "carries no DOI" was true and useless (ADR-067).
+        converted = sum(1 for source in sources if source.suffix == ".md")
+        _show("[yellow]No DOI to resolve.[/yellow] Nothing here will invent one.")
+        if converted and not cited:
+            _show(
+                f"[dim]{converted} of these are Markdown. A document's own DOI is in the "
+                "PDF's metadata and does not survive conversion - run this on the PDFs, or "
+                "add --cited to resolve what they cite instead.[/dim]"
+            )
+        elif cited:
+            _show(
+                "[dim]Their reference lists carry no recoverable DOI. Most journals print "
+                "none: measured at 225 of 2,315 references, about one in eleven "
+                "(ADR-064).[/dim]"
+            )
         raise typer.Exit(code=1)
 
     destination = workspace.resolve_within(into)
@@ -2211,6 +2225,26 @@ def review(
         _show(f"-> {into}")
 
 
+def _engine_seen(config: Config) -> EngineSeen:
+    """Ask the engine whether it answers, as the window's contract rather than the adapter's.
+
+    Composition: the window is handed this to call, so a view never touches an adapter and
+    nothing is asked until somebody presses the button (ADR-077).
+    """
+    host = resolve_engine_host(config.engine_host, config.network_access)
+    if not config.model:
+        return EngineSeen(asked=True, detail="No model is configured.")
+    found = check_engine(config.model, host, config.context_tokens)
+    return EngineSeen(
+        asked=True,
+        reached=found.reached,
+        answered=found.answered,
+        models=len(found.models),
+        seconds=found.seconds or 0.0,
+        detail=found.detail,
+    )
+
+
 @app.command()
 def window(
     config_path: Annotated[
@@ -2252,6 +2286,8 @@ def window(
         saved,
         commands_of(app),
         prompts_of(_known_skills(config_path), config),
+        status_of(workspace.root, config),
+        lambda: _engine_seen(config),
     )
 
 

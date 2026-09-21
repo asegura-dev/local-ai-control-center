@@ -25,6 +25,7 @@ this thin.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from tkinter import ttk
 
@@ -34,6 +35,7 @@ from local_ai_control_center.features.appearance import Palette, Preferences, re
 from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.overview import configurations_in
 from local_ai_control_center.features.prompts import Prompt
+from local_ai_control_center.features.status import EngineSeen, Status
 from local_ai_control_center.views import paint, program, records, workspace
 from local_ai_control_center.views.section import Section, State
 
@@ -62,6 +64,8 @@ class Window(ctk.CTk):
         saved: Path,
         commands: tuple[Command, ...] = (),
         prompts: tuple[Prompt, ...] = (),
+        status: Status | None = None,
+        check_engine: Callable[[], EngineSeen] | None = None,
     ) -> None:
         super().__init__()
         self._pending: str | None = None
@@ -70,6 +74,11 @@ class Window(ctk.CTk):
         self.configs = configs
         self.commands = commands
         self.prompts = prompts
+        # Not `self.status`: Tk delegates an unknown attribute to its interpreter, which has
+        # one by that name, so the assignment went somewhere else and the read failed.
+        self.seen = status
+        self.check_engine = check_engine
+        self.engine = EngineSeen()
         self.preferences = preferences
         self.saved = saved
         self.skin: Palette = preferences.palette()
@@ -86,6 +95,7 @@ class Window(ctk.CTk):
         self._rail(available)
         self._middle()
         self._panel()
+        self._bar()
         self.right.bind("<Configure>", self._reflow)
         self.right.bind("<MouseWheel>", self._wheel)
         self._go(SECTIONS[0])
@@ -241,6 +251,58 @@ class Window(ctk.CTk):
 
     # --- behaviour -------------------------------------------------------------------------
 
+    def _bar(self) -> None:
+        """The line along the bottom: what there is, and what may be reached.
+
+        Packed before the columns claim the rest of the window, which is what `side="bottom"`
+        on a sibling that comes later would not do.
+        """
+        skin = self.skin
+        bar = ctk.CTkFrame(self, height=30, corner_radius=0, fg_color=skin.rail)
+        bar.pack(side="bottom", fill="x")
+        bar.pack_propagate(False)
+
+        shown = self.seen
+        left = shown.material if shown else "no workspace read"
+        ctk.CTkLabel(
+            bar, text=f"  {left}", anchor="w", text_color=skin.dim, font=ctk.CTkFont(size=11)
+        ).pack(side="left", padx=(8, 0))
+
+        self.engine_said = ctk.CTkLabel(
+            bar, text="", anchor="e", text_color=skin.dim, font=ctk.CTkFont(size=11)
+        )
+        self.engine_said.pack(side="right", padx=(0, 10))
+        if self.check_engine is not None:
+            ctk.CTkButton(
+                bar,
+                text="check",
+                width=52,
+                height=20,
+                corner_radius=5,
+                fg_color=skin.card,
+                hover_color=skin.accent,
+                text_color=skin.dim,
+                font=ctk.CTkFont(size=10),
+                command=self._ask_the_engine,
+            ).pack(side="right", padx=8)
+        self._say_the_engine()
+
+    def _say_the_engine(self) -> None:
+        """What the bar says on the right: what is allowed, then what was found."""
+        shown = self.seen
+        allowed = shown.reach if shown else ""
+        model = f"{shown.model}   " if shown and shown.model else ""
+        self.engine_said.configure(text=f"{model}{allowed}   ·   {self.engine.said}  ")
+
+    def _ask_the_engine(self) -> None:
+        """Ask the engine whether it answers. **Only from here**, never on opening."""
+        if self.check_engine is None:
+            return
+        self.engine_said.configure(text="asking the engine...  ")
+        self.update_idletasks()
+        self.engine = self.check_engine()
+        self._say_the_engine()
+
     def _reflow(self, _event: object = None) -> None:
         """Re-wrap to the width the panel has, debounced against a drag."""
         if self._pending is not None:
@@ -325,6 +387,13 @@ def show(
     saved: Path,
     commands: tuple[Command, ...] = (),
     prompts: tuple[Prompt, ...] = (),
+    status: Status | None = None,
+    check_engine: Callable[[], EngineSeen] | None = None,
 ) -> None:
-    """Open the window and hand control to Tk until it closes."""
-    Window(folder, configs, preferences, saved, commands, prompts).mainloop()
+    """Open the window and hand control to Tk until it closes.
+
+    The engine check is passed in rather than performed here: reaching another machine is an
+    adapter's job, and a view that did it would be a view reaching past `features/`
+    (ADR-066). It is also never called until somebody presses the button (ADR-077).
+    """
+    Window(folder, configs, preferences, saved, commands, prompts, status, check_engine).mainloop()

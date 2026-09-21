@@ -17,7 +17,9 @@ field bounded, and none of it ever put in front of a model.
 
 from __future__ import annotations
 
+import html
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,6 +42,15 @@ _EARLIEST_YEAR = 1500
 _LATEST_YEAR = 2100
 
 
+_TAG = re.compile(r"<[^>]{1,40}>")
+"""Markup a publisher deposited inside a title: `<sup>68</sup> Ga-Labeled`.
+
+Removed rather than rendered. A bibliography is read as text and in a terminal, and the tag
+is noise in both - while `68 Ga-Labeled` is what the title says. Bounded in length so that a
+stray `<` in a chemical name cannot swallow the rest of the line.
+"""
+
+
 def _clean(value: object, longest: int) -> str:
     """One field from the registry, as text that can be safely written into a file.
 
@@ -54,7 +65,11 @@ def _clean(value: object, longest: int) -> str:
     """
     if not isinstance(value, str):
         return ""
-    kept = "".join(" " if c.isspace() else c if c.isprintable() else "" for c in value)
+    # Crossref hands back what the publisher deposited, which is XML: `Pathology &amp;
+    # Oncology Research` and `<sup>68</sup> Ga-Labeled`. Found by reading the first real
+    # bibliography this produced (ADR-067).
+    unwrapped = html.unescape(_TAG.sub("", value))
+    kept = "".join(" " if c.isspace() else c if c.isprintable() else "" for c in unwrapped)
     return " ".join(kept.split())[:longest]
 
 

@@ -1,6 +1,6 @@
 # Decision records
 
-Seventy-six records, in the order they were decided. The number is the identity: it is how
+Seventy-seven records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -481,3 +481,10 @@ The window reached eight sections in a day, and adding one meant editing **four 
 [`ADR-076-the-sections-a-document-numbers.md`](ADR-076-the-sections-a-document-numbers.md)
 
 A PDF does not say what a heading is - measured, seven of eight papers carry none at all - but where an author numbered their sections, the numbering survives extraction. **The record is the measurement**: four rules were tried and the count went 16, 18, 10, **6 of 24**. The second *rose*, and was the worst: adding consecutive numbering counted author affiliations and bibliographies, because every numbered list is consecutive. The third required the dot and looked clean until it was run on the real guideline, which numbers its references `10. Haas, G.P` **with the dot**. Two structural conditions more - sections appear in order, and a section has a body - and the guideline came out as its nine real sections and nothing else. Detected, never written into the document: hundreds of quotations are checked against these files as they are. `lacc sections --take 5` pulled 42,149 tokens out of 348,276 without anybody cutting the file up.
+
+
+### 077 - a line along the bottom
+
+[`ADR-077-a-line-along-the-bottom.md`](ADR-077-a-line-along-the-bottom.md)
+
+A bar with what is on disk on the left and what the configuration may reach on the right. The only interesting decision is when **not** to act: **the engine is not asked when the window opens**, only when somebody presses `check`. A window that pings on opening is a window that talks to the network because somebody looked at it, and reaching anywhere here is deliberate. `not checked` and `unreachable` are different words, because the engine may be perfectly fine and simply never have been asked. The check is passed in as a function rather than performed, so a view never touches an adapter.

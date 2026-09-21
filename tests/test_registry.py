@@ -197,3 +197,29 @@ def test_a_bibliography_is_recognised_as_something_lacc_wrote() -> None:
 
     written = bibliography([], [], [], "https://api.crossref.org")
     assert written.startswith(BIBLIOGRAPHY_MARK)
+
+
+def test_markup_a_publisher_deposited_does_not_reach_the_page() -> None:
+    """Crossref returns what the publisher deposited, and publishers deposit XML.
+
+    Found by reading the first real bibliography this produced: `Pathology &amp; Oncology
+    Research` and `<sup>68</sup> Ga-Labeled Inhibitors` (ADR-067).
+    """
+    work = work_from(
+        _record(
+            title=["<sup>68</sup> Ga-Labeled Inhibitors of PSMA"],
+            **{"container-title": ["Pathology &amp; Oncology Research"]},
+        ),
+        "10.1000/x",
+        WHEN,
+    )
+    assert work.title == "68 Ga-Labeled Inhibitors of PSMA"
+    assert work.container == "Pathology & Oncology Research"
+
+
+def test_a_stray_angle_bracket_does_not_swallow_the_title() -> None:
+    """A chemical name can contain `<`. The tag pattern is bounded so it cannot run away."""
+    work = work_from(
+        _record(title=["Effect of < 0.5 ng/ml PSA on detection rates"]), "10.1/x", WHEN
+    )
+    assert "0.5 ng/ml PSA on detection rates" in work.title

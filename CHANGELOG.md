@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A status bar along the bottom of the window** (ADR-077). What is on disk on the left -
+  documents, quotations in the largest corpus - and what this configuration may reach on the
+  right: the engine's address, whether the network is on, whether a registry is named.
+
+  **The engine is not asked when the window opens.** It is asked when somebody presses
+  `check`, and the bar says `not checked` until then. A window that pings on opening is a
+  window that talks to the network *because somebody looked at it*, and reaching anywhere here
+  is deliberate. `not checked` and `unreachable` are deliberately different words: the engine
+  may be perfectly fine and simply never have been asked.
+
+  The check is handed to the window as a function rather than performed there, so a view never
+  touches an adapter.
+
+### Fixed
+- **Markup a publisher deposited reached the bibliography** (ADR-067). Crossref returns what
+  the publisher deposited, and publishers deposit XML: `Pathology &amp; Oncology Research`,
+  `<sup>68</sup> Ga-Labeled Inhibitors of PSMA`. Entities are decoded and tags removed now,
+  bounded so a stray `<` in a chemical name cannot swallow the rest of a title.
+
+  Found by reading the first real bibliography this produced - 172 works resolved from 212
+  DOIs across a bibliography of 24 papers.
+
+- **`resolve` said "no DOI" without saying why** (ADR-067). A document's own DOI lives in the
+  PDF's metadata and does not survive conversion to Markdown, so run against a workspace of
+  converted documents it reported the truth uselessly. It now says which of them are Markdown
+  and points at `--cited`.
+
+### Added
 - **`lacc sections`: the sections a document numbers for itself** (ADR-076). A PDF does not
   say what a heading is - a heading there is a larger font, and nothing of that survives
   extraction, so **seven of eight papers carry no heading at all**. Where an author numbered

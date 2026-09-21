@@ -170,6 +170,7 @@ _A_VIEW_MAY_HOLD = frozenset(
         "_page_range",  # parsing this view's own argument
         "_words",  # parsing this view's own argument
         "Window._state",  # composition: gathering what a section is handed (ADR-075)
+        "_engine_seen",  # composition: an adapter's answer as the window's contract
     }
 )
 """What belongs in a view although it never prints. Each is named, never a category."""
