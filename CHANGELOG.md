@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`tools/measure.py`: the measurements this project argues from, in one run.** Layers and
+  their sizes, logic that has drifted into a view, records against their index, the suite, and
+  for a workspace every document with its tokens, pages and structure and every corpus with
+  what is citable in it.
+
+  **Nothing it prints is stored.** A number in a file is true for a while and then quietly
+  stops being, which is this project's most frequent defect - twelve wrong figures, six of
+  them flattering. A figure that can be re-taken in seconds never has to be trusted, and one
+  that is written down will be believed after it stops being true.
+
+  It measures nothing new. Every count in it had been done by hand at the point of needing it;
+  the tool makes arguing from measurement the cheap option rather than the diligent one.
+
+- **[How a change is made here](docs/guides/how-a-change-is-made-here.md)**, the working
+  method in six steps: measure before deciding, write the record before the code, **make the
+  check fail on purpose**, run it on real material, report what went wrong including your own
+  part, and finish the documentation in the same session.
+
+  Each step carries the measurement that justifies it. Measuring first refused half of two
+  plans that were already being written. Real use found seven defects; the suite found none of
+  those seven and was green through all of them.
+
+- **[`docs/adr/TEMPLATE.md`](docs/adr/TEMPLATE.md)**, the record to copy, with what each
+  section is for written into it. Two sections carry the weight: what was measured, when
+  something was, and the trade-off, always - if the trade-off is hard to write, the decision
+  is not understood yet.
+
+### Added
 - **The window reads every Markdown in the workspace, not just the records** (ADR-073). A
   Markdown engine had been built for this project's own documentation and was one import away
   from a workspace full of Markdown the window could only count: a corpus of 832 quotations

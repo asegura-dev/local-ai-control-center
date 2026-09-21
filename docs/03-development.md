@@ -97,9 +97,29 @@ one rather than refusing, and says it is guessing from the folder's name.
 The virtual environment has its own version of this problem, for different reasons; see
 [the guide](guides/virtualenv-outside-a-sync-folder.md).
 
+## Taking the measurements
+
+    .un.ps1 run python tools/measure.py                  the project
+    .un.ps1 run python tools/measure.py ~/lacc-workspace  the project and the material
+
+Layers and their sizes, logic that has drifted into a view, records against their index, the
+suite, and for a workspace: every document with its tokens, pages and structure, and every
+corpus with what is citable in it.
+
+**Nothing it prints is stored**, for the same reason the inventory below is not committed: a
+number in a file is true for a while and then quietly stops being, which is this project's
+most frequent defect. A figure that can be re-taken in seconds never has to be trusted.
+
+The habit is smaller than the tool. **Before writing a sentence with a number in it, take the
+number.** Twice, a count refused half of a plan that was already being written.
+
+[How a change is made here](guides/how-a-change-is-made-here.md) is the whole method in six
+steps, and [`docs/adr/TEMPLATE.md`](adr/TEMPLATE.md) is the record to copy.
+
 ## The record-to-code inventory
 
-    .un.ps1 run python tools/record_coverage.py
+    .
+un.ps1 run python tools/record_coverage.py
 
 Prints, for every decision record, the symbols it names and where the source uses them, plus
 what a record names that the source never mentions. **It detects nothing**, and a symbol low
