@@ -85,6 +85,16 @@ it.
 5. **In the order they appear**: a `1.` found below the `5.` is not the first section.
 6. **With a body**: ten lines before the next one starts.
 
+**Inside a confirmed section, the dot is not required.** The parent's number does the work it
+was doing: a `5.1` between section 5 and section 6 is a subsection of 5 whatever punctuation
+follows. This is not a relaxation - it is a different anchor, and a stronger one, because the
+prefix and the position both have to hold.
+
+It matters because the guideline **writes its subsections without the dot** - `5.1 Screening`,
+`5.1.4 P opulation-based screening` - and prints some as the number alone with the name on
+the line beneath. With the dot required, its nine chapters were visible and its hundred and
+forty-five subsections were not.
+
 **A document with no sections reports none.** Eighteen of twenty-four number nothing, and that
 is the answer rather than a failure - it is the same shape as ADR-064's reference parsing, where a
 document that yields nothing is a document to look at rather than a silent gap.
@@ -95,8 +105,10 @@ document whose contents page is at the end, or which has none, is handled by the
 ## Consequences
 
 - `lacc sections <document>` lists what a document numbers, with the line each starts on.
-- `--section <number>` takes one out, so the EAU can be read a section at a time without
-  anybody cutting the file up.
+- `--take <number> --into <file>` takes one out, so the guideline can be read a part at a
+  time without anybody cutting the file up. Measured on it: **154 sections found**, chapter 5
+  comes out at 42,149 tokens of 348,276, and `5.2.4 Imaging` - the part on nodal staging - at
+  **1,440**, which fits any window with room to spare.
 - `core/sections.py` is pure: text in, sections out, no I/O and no model.
 
 ## Trade-off
@@ -111,6 +123,9 @@ it is invisible to this, and one that numbers its figures `1. Overview of the me
 own lines would offer a false section. The second is bounded by the consecutive-numbering
 conditions and the first is simply a miss, reported as such.
 
-**Titles come out as the extraction left them.** `EPIDEMIOL OGY AND AETIOLOGY` is what the PDF
-gives, and this does not repair it - the same spacing damage `_unspaced` exists to see past
+**Titles come out as the extraction left them, and some are cut in half.** `EPIDEMIOL OGY AND
+AETIOLOGY`, `5.1.1 Pr`, a heading that arrives as `Imag` on one line and `ing` on the next:
+that is what the PDF gives. The **numbers** are reliable and the titles are as good as the
+extraction was, which is enough to navigate by and not enough to read as an index. This does
+not repair them - the same spacing damage `_unspaced` exists to see past
 when checking a quotation. Repairing it here would mean editing what the document says.

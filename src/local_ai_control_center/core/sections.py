@@ -41,6 +41,21 @@ _LONGEST_TITLE = 9
 """Words. A section is named, not written - past this it is a sentence that starts with a
 number, which in these documents is usually a numbered finding or a figure caption."""
 
+
+def _pattern_under(top: str) -> re.Pattern[str]:
+    """The shape of a subsection of ``top``, where the parent's number is the anchor.
+
+    **Inside a confirmed section the dot is not needed**, because the prefix does the work it
+    was doing: a `5.1` between section 5 and section 6 is a subsection of 5 whatever
+    punctuation follows. The EAU guideline writes `5.1 Screening` and `5.1.4 P opulation-based
+    screening` with no dot, and its subsections were invisible until this existed (ADR-076).
+
+    Built rather than formatted: a format string collides with the repetition braces the
+    pattern needs, which is how `{0,3}` became a `KeyError`.
+    """
+    return re.compile(r"^\s{0,3}(" + re.escape(top) + r"(?:\.\d{1,2}){1,2})\.?\s*(.*?)\s*$")
+
+
 _ENOUGH_SECTIONS = 3
 """Below this a run of numbered lines is a list in the prose rather than a structure."""
 
@@ -131,18 +146,46 @@ def sections_in(text: str) -> tuple[Section, ...]:
     if len(kept) < _ENOUGH_SECTIONS:
         return ()
 
-    # A subsection belongs to the section it sits inside. Checked by position rather than by
-    # its number alone, so a `2.1` appearing after section 5 is not filed under section 2.
+    # A subsection belongs to the section it sits inside, found by position rather than by
+    # its number alone - a `2.1` appearing after section 5 is not filed under section 2.
+    every = text.splitlines()
     inside: list[Section] = []
     for position, top in enumerate(kept):
         ends_at = kept[position + 1].line if position + 1 < len(kept) else lines
         inside.append(top)
-        inside.extend(
-            entry
-            for entry in found
-            if entry.depth > 1 and entry.top == top.number and top.line < entry.line < ends_at
-        )
+        inside.extend(_under(top, every, ends_at))
     return tuple(sorted(inside, key=lambda s: s.line))
+
+
+def _under(top: Section, lines: list[str], ends_at: int) -> list[Section]:
+    """The subsections of one confirmed section, between it and the next.
+
+    A title on the following line is taken from there. Guidelines print the number alone and
+    the name beneath it, and a subsection with no name is still a place in the document.
+    """
+    pattern = _pattern_under(top.number)
+    found: list[Section] = []
+    for number in range(top.line, min(ends_at, len(lines) + 1)):
+        match = pattern.match(lines[number - 1])
+        if not match:
+            continue
+        label, title = match.group(1), match.group(2)
+        if not title:
+            following = next(
+                (
+                    lines[n].strip()
+                    for n in range(number, min(number + 2, len(lines)))
+                    if lines[n].strip()
+                ),
+                "",
+            )
+            title = following if len(following.split()) <= _LONGEST_TITLE else ""
+        if title and (len(title.split()) > _LONGEST_TITLE or not title[0].isupper()):
+            continue
+        if _ENDS_IN_A_PAGE.search(title):
+            continue
+        found.append(Section(number=label, title=title, line=number))
+    return found
 
 
 def section_of(text: str, number: str) -> str:
