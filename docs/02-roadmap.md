@@ -194,7 +194,16 @@ rather than truncated, and the audit states the one gap it cannot close. It does
 model is reliable. One quotation in five was invented, and that is the measurement v1.0
 ships with rather than the one it hides.
 
-## v2: a document read in passes
+## What v2 used to mean, and does not any more
+
+**This section described a future that has been delivered.** Reading a document in passes is
+built, measured and published (ADR-046), and `--in-passes` is how the EAU guidelines entered
+the corpus at all. It is left here because the reasoning still holds and the trade-off it
+records is still the trade-off; what changed is the tense. It was read as a statement about
+what is coming for longer than it was true, which is the failure chapter 4 names as **asking
+when a figure was taken** - and a roadmap is a figure too.
+
+The name is free again. What v2.0 means now is further down.
 
 v2 is one thing, and the list it replaced was six phrases (ADR-045). **A document too large
 for the window is read in passes over its pages**, which is what a tool for writing from
@@ -497,6 +506,146 @@ three to six sentences resting on one quotation, which cannot hold it, so every 
 under-cited by construction and the judge flags all of it. Every figure in those paragraphs is
 in the corpus - missing citation, not invention. How to resolve it changes how a person
 writes, so it waits for the person.
+
+## The route from here: v2.0 and v3.0
+
+Five steps, and the order is causal rather than preferred. Each one is a prerequisite for the
+next in a way that was measured, not assumed.
+
+```
+v1.8.1  one corpus format, written by both writers   corrupted data, shipped alone
+v1.9.0  metadata from an authority + the last two documents
+v2.0.0  the core takes back what is its own  +  coverage
+v2.5.0  an interface that reads
+v3.0.0  discovery, and an interface that acts
+```
+
+### v1.9.0 - the material becomes complete, and citable
+
+Two things, and neither is design work. **Reference metadata comes from an authority instead
+of a model**: asked for the journal a paper appeared in, with an instruction not to guess in
+the prompt, a 14B invented twelve names out of twenty-four (ADR-047). Crossref by DOI is a new
+port with a whitelist and its own record. **And the two documents with no quotation in the
+corpus are read in passes** - one of 29,362 tokens and the guideline of 348,276, of which four
+extracted sections currently carry 111 quotations.
+
+This is the release where the project stops investigating and starts **delivering**: a
+bibliography whose entries can be written down without checking each one by hand.
+
+### v2.0.0 - the core takes back what is its own, and coverage becomes a thing that exists
+
+**Coverage is the only remaining phase that produces a paragraph nobody could write before.**
+A cluster with two quotations is a subject the bibliography barely touches - a gap **counted**
+rather than opined. That distinction was measured the hard way: asked to name the research gap,
+both models invented one, and the 32B named as missing the topic of the first paper on its own
+list.
+
+It carries a precondition that is not scheduling: **a gap measured over an incomplete corpus is
+a false gap.** Cluster today and a subject the guideline covers across forty pages that never
+entered the window looks like a hole. That would be a thirteenth wrong figure, and one of the
+kind that flatters the tool - which is why v1.9.0 comes first.
+
+The other half of this release is a debt with a receipt. `cli.py` is **2,588 lines, 72% of all
+root-level code**, and what lives in it is not only presentation: `_collected_markdown` and
+`_assembled` both **write** the corpus format, while `parse_corpus` **reads** it from `core/`.
+That asymmetry is the root cause of ADR-065 - two writers in the interface, one reader in the
+core, free to drift apart with the suite green.
+
+**The layering rule was written in one direction and only that direction was checked.**
+PRINCIPLES says the core contains no interface code, and `tests/test_layering.py` proves it
+five times over: core imports nothing, a port imports nothing, an adapter reaches only for core
+and ports, nothing in core imports the cycle, every module lives in a layer. Every one of them
+follows dependencies **inward**. None of them asks whether logic has leaked **outward** into
+the interface. The converse of the rule was never stated and never measured, and it cost a
+defect that silently stripped meaning from a user's corpus.
+
+Coverage is the second consumer of that format. Paying the debt immediately before adding the
+consumer is what stops ADR-065 from happening again with two interfaces instead of one, and
+moving modules breaks import paths, which is what makes this a major version.
+
+**Where the logic goes was decided by measuring, and the measurement refused half the idea.**
+The shape proposed was a hybrid: keep the hexagon, cut vertical slices by capability. Counting
+first:
+
+| | |
+|---|---|
+| core modules used by exactly one capability | **3 of 14** (`corpus`, `declared`, `references`) |
+| core modules used by three or more places | **9 of 14** |
+| `config` alone is imported by | 9 modules |
+| commands in `cli.py` | **14**, 1,050 lines |
+| helpers in `cli.py` | **49**, 1,225 lines |
+| the six largest helpers that are not presentation | **341 lines** |
+
+**So the core does not get cut.** Nine of its fourteen modules are genuinely shared - `config`,
+`workspace`, `permissions`, `preview`, `grounding` - and slicing them by capability would
+invent boundaries the code does not have, which is how a refactor becomes six releases that
+advance nothing. This document already records that happening once.
+
+**The monolith is `cli.py`, and that is where the vertical cut belongs.** Fourteen commands and
+forty-nine helpers in one file, where `_judge_the_readings` (92 lines), `_collected_markdown`
+(73) and `_assembled` (61) are domain logic wearing a presentation module's clothes.
+
+The result is the hybrid, with each half where the measurement puts it: **the hexagon stays
+horizontal and shared** - ports, adapters, and the nine core modules everything uses - **and
+each capability becomes a vertical slice** holding its own use case, pure and testable, with
+the CLI and the interface as two views of it. `_collected_markdown` and `_assembled` end up in
+the same slice as the reader that has to agree with them, which is the arrangement that would
+have made ADR-065 impossible rather than merely caught.
+
+**And the converse rule gets written and checked.** `tests/test_layering.py` gains what it
+never had: **a view contains no logic.** Stated for the CLI, and binding on the interface
+before a line of it exists.
+
+### v2.5.0 - an interface that reads
+
+**A window of its own, with no port listening.** The material this project exists to protect
+is private research, so an interface that opens a TCP socket on the machine holding it buys
+convenience with attack surface. **CustomTkinter**: Tk ships with Python, the window talks to
+Python directly because it *is* Python, nothing listens, nothing is served, and PyInstaller
+packages it without a browser runtime.
+
+**The layout is a file explorer and the manner is a reading application.** A tree on the left -
+workspace, documents, corpora, runs - and what is selected on the right, which is the shape
+every person on Windows already knows. `ttk.Treeview` is literally that widget. The surface is
+quiet and warm rather than dense with chrome, because what is on it is prose and quotations,
+and a tool for reading should look like one.
+
+Two costs, named now rather than discovered later. **CustomTkinter ships no type information
+and `mypy` here runs `strict` over all of `src`**, so it arrives with an override for that one
+import - honest, and narrow. **And Tk cannot be exercised headlessly**, so no test can cover a
+window on a machine with no display. That is not a reason to skip tests: it is the reason the
+vertical slices come first. Everything worth testing lives in the use case the window calls,
+and the window is thin enough that looking at it is enough.
+
+**It reads, and reading is the whole of this release.** The corpus, each quotation with its
+standing, the audit trail, and the coverage map. Running skills stays in the CLI.
+
+The ordering argument is simple: **the coverage map is the first thing this project produces
+that a terminal cannot show.** A gap is a shape. Before it exists, an interface would be a form
+that types commands for someone who already knows how to type them.
+
+### v3.0.0 - what can happen without you typing
+
+The two remaining directions both change what is possible without a keystroke, which is why
+they share a major version and why that version is about one principle rather than two
+features.
+
+**Discovery with a whitelist.** Titles and abstracts from PubMed, Crossref or arXiv reveal a
+query, not a document, and the fact that someone researches prostate imaging is public the
+moment they publish. It stays bounded: a `discover` capability, a list of domains in the
+configuration, metadata only, never a PDF download, and whatever comes back treated as hostile
+text until it is accepted into the workspace.
+
+**An interface that acts**, with preview and confirmation on screen. The delicate part is named
+in advance: a click must not become easier to give than the confirmation it replaces. That is
+where a principle erodes quietly, so it gets its own record rather than arriving as a button.
+
+### Deliberately not on the critical path
+
+Persistent vectors with sqlite-vec, declared pipelines, the one paper whose bare numbering
+makes it invisible to `lacc references`, and CACC. Each is real. None of them answers the
+question this project now asks of every phase: **what did you write that you could not write
+before?**
 
 ## What this roadmap is not
 
