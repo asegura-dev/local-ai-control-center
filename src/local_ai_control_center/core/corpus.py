@@ -27,6 +27,20 @@ catch because it only ever round-tripped an unmarked corpus. Two hundred and six
 quotations were silently unreadable - the exact failure this module's docstring is uneasy
 about, arriving by the exact route it predicted."""
 _VERDICT = re.compile(r"^(p\. \d+|page unknown) - (.+)$")
+
+_A_STANDING = re.compile(
+    r"^(verified"
+    r"|in the document, page not determined"
+    r"|not re-checked\b"
+    r"|\*\*NOT IN THE DOCUMENT\*\*)",
+    re.IGNORECASE,
+)
+"""What a standing looks like on the page line, as a closed set this project writes.
+
+It is closed on purpose. An older assembler put the paraphrase here instead, and telling the
+two apart is what lets a corpus written by that version keep what each quotation was taken to
+mean. Anything not in this set is that paraphrase (ADR-065).
+"""
 _NEAREST = "Closest text in the source: "
 _UNCOLLECTED = "**Not collected.**"
 
@@ -96,9 +110,22 @@ def parse_corpus(text: str) -> tuple[CollectedClaim, ...]:
             continue
         outcome = _VERDICT.match(line)
         if outcome and quote:
-            where, verdict = outcome.group(1), outcome.group(2).strip()
+            where, said = outcome.group(1), outcome.group(2).strip()
             page = int(where.removeprefix("p. ")) if where.startswith("p. ") else None
-            expecting_claim = True
+            # An older assembler put the **paraphrase** on this line instead of the
+            # standing, so reading such a file filed the paraphrase as a verdict - and a
+            # recorded verdict is correctly never carried forward (ADR-042). Assembling a
+            # corpus twice therefore stripped every paraphrase in it (ADR-065).
+            #
+            # The standings are a closed set this project writes, so anything else on this
+            # line is a paraphrase from that writer. Recognising it is reading a format this
+            # project produced, not guessing at one.
+            if _A_STANDING.match(said):
+                verdict = said
+                expecting_claim = True
+            else:
+                verdict = ""
+                flush(said)
             continue
         if line.startswith(_NEAREST):
             # The writer puts this after the paraphrase, by which point the claim is

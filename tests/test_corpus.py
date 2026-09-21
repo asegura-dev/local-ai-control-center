@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from local_ai_control_center.cli import _collected_markdown
-from local_ai_control_center.core.corpus import about, parse_corpus
+from local_ai_control_center.cli import _assembled, _collected_markdown
+from local_ai_control_center.core.corpus import CollectedClaim, about, parse_corpus
 from local_ai_control_center.core.grounding import CheckedClaim, Claim
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction
 from local_ai_control_center.cycle import RunResult
@@ -132,3 +132,66 @@ def test_a_marked_quotation_is_still_readable(tmp_path: Path) -> None:
     read_back = parse_corpus(marked)
     assert [c.quote for c in read_back] == ["a marked quotation", "an unmarked one"]
     assert [c.page for c in read_back] == [3, 4]
+
+
+def _assemble(claims: list[CollectedClaim]) -> str:
+    """Run the corpus assembler over claims, re-checking nothing."""
+    return _assembled([(claim, True) for claim in claims], frozenset(), [Path("a.md")])
+
+
+def test_the_other_writer_is_read_back_unchanged_too() -> None:
+    """There were two writers and the round trip covered one of them (ADR-065)."""
+    written = _assemble(
+        [
+            CollectedClaim(
+                document="paper.md",
+                quote="a placed quotation",
+                claim="it was placed",
+                page=7,
+            )
+        ]
+    )
+    read_back = parse_corpus(written)
+    assert [c.quote for c in read_back] == ["a placed quotation"]
+    assert [c.claim for c in read_back] == ["it was placed"]
+    assert [c.page for c in read_back] == [7]
+
+
+def test_assembling_twice_keeps_what_each_quotation_was_taken_to_mean() -> None:
+    """The loss only appears on the second pass, which is why once was not enough.
+
+    `_assembled` put the paraphrase on the page line, where `parse_corpus` matched it as a
+    verdict - and a recorded verdict is correctly never carried forward (ADR-042). So the
+    first assembly looked right and the second silently stripped every paraphrase in the
+    corpus, while reporting the same counts it always had (ADR-065).
+
+    Found on a real corpus by noticing the result was 35 KB smaller with 178 more
+    quotations. Nothing else would have shown it.
+    """
+    start = [
+        CollectedClaim(
+            document="paper.md", quote="a placed quotation", claim="it was placed", page=7
+        ),
+        CollectedClaim(
+            document="paper.md", quote="an unplaceable one", claim="it is there", page=None
+        ),
+    ]
+    once = parse_corpus(_assemble(start))
+    twice = parse_corpus(_assemble(list(once)))
+
+    assert [c.claim for c in once] == ["it was placed", "it is there"]
+    assert [c.claim for c in twice] == ["it was placed", "it is there"], (
+        "the paraphrase survives a second assembly"
+    )
+    assert [c.quote for c in twice] == ["a placed quotation", "an unplaceable one"]
+    assert [c.page for c in twice] == [7, None]
+
+
+def test_both_writers_say_the_same_thing_about_a_placed_quotation() -> None:
+    """One format, written by both, is what closes the round trip."""
+    by_collect = _collected_markdown(
+        "extract_claims", "a-model", [("paper.md", _result(_checked("q", "c", "verified", 7)))]
+    )
+    by_corpus = _assemble([CollectedClaim(document="paper.md", quote="q", claim="c", page=7)])
+    assert "p. 7 - verified" in by_collect
+    assert "p. 7 - verified" in by_corpus

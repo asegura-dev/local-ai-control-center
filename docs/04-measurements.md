@@ -432,6 +432,13 @@ claim - and twice here it was wrong while its tests were green. Both times the t
 the component the program never builds by hand. If nothing but a test reaches a switch, the
 switch is not there.
 
+**Ask whether two things that write the same file agree about it.** A corpus is written by
+`collect` and by `corpus`, and they disagreed about which line carries the standing. The
+round-trip test that exists precisely to catch this covered one writer, the other arrived
+later, and nothing connected them. The result reported every figure correctly - the count of
+quotations, the count verified, the files read - while stripping the meaning from all of them.
+What found it was the file being 35 KB smaller than it should have been (ADR-065).
+
 **Ask whether a premise in a plan was ever a measurement.** The second of those was not
 phrased as a prediction. It was stated as a fact about the corpus, in the sentence justifying
 the work, and it read like something already known. A plan is where unmeasured claims are

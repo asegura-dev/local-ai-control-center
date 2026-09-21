@@ -16,7 +16,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Sixty-four records front to back is a history. These are the threads through them, for
+Sixty-five records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -140,6 +140,7 @@ not to reach for an approximate algorithm to find them.
 | 062 | [the-question-the-terminal-and-the-answer](adr/ADR-062-the-question-the-terminal-and-the-answer.md) | Three defects between a question and its answer, found by one real use: a declared skill's prompt never carried the question, so a request about convolutional networks returned radiation dosimetry; a greater-or-equal sign ended the run while printing, after the answer was produced; and `standard` was right not to keep it. Each minor, together enough to turn a paid-for answer into nothing and report success. |
 | 063 | [write-dense-and-prune](adr/ADR-063-write-dense-and-prune.md) | A paragraph of several sentences cannot rest on one quotation, so every draft was under-cited by construction and the judge flagged all of it. Of three ways out, the author chose to write dense and let the judge mark what needs support - and this builds the piece that was missing from it: a flagged reading is shown two passages from what was already sent that might support it, named candidates and never support, with nothing added to the draft. |
 | 064 | [what-your-papers-cite](adr/ADR-064-what-your-papers-cite.md) | 2,315 references sit inside 24 papers, and a work several of them cite is one the field treats as load-bearing. Parsed rather than generated - a model invents reference metadata, and the list is already in the file - and with no network at all. Records that folding the section as a whole ran each DOI into the next reference, making every one distinct and the count of shared works zero where it is eight. Names its ceiling: 9% of references carry a recoverable DOI, and only 11 of 23 documents can be compared against. |
+| 065 | [two-writers-one-round-trip](adr/ADR-065-two-writers-one-round-trip.md) | The round trip that answers this project's unease about re-parsing generated prose covered one of two writers. The assembler put the paraphrase where the reader expects the standing, so it parsed as a verdict - and a recorded verdict is correctly never carried forward - which meant assembling a corpus twice stripped the meaning from every quotation while reporting the same counts. Found because the merged file was 35 KB smaller with 178 more quotations. |
 
 ## Guides (`docs/guides/`)
 

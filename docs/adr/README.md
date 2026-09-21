@@ -1,6 +1,6 @@
 # Decision records
 
-Sixty-four records, in the order they were decided. The number is the identity: it is how
+Sixty-five records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -398,3 +398,10 @@ Three defects between a question and its answer, found by one real use. A declar
 [`ADR-064-what-your-papers-cite.md`](ADR-064-what-your-papers-cite.md)
 
 A bibliography of 24 papers is also 2,315 references, and a work several of them cite is one the field treats as load-bearing. Parsed from the list each document already carries - no model, because reference metadata is exactly what a model invents, and no network. Records the defect the measurement found: folding the section as a whole ran each DOI into the next reference, so every DOI came out distinct and the count of shared works was zero where the answer is eight. Names its own ceiling at nine per cent, since most bibliographies print no DOI, and reports "not among the ones identifiable by DOI" rather than "not held" because only 11 of 23 documents carry one.
+
+
+### 065 - two writers, one round trip
+
+[`ADR-065-two-writers-one-round-trip.md`](ADR-065-two-writers-one-round-trip.md)
+
+`corpus.py` answers its own unease about re-parsing generated prose with a round trip - and there were two writers, covered by one. The assembler put the paraphrase where the reader expects the standing, so it was filed as a verdict, and a recorded verdict is correctly never carried forward. Assembling a corpus twice therefore stripped the meaning from every quotation in it while reporting the same counts it always had. Found because a merged file was 35 KB smaller with 178 more quotations. One format now, written by both, read through both, and tested twice - because the first pass looked right.

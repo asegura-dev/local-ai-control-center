@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Assembling a corpus twice stripped the meaning from every quotation in it** (ADR-065).
+  `collect` and `corpus` both write this project's corpus format, and they did not write the
+  same one: `collect` puts the **standing** on the page line and the paraphrase below it,
+  while `corpus` put the **paraphrase** on the page line. The round-trip test that answers
+  this module's stated unease about re-parsing generated prose covered the first writer only.
+
+  Given the second shape, the reader filed the paraphrase as a recorded verdict - and a
+  recorded verdict is correctly never carried forward, which is why ADR-042 exists. So the
+  second assembly of any corpus came out with every paraphrase gone, while reporting figures
+  that were all true: *"832 quotations from 2 files; 723 are in their document"*.
+
+  It was found by adding one document to a real corpus and noticing the result was **35 KB
+  smaller with 178 more quotations**. Nothing else would have shown it: the counts were
+  right, the quotations were right, the file parsed.
+
+  `_assembled` now writes what `collect` writes, and the reader recognises the older shape -
+  the standings are a closed set this project writes, so anything else on that line is a
+  paraphrase from the previous assembler. Without that the fix would have been forward-only
+  and 654 paraphrases already on disk would have been dropped on the next assembly. The
+  round trip is now tested through both writers and **twice**, because the first assembly
+  looked correct and the loss only appeared on the second.
+
 ## [1.8.0] - 2026-09-20
 
 ### Fixed

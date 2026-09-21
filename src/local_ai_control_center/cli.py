@@ -2152,6 +2152,23 @@ def _recheck(
 _STANDINGS = ((True, "Citable"), (None, "Not re-checked"), (False, "Not in the document"))
 
 
+def _standing_said(found: bool | None, page: int | None) -> str:
+    """What the page line says about a quotation, in the words `collect` uses.
+
+    Three outcomes and not two, because a quotation that is in the document and cannot be
+    placed on a page is not a fabrication - the error ADR-042 exists to correct. `verified`
+    means found **and** placed; found-but-unplaceable says so in full.
+
+    Decided by the re-check, never by the label the file being read carried. A quotation
+    whose document has left the workspace says that instead of claiming either standing.
+    """
+    if found is None:
+        return "not re-checked: the document is no longer in the workspace"
+    if not found:
+        return "**NOT IN THE DOCUMENT**"
+    return "verified" if page else "in the document, page not determined"
+
+
 def _assembled(
     rechecked: list[tuple[CollectedClaim, bool | None]],
     marked: frozenset[str],
@@ -2194,9 +2211,22 @@ def _assembled(
                 continue
             lines += [f"### {heading}", ""]
             for claim in group:
-                mark = "- " if claim.quote in marked else ""
+                bullet = "- " if claim.quote in marked else ""
                 where = f"p. {claim.page}" if claim.page else "page unknown"
-                lines += [f"{mark}> {claim.quote}", "", f"{where} - {claim.claim}", ""]
+                # The same shape `_collected_markdown` writes: the standing on the page
+                # line, the paraphrase on its own line below. Putting the paraphrase on the
+                # page line made this file unreadable by the parser that reads the other
+                # one - it matched as a verdict, and a verdict is correctly not carried
+                # forward - so assembling a corpus twice silently stripped every paraphrase
+                # in it while reporting success (ADR-065).
+                lines += [
+                    f"{bullet}> {claim.quote}",
+                    "",
+                    f"{where} - {_standing_said(standing, claim.page)}",
+                    "",
+                    claim.claim,
+                    "",
+                ]
                 if claim.nearest and standing is False:
                     lines += [f"Closest text in the source: {claim.nearest}", ""]
     return chr(10).join(lines) + chr(10)
