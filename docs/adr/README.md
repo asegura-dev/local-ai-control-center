@@ -1,6 +1,6 @@
 # Decision records
 
-Sixty-six records, in the order they were decided. The number is the identity: it is how
+Sixty-seven records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -412,3 +412,10 @@ A bibliography of 24 papers is also 2,315 references, and a work several of them
 [`ADR-066-a-view-contains-no-logic.md`](ADR-066-a-view-contains-no-logic.md)
 
 Every layering test followed dependencies inward and none asked whether logic had leaked outward, which is what ADR-065 cost: both writers of the corpus format in `cli.py`, the reader in `core`, free to drift apart with the suite green. "Logic" has no syntax, so the rule is stated by its opposite - a function in a view that never touches the presentation, directly or through anything it calls, is not part of the view. It named twelve functions and the first two were the two writers. A vertical slice per capability over a hexagon that stays horizontal, because counting refused the other half: nine of fourteen core modules are genuinely shared and cutting them would invent boundaries the code does not have.
+
+
+### 067 - metadata from a registry, not from a model
+
+[`ADR-067-metadata-from-a-registry.md`](ADR-067-metadata-from-a-registry.md)
+
+Asked for a journal name with an instruction not to guess, a 14B invented twelve of twenty-four (ADR-047) - which is the last thing standing between a complete corpus and a bibliography that can be handed in. `lacc resolve` asks whoever assigns DOIs instead. The first destination in this project that is not the user's own machine, so the record spends more length on what leaves than on what arrives: a DOI and nothing else, only with `network_access` **and** `registry_url` both on, only after a preview that says how many and where, and never twice for the same work. No contact address is sent although it would buy a faster queue, because that address is the user's. No abstract is read although the registry returns one, because it is the one long free-text field and a bibliography does not need it - the vector is removed rather than sanitised.

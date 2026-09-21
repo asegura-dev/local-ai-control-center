@@ -24,6 +24,7 @@ from rich.table import Table
 from rich.text import Text
 
 from local_ai_control_center.adapters.asking import AskingJudge
+from local_ai_control_center.adapters.crossref import CrossrefRegistry, RememberedRegistry
 from local_ai_control_center.adapters.dense import DenseRetriever, FusedRetriever
 from local_ai_control_center.adapters.documents import (
     HiddenText,
@@ -93,6 +94,7 @@ from local_ai_control_center.cycle import (
     write_new_file,
 )
 from local_ai_control_center.features.ask import as_material, might_support
+from local_ai_control_center.features.bibliography import bibliography
 from local_ai_control_center.features.corpus import (
     assembled,
     collected_markdown,
@@ -103,6 +105,7 @@ from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.embedder import EmbeddingError
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
 from local_ai_control_center.ports.provider import Provider, ProviderError
+from local_ai_control_center.ports.registry import RegistryError, Work
 from local_ai_control_center.ports.retriever import Passage, Retriever, Selection
 from local_ai_control_center.system.audit import (
     AnchorCheck,
@@ -957,6 +960,116 @@ def metadata(
             "Preprints, statistics sheets and some guidelines ship without it. Nothing here "
             "will invent it for you, which is the point."
         )
+
+
+@app.command()
+def resolve(
+    sources: Annotated[list[Path], typer.Argument(help="Documents inside the workspace.")],
+    into: Annotated[Path, typer.Option("--into", help="Where to write the bibliography.")],
+    cited: Annotated[
+        bool, typer.Option("--cited", help="Also resolve the DOIs these documents cite.")
+    ] = False,
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Ask a registry what each work is, using the DOI the document already carries.
+
+    **The one command here that talks to something that is not yours.** What leaves is a
+    DOI and nothing else: no document, no quotation, no corpus, no question and no text you
+    wrote. You are shown how many are about to be sent, and where, before any of them go.
+
+    Two switches have to be on - `network_access` and `registry_url` - and both are off by
+    default. Answers are kept beside the file written, so a DOI is never asked twice and a
+    bibliography can be rebuilt from what was actually received (ADR-067).
+    """
+    config, workspace = _load(config_path)
+    if not config.registry_url:
+        _show(
+            "[red]No registry is configured.[/red] Write `registry_url: https://api.crossref.org` "
+            "in your configuration. It is empty by default, and empty means nothing leaves "
+            "this machine."
+        )
+        raise typer.Exit(code=1)
+    if not config.network_access:
+        _show(
+            "[red]network_access is off.[/red] It is the ceiling, and a registry address "
+            "does not lift it. Both have to be on, deliberately."
+        )
+        raise typer.Exit(code=1)
+
+    wanted: dict[str, str] = {}
+    silent: list[str] = []
+    for source in sources:
+        try:
+            path = workspace.resolve_within(source)
+        except ValueError as error:
+            _show(f"[red]{error}[/red]")
+            raise typer.Exit(code=1) from error
+        if not path.exists():
+            _show(f"[red]{source} is not in the workspace.[/red]")
+            raise typer.Exit(code=1)
+        own = embedded_metadata(path).doi
+        if own:
+            wanted.setdefault(own.strip().lower(), source.name)
+        else:
+            silent.append(source.name)
+        if cited:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            found = frozenset(r.doi for r in references_in(text) if r.doi)
+            for doi in without_truncations(found):
+                wanted.setdefault(doi, f"cited by {source.name}")
+
+    if not wanted:
+        _show(
+            "[yellow]No DOI to resolve.[/yellow] None of these documents carries one, and "
+            "nothing here will invent it. That is the measured ceiling of this route."
+        )
+        raise typer.Exit(code=1)
+
+    destination = workspace.resolve_within(into)
+    remembered = destination.with_suffix(".registry.json")
+    registry = RememberedRegistry(
+        CrossrefRegistry(config.registry_url, config.registry_mailto), remembered
+    )
+    fresh = sorted(doi for doi in wanted if not registry.holds(doi))
+
+    _show(
+        f"[bold]{len(wanted)} DOIs[/bold], of which {len(wanted) - len(fresh)} are already known."
+    )
+    if fresh:
+        _show(
+            f"[yellow]{len(fresh)} would be sent to {config.registry_url}.[/yellow] "
+            "A DOI is public; the list of them is your bibliography."
+        )
+        if config.registry_mailto:
+            _show(f"Identifying you as [bold]{config.registry_mailto}[/bold], as configured.")
+        if not typer.confirm("Send them?", default=False):
+            _show("Nothing was sent.")
+            raise typer.Exit(code=1)
+
+    resolved: list[Work] = []
+    unknown: list[str] = []
+    for doi in sorted(wanted):
+        try:
+            answer = registry.about(doi)
+        except RegistryError as error:
+            _show(f"[red]{error}[/red]")
+            _show("Nothing was written. What had been answered is kept, so a retry asks less.")
+            registry.write()
+            raise typer.Exit(code=1) from error
+        if answer and answer.says_anything:
+            resolved.append(answer)
+        else:
+            unknown.append(doi)
+    registry.write()
+
+    write_new_file(destination, bibliography(resolved, unknown, silent, config.registry_url))
+    _show(f"[green]{len(resolved)} of {len(wanted)} resolved[/green] -> {into}")
+    if unknown:
+        _show(f"[yellow]{len(unknown)} the registry does not hold.[/yellow] Usually a mangled DOI.")
+    if silent:
+        _show(f"[dim]{len(silent)} documents carry no DOI of their own.[/dim]")
 
 
 @app.command()

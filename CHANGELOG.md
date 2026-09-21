@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`lacc resolve`: what a work is, from whoever assigns the identifier** (ADR-067). Asked
+  for the journal a paper appeared in, with *"say not available for anything missing"* in the
+  prompt, a 14B invented **twelve journal names out of twenty-four** (ADR-047). That is the
+  last thing standing between a complete corpus and a bibliography that can be handed in.
+
+  **This is the first destination in this project that is not your own machine or your own
+  network, so the decision spends more of its length on what leaves than on what arrives.**
+  A DOI leaves, and nothing else: no document, no quotation, no corpus, no question, no
+  filename and no text you wrote. Two switches must both be on and both are off by default -
+  `network_access` is the ceiling and `registry_url` is the destination, written in the file
+  you wrote rather than arriving through the environment (ADR-030, ADR-060). A preview says
+  how many identifiers are about to be sent and where, and waits.
+
+  Two refusals are part of the feature. **No contact address is sent**, although supplying
+  one buys a faster queue at Crossref: that address is yours, and trading personal data for
+  throughput is not a decision LACC makes on your behalf - write it in your own configuration
+  if you want that. **No abstract is read**, although the registry returns one: it is the
+  single long free-text field in the answer and the obvious carrier for an injection, and a
+  bibliography does not need it, so the field is not read at all rather than sanitised.
+
+  Answers are cached beside the file written. That is not speed: a thesis has to be
+  re-buildable from what was **actually received, on a date**, and a DOI already answered is
+  never sent again. Every record carries the day it was fetched, because staleness is this
+  project's most frequent defect.
+
+  A field the registry does not hold is **named as missing**. An empty field is a fact; a
+  filled-in one is a claim, and a filled-in one is exactly what this replaces.
+
 ## [1.8.1] - 2026-09-21
 
 ### Added

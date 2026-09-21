@@ -27,6 +27,10 @@ was written and needs re-checking like any other measurement.
 | No arbitrary code execution | No `eval`, `exec`, `pickle`, `subprocess` or `os.system` anywhere in the source; both YAML loads are `safe_load` | **held** |
 | A document cannot forge a fence | Fence markers are fixed strings holding no user text (ADR-038), tested against a real model | **held by test** |
 | Text a reader cannot see is reported | Detection of invisible render modes and off-page positioning (ADR-040) | **held by test** |
+| A registry is reached only with two switches on | `registry_url` is empty by default and `network_access` is the ceiling; neither implies the other, and the command refuses each case by name (ADR-067) | **held by test** |
+| Only a DOI leaves, never a document | The request is a URL with a public identifier; no corpus, quotation, question or filename is sent | **held** |
+| No contact address is sent unless written | `registry_mailto` is empty by default and is never filled in: it is the user's personal data (ADR-067) | **held** |
+| A registry answer cannot carry a payload | No abstract is read at all, control characters are removed, every field is bounded, and none of it enters a prompt | **held by test** |
 | Writing happens in three places only | The workspace directory, the exclusive-create write, and the audit trail with its sidecar | **held** |
 
 ## Traceability

@@ -163,6 +163,22 @@ class Config(BaseModel):
         description="Level of detail recorded by the audit trail.",
     )
 
+    registry_url: str = Field(
+        default="",
+        description=(
+            "Where to resolve a DOI, such as https://api.crossref.org. Empty means no "
+            "registry is reached at all, which is the default."
+        ),
+    )
+    registry_mailto: str = Field(
+        default="",
+        description=(
+            "An address to identify yourself to the registry, for its faster queue. "
+            "Empty by default and never filled in for you: it is personal data, and "
+            "whether to trade it for throughput is yours to decide (ADR-067)."
+        ),
+    )
+
     workspace_root: Path = Field(
         description="Base directory LACC treats as its working area.",
     )
@@ -294,6 +310,24 @@ class Config(BaseModel):
             "the model happens to choose."
         ),
     )
+
+    @field_validator("registry_url")
+    @classmethod
+    def _a_registry_address_or_nothing(cls, value: str) -> str:
+        """Refuse anything in this field that is not an address.
+
+        The same reasoning as `server_url`: a destination is written here, in the file the
+        user wrote, never as the name of a variable and never through the environment
+        (ADR-030, ADR-060). Empty is the default and means the registry is not reached.
+        """
+        address = value.strip()
+        if address and not address.startswith(("http://", "https://")):
+            raise ValueError(
+                f"registry_url is {address!r}, which is not an address. Write the registry "
+                "itself, like `https://api.crossref.org` - this is the destination, not the "
+                "name of a variable holding it."
+            )
+        return address.rstrip("/")
 
     @field_validator("context_tokens")
     @classmethod
