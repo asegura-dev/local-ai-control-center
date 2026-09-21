@@ -9,6 +9,8 @@ from __future__ import annotations
 import ast
 import pathlib
 
+import pytest
+
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "src" / "local_ai_control_center"
 PACKAGE = "local_ai_control_center."
 
@@ -84,6 +86,7 @@ def test_every_module_lives_in_a_layer_that_has_a_meaning() -> None:
     """
     assert {p.name for p in _modules_in("root")} <= {"cycle.py", "cli.py", "window.py"}
     assert _modules_in("features"), "features/ is a layer and is empty"
+    assert _modules_in("views"), "views/ is a layer and is empty"
 
 
 # --- The converse of the rule above (ADR-066) --------------------------------------------
@@ -141,6 +144,7 @@ _PRESENTATION = frozenset(
         "clipboard_append",
         "bind",
         "after",
+        "yview_scroll",
     }
 )
 """The vocabulary that makes a function part of a view.
@@ -155,6 +159,8 @@ doubles whatever the first one got wrong.
 """
 
 _VIEWS = ("cli.py", "window.py")
+"""The driving adapters. The sections under `views/` are covered by the rule below,
+which walks that whole layer (ADR-075)."""
 """Every driving adapter, so a rule written for one cannot silently miss the other."""
 
 _A_VIEW_MAY_HOLD = frozenset(
@@ -163,6 +169,7 @@ _A_VIEW_MAY_HOLD = frozenset(
         "_build_provider",  # composition: the view is the driving adapter (ADR-029)
         "_page_range",  # parsing this view's own argument
         "_words",  # parsing this view's own argument
+        "Window._state",  # composition: gathering what a section is handed (ADR-075)
     }
 )
 """What belongs in a view although it never prints. Each is named, never a category."""
@@ -280,6 +287,41 @@ def test_the_named_debt_is_really_still_there() -> None:
             present |= set(_touches_presentation(view))
     gone = (_A_VIEW_MAY_HOLD | _LOGIC_THE_VIEW_STILL_HOLDS) - present
     assert not gone, f"named as exceptions but no longer in any view: {sorted(gone)}"
+
+
+def test_a_section_reaches_only_for_what_a_view_may_reach() -> None:
+    """A section draws; it does not decide, and it does not know the cycle or the CLI.
+
+    `views/` is where the window's sections live. They may use `features/` - which is what
+    they are drawing - and `core`/`ports` for the contracts that cross, and nothing else
+    (ADR-075).
+    """
+    for module in _modules_in("views"):
+        for imported in _runtime_imports_of(module):
+            # `from ...views import paint` names the package itself, which `_layer` reads
+            # as the root because it has no dot. It is this layer either way.
+            where = "views" if imported == "views" else _layer(imported)
+            assert where in {"core", "ports", "features", "views"}, (
+                f"{module.name} reaches for {imported}"
+            )
+
+
+def test_every_section_can_list_and_is_named() -> None:
+    """A section is declared, so one that is half-added cannot exist.
+
+    It used to take four edits - the menu, the router, the selection handler and a pair of
+    methods - and getting three of them right produced a section that appeared in the menu
+    and did nothing at all.
+    """
+    pytest.importorskip("customtkinter", reason="the window is an optional install")
+    from local_ai_control_center.window import SECTIONS
+
+    assert len(SECTIONS) >= 8
+    names = [section.name for section in SECTIONS]
+    assert len(names) == len(set(names)), f"two sections share a name: {names}"
+    for section in SECTIONS:
+        assert section.name, "a section with no name cannot be chosen"
+        assert callable(section.listing), f"{section.name} cannot fill the sidebar"
 
 
 def test_a_slice_reaches_only_for_core_and_ports() -> None:

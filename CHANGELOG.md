@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **A window section is declared, not wired** (ADR-075). The window reached eight sections in
+  a day, and adding one meant editing **four places**: the menu, the router, the selection
+  handler and a pair of methods. Get three of the four right and the section **appears in the
+  menu and does nothing at all** - no error, no empty panel, just a button that does not
+  respond. `cli.py` reached 2,610 lines by exactly this route.
+
+  A `Section` now carries its name, its listing and what to show, and the window iterates over
+  a tuple of them knowing nothing about any of them. Sections are grouped by what they read -
+  the workspace, the program, the records - rather than one file each, because a reader
+  looking for "how is a corpus shown" should find it beside "how a review is shown".
+
+  Measured: `window.py` went from **763 lines and 28 methods to 330 lines and 17 functions**,
+  and the places to edit to add a section went from four to one. `views/` is a layer now, and
+  the layering test enforces it: a section may reach `features/` and the contracts that cross,
+  and nothing else.
+
+  The refactor was accepted because that risk was countable. This project's roadmap records
+  six consecutive releases of defensible refactors that advanced nothing.
+
+### Fixed
+- **The document panel did not scroll over its own text** (ADR-075). Tk delivers the wheel to
+  the widget under the pointer and a label does not pass it on, so a long record scrolled only
+  while the pointer was over the gaps between cards - which looked like no scrolling at all.
+  The wheel is bound on every child now.
+
 ### Added
 - **A prompts section: exactly what each skill would ask** (ADR-074). Almost every measured
   finding in this project is about the distance between what somebody meant to ask and what

@@ -1,6 +1,6 @@
 # Decision records
 
-Seventy-four records, in the order they were decided. The number is the identity: it is how
+Seventy-five records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -467,3 +467,10 @@ The Markdown engine built for this project's records was one import away from a 
 [`ADR-074-what-it-is-about-to-ask.md`](ADR-074-what-it-is-about-to-ask.md)
 
 Almost every measured finding here is about the distance between what somebody meant to ask and what was sent: an instruction not to guess that produced twelve invented journal names, a schema that delivered the shape and lost the answer, a declared skill whose prompt never carried the question. Each was invisible for exactly as long as nobody looked at the prompt - and the prompt has always been printable, because a plan is pure by design (ADR-014). A section that shows, for every skill, the instruction, the capabilities it would ask you to allow, what it checks, and how long the asking is before any document is added. The document's place is **shown rather than left as a marker**, because the one important fact about a prompt is that the document arrives inside it, surrounded by instructions. A skill that cannot be planned says why in place of its template.
+
+
+### 075 - a section is a piece
+
+[`ADR-075-a-section-is-a-piece.md`](ADR-075-a-section-is-a-piece.md)
+
+The window reached eight sections in a day, and adding one meant editing **four places** - the menu, the router, the selection handler and a pair of methods. Get three of the four right and the section appears in the menu and does nothing at all: no error, no empty panel, just a button that does not respond. `cli.py` reached 2,610 lines by exactly this route. So a section is now **declared rather than wired**: a name, a listing and what to show, and the window iterates over a tuple of them knowing nothing else. Grouped by what they read rather than one file each, because a reader looking for "how is a corpus shown" should find it beside "how a review is shown". Measured: `window.py` went 763 lines and 28 methods to 330 lines and 17 functions, and the places to edit went from four to one. The refactor was accepted because that risk was countable - this project's roadmap records six consecutive releases of defensible refactors that advanced nothing.

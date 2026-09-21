@@ -52,7 +52,7 @@ def _tokens(text: str) -> int:
 def _layers() -> None:
     _rule("layers", "Where does the code live, and is any one file becoming the program?")
     rows: list[tuple[str, int, int]] = []
-    for layer in ("core", "ports", "adapters", "features", "system"):
+    for layer in ("core", "ports", "adapters", "features", "views", "system"):
         files = [p for p in (SOURCE / layer).rglob("*.py") if p.name != "__init__.py"]
         lines = sum(len(p.read_text(encoding="utf-8").splitlines()) for p in files)
         rows.append((layer, len(files), lines))
@@ -145,6 +145,10 @@ def _view_logic() -> None:
         print(f"  {name:12} {len(functions):3} functions, {len(astray):2} never touch presentation")
         for found in astray:
             print(f"                 {found}")
+    print()
+    print("  Names here are not defects on their own: the entry point, composition and the")
+    print("  parsing of a view's own arguments belong in a view. `tests/test_layering.py`")
+    print("  holds the list of which, one by one, and fails on anything else (ADR-066).")
 
 
 def _records() -> None:
