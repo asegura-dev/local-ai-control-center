@@ -16,7 +16,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Sixty-seven records front to back is a history. These are the threads through them, for
+Sixty-eight records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -143,6 +143,7 @@ not to reach for an approximate algorithm to find them.
 | 065 | [two-writers-one-round-trip](adr/ADR-065-two-writers-one-round-trip.md) | The round trip that answers this project's unease about re-parsing generated prose covered one of two writers. The assembler put the paraphrase where the reader expects the standing, so it parsed as a verdict - and a recorded verdict is correctly never carried forward - which meant assembling a corpus twice stripped the meaning from every quotation while reporting the same counts. Found because the merged file was 35 KB smaller with 178 more quotations. |
 | 066 | [a-view-contains-no-logic](adr/ADR-066-a-view-contains-no-logic.md) | Five layering tests followed dependencies inward; none asked whether logic had leaked outward, which is exactly what ADR-065 cost. Stated by its opposite so a machine can check it: a function in a view that never touches the presentation is not part of the view. It named twelve, and the first two were the two writers of the corpus format. A vertical slice per capability over a hexagon that stays horizontal. |
 | 067 | [metadata-from-a-registry](adr/ADR-067-metadata-from-a-registry.md) | A model asked for a journal name invented twelve of twenty-four with an instruction not to, so `lacc resolve` asks whoever assigns DOIs. The first non-local destination here: a DOI leaves and nothing else, two switches must both be on, a preview says how many and where, no contact address is sent, and no abstract is read. |
+| 068 | [the-check-turned-around](adr/ADR-068-the-check-turned-around.md) | Every check here verifies what a model wrote. `lacc review` asks it of what **you** wrote: does anything in your own corpus hold this paragraph up? Reads and reports, never rewrites. Uncovered is not false, said wherever it appears. Graded on five paragraphs answered in advance; the one disagreement was the prediction's fault. |
 
 ## Guides (`docs/guides/`)
 

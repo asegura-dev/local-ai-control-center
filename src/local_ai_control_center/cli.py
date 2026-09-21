@@ -42,7 +42,11 @@ from local_ai_control_center.adapters.ollama import (
 )
 from local_ai_control_center.adapters.vectors import SUFFIX as VECTOR_SUFFIX
 from local_ai_control_center.adapters.words import WordRetriever
-from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve
+from local_ai_control_center.core.budget import (
+    CHARS_PER_TOKEN,
+    answer_reserve,
+    estimate_tokens,
+)
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
 from local_ai_control_center.core.corpus import CollectedClaim, about, parse_corpus
 from local_ai_control_center.core.declared import (
@@ -101,6 +105,12 @@ from local_ai_control_center.features.corpus import (
     recheck,
 )
 from local_ai_control_center.features.measure import spread
+from local_ai_control_center.features.review import (
+    Finding,
+    concluded,
+    paragraphs_in,
+    report,
+)
 from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.embedder import EmbeddingError
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
@@ -2075,6 +2085,113 @@ def corpus(
 def _words(given: str | None) -> tuple[str, ...]:
     """Split a comma-separated option into words, dropping the empties."""
     return tuple(word.strip() for word in (given or "").split(",") if word.strip())
+
+
+CANDIDATES_PER_PARAGRAPH = 3
+"""How many quotations each paragraph is judged against.
+
+Three, because the cost is one judgement each and a draft is dozens of paragraphs. More
+candidates find more support and take proportionally longer; this is the number at which a
+review of a section finishes while somebody is still willing to wait (ADR-068).
+"""
+
+
+@app.command()
+def review(
+    draft: Annotated[Path, typer.Argument(help="The document you wrote, in the workspace.")],
+    against: Annotated[
+        Path, typer.Option("--against", help="A corpus from `collect` or `corpus`.")
+    ],
+    into: Annotated[
+        Path | None, typer.Option("--into", help="Write the report here as well.")
+    ] = None,
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Read what **you** wrote against the sources **you** collected.
+
+    Every other check here verifies text a model produced. This turns that around and asks,
+    of each paragraph in your draft: is there anything in my own corpus that holds this up?
+
+    **It reads and reports. It writes nothing and changes nothing** - revising is a separate
+    act with a separate risk, and a tool that told you a sentence was unsupported and then
+    rewrote it would just give you a fluent unsupported sentence.
+
+    **Uncovered is not false.** A paragraph can be true and well argued while resting on a
+    paper that is not in your corpus, which on a bibliography of two dozen papers is the
+    ordinary case (ADR-068).
+    """
+    config, workspace = _load(config_path)
+    try:
+        written = workspace.resolve_within(draft)
+        corpus_file = workspace.resolve_within(against)
+    except ValueError as error:
+        _show(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+    for path, what in ((written, draft), (corpus_file, against)):
+        if not path.exists():
+            _show(f"[red]{what} is not in the workspace.[/red]")
+            raise typer.Exit(code=1)
+
+    blocks = paragraphs_in(written.read_text(encoding="utf-8", errors="replace"))
+    if not blocks:
+        _show("[yellow]Nothing in this document asserts anything.[/yellow]")
+        raise typer.Exit(code=1)
+
+    collected = [
+        c
+        for c in parse_corpus(corpus_file.read_text(encoding="utf-8", errors="replace"))
+        if "NOT IN THE DOCUMENT" not in c.recorded_verdict
+    ]
+    if not collected:
+        _show(f"[red]{against} holds no usable quotations.[/red]")
+        raise typer.Exit(code=1)
+    passages = tuple(
+        Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
+    )
+    retriever = _retriever_for(config, corpus_file)
+
+    judgements = len(blocks) * CANDIDATES_PER_PARAGRAPH
+    _show(
+        f"[bold]{len(blocks)} paragraphs[/bold] against [bold]{len(passages)} quotations[/bold]: "
+        f"about {judgements} judgements, a few seconds each."
+    )
+    if not typer.confirm("Read it?", default=True):
+        raise typer.Exit(code=1)
+
+    provider = _build_provider(ProviderChoice.ollama, config)
+    judge = AskingJudge(provider)
+    findings: list[Finding] = []
+    # A budget large enough for everything: the ranking is what is wanted here, not a
+    # selection, and a quotation dropped for space would be support the writer never sees.
+    # Computed once - the corpus does not change between paragraphs.
+    whole = sum(estimate_tokens(passage.text) for passage in passages) + len(passages)
+    with console.status(f"Reading {len(blocks)} paragraphs..."):
+        for block in blocks:
+            nearest = retriever.select(block.text, passages, whole).chosen
+            judged = [
+                (p.source, p.text, judge.judge(block.text, p.text))
+                for p in nearest[:CANDIDATES_PER_PARAGRAPH]
+            ]
+            findings.append(concluded(block, judged))
+
+    against_it = [f for f in findings if f.verdict == "contradicted"]
+    uncovered = [f for f in findings if f.verdict == "nothing"]
+    held = len(findings) - len(against_it) - len(uncovered)
+    if against_it:
+        _show(f"[red]{len(against_it)} paragraphs your corpus contradicts.[/red] Read these first.")
+        for finding in against_it:
+            _show(f"  [red]Line {finding.paragraph.line}[/red] - {finding.document}")
+    _show(f"[green]{held} held up[/green], [yellow]{len(uncovered)} not covered[/yellow].")
+    _show(
+        "[dim]Not covered means nothing collected holds it - not that it is wrong. The "
+        "source may simply not be in this corpus.[/dim]"
+    )
+    written_report = report(findings, draft.name, against.name, 0)
+    if into:
+        write_new_file(workspace.resolve_within(into), written_report)
+        _show(f"-> {into}")
 
 
 @app.command()

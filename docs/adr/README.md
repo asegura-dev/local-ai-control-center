@@ -1,6 +1,6 @@
 # Decision records
 
-Sixty-seven records, in the order they were decided. The number is the identity: it is how
+Sixty-eight records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -419,3 +419,10 @@ Every layering test followed dependencies inward and none asked whether logic ha
 [`ADR-067-metadata-from-a-registry.md`](ADR-067-metadata-from-a-registry.md)
 
 Asked for a journal name with an instruction not to guess, a 14B invented twelve of twenty-four (ADR-047) - which is the last thing standing between a complete corpus and a bibliography that can be handed in. `lacc resolve` asks whoever assigns DOIs instead. The first destination in this project that is not the user's own machine, so the record spends more length on what leaves than on what arrives: a DOI and nothing else, only with `network_access` **and** `registry_url` both on, only after a preview that says how many and where, and never twice for the same work. No contact address is sent although it would buy a faster queue, because that address is the user's. No abstract is read although the registry returns one, because it is the one long free-text field and a bibliography does not need it - the vector is removed rather than sanitised.
+
+
+### 068 - the check, turned around
+
+[`ADR-068-the-check-turned-around.md`](ADR-068-the-check-turned-around.md)
+
+Everything here verifies text a model produced. `lacc review` asks the same question of a draft a person wrote: is there anything in my own corpus that holds this paragraph up? Nothing new is invented - the corpus reader, the ranking and the judge all exist and all point the other way. It reads and reports, never rewrites, because a tool that told you a sentence was unsupported and then rewrote it would hand you a fluent unsupported sentence. The unit is the paragraph, which is how scientific prose carries its references. **Uncovered is not false**, and the wording says so wherever it appears. Graded on five paragraphs whose answers were written down first, it caught both planted errors - and the one disagreement was the prediction's fault: the paragraph had a causal clause no quotation supports, and its author had not noticed writing it.

@@ -432,6 +432,13 @@ claim - and twice here it was wrong while its tests were green. Both times the t
 the component the program never builds by hand. If nothing but a test reaches a switch, the
 switch is not there.
 
+**Ask what a verdict of "nothing" is hiding.** The first run of `lacc review` reported a
+paragraph as uncovered whose support was sitting in the corpus, and the report named no
+candidates - so nothing on the page distinguished *never retrieved* from *retrieved and
+rejected*, which need opposite responses. The finding turned out to be correct and the
+report still had to change: a verdict a reader cannot act on is a verdict they will learn to
+ignore (ADR-068).
+
 **Ask whether two things that write the same file agree about it.** A corpus is written by
 `collect` and by `corpus`, and they disagreed about which line carries the standing. The
 round-trip test that exists precisely to catch this covered one writer, the other arrived

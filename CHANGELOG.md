@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`lacc review`: your draft against your own sources** (ADR-068). Everything this project
+  verifies, it verifies about text a *model* produced. This turns the same machinery around
+  and asks, of each paragraph **you** wrote: is there anything in my corpus that holds this
+  up? Nothing new was invented - the corpus reader, the ranking by meaning and the judge all
+  existed and all pointed the other way.
+
+  It reads and reports, and **writes nothing**. Revising is a separate act with a separate
+  risk: a tool that told you a sentence was unsupported and then rewrote it would hand you a
+  fluent unsupported sentence. The unit is the paragraph, because that is how scientific
+  prose carries its references.
+
+  **Uncovered is not false**, and the report says so wherever it appears rather than once in
+  a legend. A paragraph can be true and well argued while resting on a paper that is not in
+  your corpus, which on a bibliography of two dozen papers is the ordinary case.
+
+  Graded on five paragraphs whose correct answers were written down **before** the run, over
+  the real corpus of 723 usable quotations. It caught both planted errors - a claim that
+  choline outperforms PSMA for nodal detection, and a near-100% sensitivity that would make
+  histology unnecessary. The single disagreement was the *prediction's* fault: the paragraph
+  carried a causal clause no quotation supports, and whoever wrote it had not noticed.
+
+  The run also found a defect in its own report. "Nothing covers this" named no candidates,
+  so a reader could not tell whether their support was never retrieved or was retrieved and
+  rejected - opposite problems needing opposite responses. The report now prints what was
+  ranked closest and judged, which is ADR-034's rule one level up: report the match, decide
+  nothing.
+
+### Added
 - **`lacc resolve`: what a work is, from whoever assigns the identifier** (ADR-067). Asked
   for the journal a paper appeared in, with *"say not available for anything missing"* in the
   prompt, a 14B invented **twelve journal names out of twenty-four** (ADR-047). That is the
