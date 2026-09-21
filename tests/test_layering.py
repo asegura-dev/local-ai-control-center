@@ -133,19 +133,17 @@ _A_VIEW_MAY_HOLD = frozenset(
 )
 """What belongs in a view although it never prints. Each is named, never a category."""
 
-_LOGIC_THE_VIEW_STILL_HOLDS = frozenset(
-    {
-        "_might_support",  # -> a future `ask` slice
-        "_ask_once",  # -> a future `ask` slice
-        "_as_material",  # -> a future `ask` slice
-        "_spread",  # -> a future `measure` slice
-    }
-)
+_LOGIC_THE_VIEW_STILL_HOLDS: frozenset[str] = frozenset()
 """Logic that has not moved yet, named one by one so the rule binds on everything else.
 
+**It is empty, and that is the point.** It began at four names after the `corpus` slice
+landed and reached zero when `ask` and `measure` followed; `ask_once` went to the cycle
+instead of a slice, because running an action through the whole system is orchestration and
+this project has one place for that (ADR-029).
+
 A baseline that were a *number* would let one function leave and another arrive. A list of
-names cannot: anything new fails this test on the day it is written. The list only shrinks,
-and it shrinks by a slice landing - `corpus` took four names out of it (ADR-066).
+names cannot: anything new fails this test on the day it is written, and while this set is
+empty the rule is absolute (ADR-066).
 """
 
 

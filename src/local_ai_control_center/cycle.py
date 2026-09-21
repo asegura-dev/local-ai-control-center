@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict
 from local_ai_control_center.core.budget import answer_reserve, estimate_tokens
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.fence import (
+    CONTENT_PLACEHOLDER,
     CONTEXT_SLOT,
     content_slot,
     instruction_shapes_in,
@@ -38,7 +39,7 @@ from local_ai_control_center.core.passes import PageRangeError, only_pages, pass
 from local_ai_control_center.core.permissions import Capability, PermissionDenied, Permissions
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.core.run import Progress, ProgressFn
-from local_ai_control_center.core.skill import Skill
+from local_ai_control_center.core.skill import Skill, SkillPlan, grant_for
 from local_ai_control_center.core.workspace import Workspace
 from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.provider import Completion, Provider
@@ -1014,4 +1015,39 @@ def run_skill(
         plan.fields,
         plan.quote_field,
         plan.output_schema,
+    )
+
+
+def ask_once(
+    resolved: Skill,
+    plan: SkillPlan,
+    material: str,
+    config: Config,
+    workspace: Workspace,
+    provider: Provider,
+    audit: AuditLog,
+    run_id: str,
+) -> RunResult:
+    """Send one question with its selected passages, and record it.
+
+    Orchestration, not domain logic, which is why it is here and not in a slice: it runs
+    an action through the whole system, and this module is the one place that does that
+    (ADR-029). It left the view under ADR-066.
+
+    Shared by `ask` and `measure`, so that measuring the synthesis path measures the same
+    thing asking does. The quotations are not checked here: they belong against the material
+    that was sent rather than against a document, and the caller does that.
+    """
+    return run_action(
+        plan.action,
+        plan.prompt_template.replace(CONTENT_PLACEHOLDER, material),
+        grant_for(resolved, config),
+        config,
+        workspace,
+        provider,
+        audit,
+        run_id,
+        lambda _preview: True,
+        verify_quotes=False,
+        temperature=plan.temperature,
     )

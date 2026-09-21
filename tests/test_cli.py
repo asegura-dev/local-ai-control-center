@@ -16,6 +16,7 @@ import pytest
 from typer.testing import CliRunner
 
 from local_ai_control_center.cli import app
+from local_ai_control_center.features.ask import might_support
 from local_ai_control_center.ports.notifier import Delivery, Notification, Notifier
 
 runner = CliRunner()
@@ -1426,7 +1427,6 @@ def test_a_flagged_reading_is_shown_what_might_support_it() -> None:
     reading's own words, leaves out the sentence already quoted, and names the result
     candidates rather than support.
     """
-    from local_ai_control_center import cli
     from local_ai_control_center.adapters.words import WordRetriever
     from local_ai_control_center.ports.retriever import Passage
 
@@ -1434,7 +1434,7 @@ def test_a_flagged_reading_is_shown_what_might_support_it() -> None:
     supports = Passage(text="specificity for nodal metastases reached 92 percent", source="b.md")
     unrelated = Passage(text="the authors thank the department", source="c.md")
 
-    candidates = cli._might_support(
+    candidates = might_support(
         "specificity for nodal metastases was high",
         quoted.text,
         (quoted, supports, unrelated),
@@ -1454,7 +1454,6 @@ def test_the_same_sentence_is_never_offered_twice() -> None:
     one answer, not across the documents a selection draws from. Two candidates that are one
     sentence twice is half a tool.
     """
-    from local_ai_control_center import cli
     from local_ai_control_center.adapters.words import WordRetriever
     from local_ai_control_center.ports.retriever import Passage
 
@@ -1464,7 +1463,7 @@ def test_the_same_sentence_is_never_offered_twice() -> None:
         Passage(text=twice, source="b.md"),
         Passage(text=twice, source="c.md"),
     )
-    candidates = cli._might_support(
+    candidates = might_support(
         "predictive values for nodal metastases were worse",
         "the network outlined each lymph node",
         passages,
@@ -1476,9 +1475,8 @@ def test_the_same_sentence_is_never_offered_twice() -> None:
 
 def test_nothing_is_offered_when_the_quoted_passage_is_all_there_was() -> None:
     """No candidates rather than a candidate that is the same sentence again."""
-    from local_ai_control_center import cli
     from local_ai_control_center.adapters.words import WordRetriever
     from local_ai_control_center.ports.retriever import Passage
 
     only = Passage(text="the network outlined each lymph node", source="a.md")
-    assert cli._might_support("anything at all", only.text, (only,), WordRetriever()) == ()
+    assert might_support("anything at all", only.text, (only,), WordRetriever()) == ()

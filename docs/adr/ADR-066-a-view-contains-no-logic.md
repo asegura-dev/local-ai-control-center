@@ -58,8 +58,10 @@ Two things were measured rather than assumed once it existed:
 |---|---|
 | logic in the view before the first slice | **12 functions, 284 lines** |
 | after `features/corpus.py` landed | **8 functions, 110 lines** |
+| after `ask`, `measure` and `ask_once` followed | **4 functions, 30 lines - all of them legitimate** |
 | against `cli.py` at the ADR-065 commit | names `_collected_markdown` and `_assembled` first |
 | a pure formatter added to the view on purpose | **the test fails, by name** |
+| a name left in the list after its function moved | **the second test fails, by name** |
 
 The last row is the one that matters. A check nobody has seen fail is a check nobody has
 seen work.
@@ -89,14 +91,19 @@ use another slice, and it may not use the view.
 agree with them.** That is the point, and it is stronger than the test: the arrangement makes
 ADR-065 impossible rather than merely detectable.
 
-**The check ships with the violations it cannot fix yet, named one by one.** With the
-`corpus` slice landed, eight functions in the view never print: four belong there - the
-entry point, composition, and two that parse this view's own arguments - and **four are
-logic waiting for their slice**: `_might_support`, `_ask_once` and `_as_material` for `ask`,
-and `_spread` for `measure`. This record does not pretend otherwise and the test does not
-skip. It carries them as an explicit list, so the rule binds on **everything else** from the
-moment it exists: new logic cannot be added to the view, and the list only shrinks. A slice
-that lands removes its names from it - `corpus` took four out.
+**The check shipped with the violations it could not fix yet, named one by one**, and then
+they were fixed. The list went 12 -> 4 -> **0**: `corpus` took the two writers and the
+re-check, `ask` took `as_material` and `might_support`, `measure` took `spread`, and
+`ask_once` went to **the cycle rather than a slice** - running an action through the whole
+system is orchestration, and this project has one place for that (ADR-029).
+
+Four functions in the view never print, and all four belong there: the entry point,
+composition, and two that parse this view's own arguments. **The exception list is empty, so
+the rule is absolute** - the next function of logic written into the view fails the suite the
+day it is written.
+
+A list of names was the right shape even while it was full: a baseline that were a *number*
+would let one function leave and another arrive in its place.
 
 A baseline that is a number would be a lie waiting to happen - it would let one function
 leave and another arrive. A baseline that is a list of names cannot.
@@ -133,8 +140,13 @@ names one is describing a location that has changed. `tools/record_coverage.py` 
 symbols each record names and where they are used, which makes the damage countable rather
 than discovered later.
 
-**And one debt is named instead of paid.** `RunResult` is a frozen model of what a run
-produced and it lives in `cycle.py` - the same misplacement this record exists to correct,
-one layer up. Moving it is its own change with its own risk, so the slice imports it for
-typing only, the test of slices ignores type-only imports because they are not dependencies,
-and this sentence is where the debt is visible.
+**One debt was named here and turned out not to be one.** This record first said `RunResult`
+was misplaced in `cycle.py` and belonged in the core. It does not: its `completion` field is
+a `Completion`, which is the contract crossing the provider port, and **the core may not
+import a port** - the first test in this file has said so since the restructure. `RunResult`
+knows both core and ports, which is exactly what the cycle is for, so it is where it belongs.
+
+The correction is left visible rather than edited away, because the claim was written without
+being checked and that is the failure this project measures most often. `features/corpus.py`
+still imports the type and only the type; the test of slices ignores type-only imports,
+because naming a type is not depending on a module.

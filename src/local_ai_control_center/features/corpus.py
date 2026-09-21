@@ -14,10 +14,10 @@ detectable.
 because what it decides is what they print: a standing comes from looking in the document
 again, never from the label the file being read carried (ADR-042).
 
-**One debt is named rather than paid here.** `RunResult` is a frozen model of what a run
-produced, and it lives in `cycle.py` - the same misplacement this slice exists to correct,
-one layer up. Moving it is its own change with its own risk, so it is imported here for
-typing only and never at run time, and the test of layers records the exception.
+`RunResult` is imported here **for typing only**. It lives in `cycle.py` and belongs there:
+its `completion` is a `Completion`, the contract crossing the provider port, and the core may
+not import a port. Naming a type is not depending on a module, which is why the test of
+slices ignores type-only imports.
 """
 
 from __future__ import annotations

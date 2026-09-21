@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-09-21
+
 ### Added
 - **A view contains no logic, and a test says so** (ADR-066). Every layering rule here
   followed dependencies **inward** - core imports nothing, a port imports nothing, an adapter
@@ -20,11 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   named were `_collected_markdown` and `_assembled`. Run against the commit where the defect
   was still live, it names them first as well.
 
-  The first vertical slice, `features/corpus.py`, puts both writers beside the reader that
-  has to agree with them. Logic in the view went from **12 functions and 284 lines to 8 and
-  110**, and what remains is carried as a list of names rather than a number, so anything new
-  fails on the day it is written. A second test checks that the names still describe
-  functions that exist, because a list that shrinks by editing is not a baseline.
+Three vertical slices landed and the list emptied: `corpus` took both writers of the
+  format and the re-check, `ask` took `as_material` and `might_support`, `measure` took
+  `spread`. `ask_once` went to **the cycle rather than a slice**, because running an action
+  through the whole system is orchestration and this project has one place for that.
+
+  Logic in the view went **12 functions and 284 lines -> 4 and 30**, and the four that remain
+  belong there: the entry point, composition, and two that parse the view's own arguments.
+  **The exception list is empty, so the rule is now absolute.** What it held was a list of
+  names rather than a number, so no function could leave and another arrive in its place, and
+  a second test asserts the names still describe functions that exist - a list that shrinks by
+  being edited is not a baseline. That test is what failed, correctly, the moment the last
+  slice moved.
 
   The shape was measured before it was accepted, and the count refused half of it: **9 of 14
   core modules are genuinely shared**, so the hexagon stays horizontal and only the

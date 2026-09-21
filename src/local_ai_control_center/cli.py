@@ -41,7 +41,7 @@ from local_ai_control_center.adapters.ollama import (
 )
 from local_ai_control_center.adapters.vectors import SUFFIX as VECTOR_SUFFIX
 from local_ai_control_center.adapters.words import WordRetriever
-from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve, estimate_tokens
+from local_ai_control_center.core.budget import CHARS_PER_TOKEN, answer_reserve
 from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
 from local_ai_control_center.core.corpus import CollectedClaim, about, parse_corpus
 from local_ai_control_center.core.declared import (
@@ -49,7 +49,6 @@ from local_ai_control_center.core.declared import (
     FileSkill,
     load_declared_skills,
 )
-from local_ai_control_center.core.fence import CONTENT_PLACEHOLDER
 from local_ai_control_center.core.grounding import (
     CheckedClaim,
     check_answer,
@@ -88,16 +87,18 @@ from local_ai_control_center.cycle import (
     PromptTooLargeError,
     ReadError,
     RunResult,
-    run_action,
+    ask_once,
     run_conversion,
     run_skill,
     write_new_file,
 )
+from local_ai_control_center.features.ask import as_material, might_support
 from local_ai_control_center.features.corpus import (
     assembled,
     collected_markdown,
     recheck,
 )
+from local_ai_control_center.features.measure import spread
 from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.embedder import EmbeddingError
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
@@ -1219,21 +1220,6 @@ def _report_ingestion(
         console.print("[yellow]Declined.[/yellow] Nothing was written.")
 
 
-def _spread(values: list[int]) -> str:
-    """Describe a set of measurements by its range and middle, never by its average.
-
-    A mean would reproduce the error this command exists to correct: it reports a single
-    number for something whose whole finding is that a single number misleads (ADR-032).
-    """
-    if not values:
-        return "-"
-    ordered = sorted(values)
-    median = ordered[len(ordered) // 2]
-    if ordered[0] == ordered[-1]:
-        return f"{ordered[0]}"
-    return f"{ordered[0]} - {ordered[-1]}  (median {median})"
-
-
 @app.command()
 def measure(
     skill: Annotated[str, typer.Argument(help="Name of the skill to measure.")],
@@ -1330,7 +1316,7 @@ def measure(
                         resolved, tuple(requests), config, workspace, provider, audit, new_run_id()
                     )
                 else:
-                    result = _ask_once(
+                    result = ask_once(
                         resolved, plan, material, config, workspace, provider, audit, new_run_id()
                     )
             except (ProviderError, ReadError, PromptTooLargeError) as error:
@@ -1359,10 +1345,10 @@ def measure(
             # like a third fabricated (ADR-042).
             rows.append((attempt, len(checked), sum(1 for c in checked if c.found)))
 
-    _report_the_spread(resolved.name, config.model, rows)
+    _report_thespread(resolved.name, config.model, rows)
 
 
-def _report_the_spread(skill_name: str, model: str, rows: list[tuple[int, int, int]]) -> None:
+def _report_thespread(skill_name: str, model: str, rows: list[tuple[int, int, int]]) -> None:
     """Show every run, then the range each column covered."""
     table = Table(title=f"{skill_name} against {model or 'the mock provider'}", expand=False)
     table.add_column("Run", justify="right")
@@ -1377,9 +1363,9 @@ def _report_the_spread(skill_name: str, model: str, rows: list[tuple[int, int, i
     totals = [total for _, total, _ in rows]
     verified = [held for _, _, held in rows]
     rates = [held * 100 // total for _, total, held in rows if total]
-    console.print(f"  quotations  {_spread(totals)}")
-    console.print(f"  in the document  {_spread(verified)}")
-    console.print(f"  rate        {_spread(rates)}")
+    console.print(f"  quotations  {spread(totals)}")
+    console.print(f"  in the document  {spread(verified)}")
+    console.print(f"  rate        {spread(rates)}")
 
     if rates and max(rates) - min(rates) >= 10:
         console.print()
@@ -1569,37 +1555,6 @@ def _corpus_skill(name: str, config_path: Path) -> Skill:
     return skill
 
 
-def _ask_once(
-    resolved: Skill,
-    plan: SkillPlan,
-    material: str,
-    config: Config,
-    workspace: Workspace,
-    provider: Provider,
-    audit: AuditLog,
-    run_id: str,
-) -> RunResult:
-    """Send one question with its selected passages, and record it.
-
-    Shared by `ask` and `measure`, so that measuring the synthesis path measures the same
-    thing asking does. The quotations are not checked here: they belong against the material
-    that was sent rather than against a document, and the caller does that.
-    """
-    return run_action(
-        plan.action,
-        plan.prompt_template.replace(CONTENT_PLACEHOLDER, material),
-        grant_for(resolved, config),
-        config,
-        workspace,
-        provider,
-        audit,
-        run_id,
-        lambda _preview: True,
-        verify_quotes=False,
-        temperature=plan.temperature,
-    )
-
-
 def _passages_for(
     question: str, corpus_file: Path, config: Config, workspace: Workspace
 ) -> tuple[Selection, str]:
@@ -1613,7 +1568,7 @@ def _passages_for(
     budget = (window - answer_reserve(window)) // 2 if window else 0
     resolved = workspace.resolve_within(corpus_file)
     selection = _retriever_for(config, resolved).select(question, passages, budget)
-    return selection, _as_material(selection)
+    return selection, as_material(selection)
 
 
 @app.command()
@@ -1725,11 +1680,11 @@ def ask(
         },
     )
 
-    material = _as_material(selection)
+    material = as_material(selection)
     started = time.monotonic()
     try:
         with console.status("Asking..."):
-            result = _ask_once(resolved, plan, material, config, workspace, provider, audit, run_id)
+            result = ask_once(resolved, plan, material, config, workspace, provider, audit, run_id)
     except (ProviderError, PromptTooLargeError) as error:
         _announce(resolved.name, "failed", time.monotonic() - started, config, audit, run_id)
         console.print(f"[red]{error}[/red]")
@@ -1786,48 +1741,6 @@ def _report_the_selection(selection: Selection) -> None:
         f"[green]{len(selection.chosen)} passages selected[/green] of {selection.considered}; "
         f"{selection.set_aside} set aside. [dim]{selection.how}[/dim]"
     )
-
-
-def _as_material(selection: Selection) -> str:
-    """Render the chosen passages as the text that goes into the prompt."""
-    blocks = []
-    for passage in selection.chosen:
-        where = f"{passage.source}, p. {passage.page}" if passage.page else passage.source
-        blocks.append(f"[{where}]{chr(10)}{passage.text}")
-    return (chr(10) * 2).join(blocks)
-
-
-def _might_support(
-    claim: str, quoted: str, passages: tuple[Passage, ...], retriever: Retriever
-) -> tuple[Passage, ...]:
-    """Passages from what was sent that might support ``claim``, best first (ADR-063).
-
-    **Candidates, never support.** LACC has ranked some sentences against the words of a
-    reading; it has not decided that any of them establishes it. The same discipline
-    `nearest_text` follows when a quotation is not found: report the match, and say plainly
-    that it is not a reconstruction of what the model meant (ADR-034).
-
-    The one already quoted is left out - a writer told to cite something knows about the
-    sentence they cited.
-    """
-    # Deduplicated on the words, not only against the quotation. A corpus holds the same
-    # sentence more than once - `without_repeats` drops repeats within one answer, not
-    # across the documents a selection draws from - and two candidates that are one
-    # sentence twice is half a tool. Found on the first real use (ADR-063).
-    seen = {quoted.strip()}
-    others: list[Passage] = []
-    for passage in passages:
-        words = passage.text.strip()
-        if words in seen:
-            continue
-        seen.add(words)
-        others.append(passage)
-    if not others:
-        return ()
-    # A budget large enough for everything: what is wanted here is the ranking, not a
-    # selection, and a passage dropped for space would be one the writer never sees.
-    whole = sum(estimate_tokens(passage.text) for passage in others) + len(others)
-    return retriever.select(claim, tuple(others), whole).chosen[:2]
 
 
 def _judge_the_readings(
@@ -1910,7 +1823,7 @@ def _judge_the_readings(
             console.print(f"    [dim]{verdict.verdict}: {verdict.detail[:110]}[/dim]")
             if retriever is None:
                 continue
-            for candidate in _might_support(
+            for candidate in might_support(
                 claim.claim.claim, claim.claim.quote, passages, retriever
             ):
                 where = (
