@@ -1,6 +1,6 @@
 # Decision records
 
-Seventy-five records, in the order they were decided. The number is the identity: it is how
+Seventy-six records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -474,3 +474,10 @@ Almost every measured finding here is about the distance between what somebody m
 [`ADR-075-a-section-is-a-piece.md`](ADR-075-a-section-is-a-piece.md)
 
 The window reached eight sections in a day, and adding one meant editing **four places** - the menu, the router, the selection handler and a pair of methods. Get three of the four right and the section appears in the menu and does nothing at all: no error, no empty panel, just a button that does not respond. `cli.py` reached 2,610 lines by exactly this route. So a section is now **declared rather than wired**: a name, a listing and what to show, and the window iterates over a tuple of them knowing nothing else. Grouped by what they read rather than one file each, because a reader looking for "how is a corpus shown" should find it beside "how a review is shown". Measured: `window.py` went 763 lines and 28 methods to 330 lines and 17 functions, and the places to edit went from four to one. The refactor was accepted because that risk was countable - this project's roadmap records six consecutive releases of defensible refactors that advanced nothing.
+
+
+### 076 - the sections a document numbers
+
+[`ADR-076-the-sections-a-document-numbers.md`](ADR-076-the-sections-a-document-numbers.md)
+
+A PDF does not say what a heading is - measured, seven of eight papers carry none at all - but where an author numbered their sections, the numbering survives extraction. **The record is the measurement**: four rules were tried and the count went 16, 18, 10, **6 of 24**. The second *rose*, and was the worst: adding consecutive numbering counted author affiliations and bibliographies, because every numbered list is consecutive. The third required the dot and looked clean until it was run on the real guideline, which numbers its references `10. Haas, G.P` **with the dot**. Two structural conditions more - sections appear in order, and a section has a body - and the guideline came out as its nine real sections and nothing else. Detected, never written into the document: hundreds of quotations are checked against these files as they are. `lacc sections --take 5` pulled 42,149 tokens out of 348,276 without anybody cutting the file up.

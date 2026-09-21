@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`lacc sections`: the sections a document numbers for itself** (ADR-076). A PDF does not
+  say what a heading is - a heading there is a larger font, and nothing of that survives
+  extraction, so **seven of eight papers carry no heading at all**. Where an author numbered
+  their sections, that numbering does survive.
+
+  **The record is the measurement.** Four rules were tried and the count went **16, 18, 10, 6
+  of 24**. The second *rose*, and was the worst of them: it added consecutive numbering, which
+  every numbered list has, so it counted author affiliations and bibliography entries as
+  sections. The third required the dot after the number and looked clean - until it was run on
+  the real guideline, which numbers its references `10. Haas, G.P`, with the dot. Two
+  structural conditions more - **sections appear in order**, and **a section has a body** - and
+  the guideline came out as its nine real sections and nothing else.
+
+  **Detected, never written into the document.** Hundreds of quotations are checked against
+  these files as they are; inserting `##` would risk every one of those checks for a
+  convenience available without it.
+
+  `--take 5 --into section.md` pulled **42,149 tokens out of 348,276** - the guideline that
+  had to be split by hand to be usable at all.
+
+- **[Working this way, in detail](docs/guides/working-this-way-in-detail.md)**: the method with
+  enough detail to follow, worked through the measurement above from first count to fourth.
+  Also how things are named here, what a docstring carries, the three passes of verifying, what
+  goes in a commit message, and the five traps this project keeps falling into.
+
 ### Changed
 - **A window section is declared, not wired** (ADR-075). The window reached eight sections in
   a day, and adding one meant editing **four places**: the menu, the router, the selection

@@ -54,7 +54,7 @@ def _show_command(key: str, panel: Panel, state: State) -> None:
             hover_color=panel.skin.accent,
             text_color=panel.skin.dim,
             font=ctk.CTkFont(size=10),
-            command=lambda words=command.usage: _copy(line, words, panel),
+            command=lambda where=line, words=command.usage: _copy(where, words, panel),
         ).pack(side="left", padx=10)
         required = [p.shown for p in command.parameters if p.required]
         optional = [p.shown for p in command.parameters if not p.required]

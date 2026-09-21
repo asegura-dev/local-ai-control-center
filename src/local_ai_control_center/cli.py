@@ -69,6 +69,7 @@ from local_ai_control_center.core.references import (
     without_truncations,
 )
 from local_ai_control_center.core.run import Progress, ProgressFn, new_run_id
+from local_ai_control_center.core.sections import section_of, sections_in
 from local_ai_control_center.core.skill import (
     AskCorpusSkill,
     AssessSourceSkill,
@@ -2251,6 +2252,70 @@ def window(
         saved,
         commands_of(app),
         prompts_of(_known_skills(config_path), config),
+    )
+
+
+@app.command()
+def sections(
+    source: Annotated[Path, typer.Argument(help="A document inside the workspace.")],
+    take: Annotated[
+        str | None, typer.Option("--take", help="Write one section out, by its number.")
+    ] = None,
+    into: Annotated[Path | None, typer.Option("--into", help="Where to write it.")] = None,
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """List the sections a document numbers for itself, and take one out.
+
+    **Read from the document's own numbering, never guessed from how a line looks.** A PDF
+    does not say what a heading is, so what is found here is what the author numbered: a dot
+    after the number, a short title, no page number trailing it, and first-level numbers that
+    run 1, 2, 3 without gaps.
+
+    Fourteen of twenty-four documents in a real bibliography number nothing, and that is
+    reported rather than worked around. **Nothing is written into the document** - the
+    quotations already checked against it stay checked (ADR-076).
+    """
+    _, workspace = _load(config_path)
+    try:
+        path = workspace.resolve_within(source)
+    except ValueError as error:
+        _show(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+    if not path.exists():
+        _show(f"[red]{source} is not in the workspace.[/red]")
+        raise typer.Exit(code=1)
+
+    text = path.read_text(encoding="utf-8", errors="replace")
+    found = sections_in(text)
+    if not found:
+        _show(
+            f"[yellow]{source.name} numbers no sections.[/yellow] Most do not: a heading in a "
+            "PDF is a larger font, and nothing of that survives extraction. Read it in passes "
+            "instead, with `--in-passes`."
+        )
+        raise typer.Exit(code=1)
+
+    if take is None:
+        _show(f"[bold]{len(found)} sections[/bold] in {source.name}")
+        for section in found:
+            indent = "  " * (section.depth - 1)
+            _show(f"  [dim]{section.line:>6}[/dim]  {indent}{section.number}  {section.title}")
+        _show("[dim]Take one with --take <number> --into <file>.[/dim]")
+        return
+
+    wanted = section_of(text, take)
+    if not wanted:
+        _show(f"[red]{source.name} does not number a section {take}.[/red]")
+        raise typer.Exit(code=1)
+    if into is None:
+        _show("[red]Name where to write it with --into.[/red]")
+        raise typer.Exit(code=1)
+    write_new_file(workspace.resolve_within(into), wanted)
+    _show(
+        f"[green]Section {take}[/green] -> {into}   "
+        f"[dim]{estimate_tokens(wanted):,} tokens of {estimate_tokens(text):,}[/dim]"
     )
 
 
