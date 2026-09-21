@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A view contains no logic, and a test says so** (ADR-066). Every layering rule here
+  followed dependencies **inward** - core imports nothing, a port imports nothing, an adapter
+  reaches only for core and ports - and none of them asked whether logic had leaked
+  **outward**. That is exactly what ADR-065 cost: both writers of the corpus format lived in
+  `cli.py` while its reader lived in `core/`, free to drift apart with 620 tests green.
+
+  "Logic" has no syntax, so the rule is stated by its opposite: **a function in a view that
+  never touches the presentation - not directly, and not through anything it calls - is not
+  part of the view.** Run against `cli.py`, it named twelve functions, and the first two it
+  named were `_collected_markdown` and `_assembled`. Run against the commit where the defect
+  was still live, it names them first as well.
+
+  The first vertical slice, `features/corpus.py`, puts both writers beside the reader that
+  has to agree with them. Logic in the view went from **12 functions and 284 lines to 8 and
+  110**, and what remains is carried as a list of names rather than a number, so anything new
+  fails on the day it is written. A second test checks that the names still describe
+  functions that exist, because a list that shrinks by editing is not a baseline.
+
+  The shape was measured before it was accepted, and the count refused half of it: **9 of 14
+  core modules are genuinely shared**, so the hexagon stays horizontal and only the
+  capabilities are cut.
+
 ### Fixed
 - **Assembling a corpus twice stripped the meaning from every quotation in it** (ADR-065).
   `collect` and `corpus` both write this project's corpus format, and they did not write the

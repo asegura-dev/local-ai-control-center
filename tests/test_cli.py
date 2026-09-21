@@ -1130,9 +1130,9 @@ def test_the_corpus_tells_a_fabrication_from_an_unplaceable_quotation() -> None:
     A quotation that is in the document and cannot be placed on a page is not a
     fabrication, and a corpus that calls it one sends its reader to re-check real work.
     """
-    from local_ai_control_center.cli import _collected_markdown
     from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction
     from local_ai_control_center.cycle import RunResult
+    from local_ai_control_center.features.corpus import collected_markdown
 
     preview = ExecutionPreview(
         action=IntendedAction(name="extract_claims", summary="s", required=frozenset()),
@@ -1147,7 +1147,7 @@ def test_the_corpus_tells_a_fabrication_from_an_unplaceable_quotation() -> None:
             _checked("nowhere in the paper", "not_found"),
         ),
     )
-    corpus = _collected_markdown("extract_claims", "a-model", [("paper.md", result)])
+    corpus = collected_markdown("extract_claims", "a-model", [("paper.md", result)])
 
     assert "p. 7 - verified" in corpus
     assert "page unknown - in the document, page not determined" in corpus

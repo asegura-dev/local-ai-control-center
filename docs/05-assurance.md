@@ -95,6 +95,27 @@ about code - can this be reached, is it called, does it cover its call sites. Th
 question about **meaning**: whether a field called `server_url_env` is a secret or a
 destination. Nothing was going to notice that but reading.
 
+## A rule that was written in one direction
+
+The five layering tests all follow dependencies **inward**, and for a long time that read as
+complete. It is half a rule. PRINCIPLES says the core contains no interface code; the converse
+- **a view contains no logic** - was never written down and never checked, and the cost was
+ADR-065: both writers of the corpus format in `cli.py`, the reader in `core/`, drifting apart
+with the suite green.
+
+It is checkable, because while "logic" has no syntax its opposite does. A function in a view
+that never touches the presentation, directly or through anything it calls, is not part of the
+view. Against `cli.py` it named twelve functions and the first two were the two writers.
+
+Two things make it more than decoration. The exceptions are **a list of names, not a number**,
+so a function cannot leave and another arrive in its place; and a second test asserts the
+named functions still exist, so the list cannot shrink by being edited. It was also run
+against the commit where ADR-065 was still live, where it names the same two first.
+
+What it does not do is stated in the record: a function that prints once is presentation by
+this definition, whatever else it does. Logic braided into printing is the harder kind and
+this finds the plainly separate kind. It is a floor.
+
 ## One piece of dead surface, which is not a hole
 
 `run_commands` is a declared capability that no skill requires and nothing implements. It

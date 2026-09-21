@@ -83,3 +83,162 @@ def test_every_module_lives_in_a_layer_that_has_a_meaning() -> None:
     Anything else there is a module nobody decided where to put.
     """
     assert {p.name for p in _modules_in("root")} == {"cycle.py", "cli.py"}
+    assert _modules_in("features"), "features/ is a layer and is empty"
+
+
+# --- The converse of the rule above (ADR-066) --------------------------------------------
+#
+# Every test to this point follows dependencies *inward*: core imports nothing, a port
+# imports nothing, an adapter reaches only for core and ports. None of them asks whether
+# logic has leaked *outward* into a view, and that is what cost ADR-065: both writers of the
+# corpus format lived in `cli.py` while its reader lived in `core`, free to drift apart with
+# the suite green. They drifted, and assembling a corpus twice silently stripped the meaning
+# from every quotation in it.
+
+_PRESENTATION = frozenset(
+    {
+        "Console",
+        "_console",
+        "_show",
+        "Progress",
+        "Panel",
+        "Table",
+        "Text",
+        "Syntax",
+        "Markdown",
+        "print",
+        "echo",
+        "secho",
+        "prompt",
+        "confirm",
+        "_approve",
+        "_confirm",
+        "style",
+    }
+)
+"""The vocabulary that makes a function part of the view.
+
+Concrete names rather than a notion of "output", because a test that cannot be run against
+the code is a wish. A helper that only formats a string for a helper that prints it is still
+presentation, which is why the check takes the transitive closure over calls.
+"""
+
+_A_VIEW_MAY_HOLD = frozenset(
+    {
+        "main",  # the entry point
+        "_build_provider",  # composition: the view is the driving adapter (ADR-029)
+        "_page_range",  # parsing this view's own argument
+        "_words",  # parsing this view's own argument
+    }
+)
+"""What belongs in a view although it never prints. Each is named, never a category."""
+
+_LOGIC_THE_VIEW_STILL_HOLDS = frozenset(
+    {
+        "_might_support",  # -> a future `ask` slice
+        "_ask_once",  # -> a future `ask` slice
+        "_as_material",  # -> a future `ask` slice
+        "_spread",  # -> a future `measure` slice
+    }
+)
+"""Logic that has not moved yet, named one by one so the rule binds on everything else.
+
+A baseline that were a *number* would let one function leave and another arrive. A list of
+names cannot: anything new fails this test on the day it is written. The list only shrinks,
+and it shrinks by a slice landing - `corpus` took four names out of it (ADR-066).
+"""
+
+
+def _touches_presentation(module: pathlib.Path) -> dict[str, bool]:
+    """For each top-level function, whether it reaches the view, directly or through a call."""
+    tree = ast.parse(module.read_text(encoding="utf-8"))
+    functions = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+
+    def mentioned(node: ast.AST) -> set[str]:
+        found: set[str] = set()
+        for inner in ast.walk(node):
+            if isinstance(inner, ast.Name):
+                found.add(inner.id)
+            elif isinstance(inner, ast.Attribute):
+                found.add(inner.attr)
+        return found
+
+    reaches = {name: bool(mentioned(fn) & _PRESENTATION) for name, fn in functions.items()}
+    calls = {name: mentioned(fn) & set(functions) for name, fn in functions.items()}
+    changed = True
+    while changed:  # a helper that feeds a printer is presentation too
+        changed = False
+        for name in functions:
+            if not reaches[name] and any(reaches[called] for called in calls[name]):
+                reaches[name] = True
+                changed = True
+    return reaches
+
+
+def test_a_view_contains_no_logic() -> None:
+    """A function in the view that never touches the presentation is not part of the view.
+
+    "Logic" has no syntax; its opposite does. Run against `cli.py` before the first slice
+    existed, this named twelve functions, and the first two it named were the two writers of
+    the corpus format - the check derived from the defect finds the defect.
+    """
+    view = SOURCE / "cli.py"
+    tree = ast.parse(view.read_text(encoding="utf-8"))
+    commands = {
+        node.name for node in tree.body if isinstance(node, ast.FunctionDef) and node.decorator_list
+    }
+    astray = {
+        name
+        for name, reaches in _touches_presentation(view).items()
+        if not reaches and name not in commands
+    }
+    unexpected = astray - _A_VIEW_MAY_HOLD - _LOGIC_THE_VIEW_STILL_HOLDS
+    assert not unexpected, (
+        f"logic in the view: {sorted(unexpected)}. It belongs in a slice under features/, "
+        "beside whatever has to agree with it (ADR-066)."
+    )
+
+
+def test_the_named_debt_is_really_still_there() -> None:
+    """The exception list shrinks by moving code, never by editing the list.
+
+    Without this, a name could stay after its function left, and the list would quietly
+    stop describing anything. It is the same failure as a figure whose tense has aged.
+    """
+    view = SOURCE / "cli.py"
+    present = set(_touches_presentation(view))
+    gone = (_A_VIEW_MAY_HOLD | _LOGIC_THE_VIEW_STILL_HOLDS) - present
+    assert not gone, f"named as exceptions but no longer in the view: {sorted(gone)}"
+
+
+def test_a_slice_reaches_only_for_core_and_ports() -> None:
+    """A capability uses the rules; it does not know the cycle, the view, or another slice.
+
+    Type-only imports are not dependencies and are not counted: `features/corpus.py` names
+    `RunResult`, which lives in `cycle.py` and should not, and says so in its docstring
+    rather than pretending otherwise.
+    """
+    for module in _modules_in("features"):
+        for imported in _runtime_imports_of(module):
+            assert _layer(imported) in {"core", "ports"}, f"{module.name} reaches for {imported}"
+
+
+def _runtime_imports_of(path: pathlib.Path) -> set[str]:
+    """Internal modules imported when the program runs, ignoring `if TYPE_CHECKING` blocks."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    typing_only = {
+        id(inner)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Name)
+        and node.test.id == "TYPE_CHECKING"
+        for inner in ast.walk(node)
+    }
+    return {
+        node.module.removeprefix(PACKAGE)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module
+        and node.module.startswith(PACKAGE)
+        and id(node) not in typing_only
+    }

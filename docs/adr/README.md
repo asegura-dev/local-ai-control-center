@@ -1,6 +1,6 @@
 # Decision records
 
-Sixty-five records, in the order they were decided. The number is the identity: it is how
+Sixty-six records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -405,3 +405,10 @@ A bibliography of 24 papers is also 2,315 references, and a work several of them
 [`ADR-065-two-writers-one-round-trip.md`](ADR-065-two-writers-one-round-trip.md)
 
 `corpus.py` answers its own unease about re-parsing generated prose with a round trip - and there were two writers, covered by one. The assembler put the paraphrase where the reader expects the standing, so it was filed as a verdict, and a recorded verdict is correctly never carried forward. Assembling a corpus twice therefore stripped the meaning from every quotation in it while reporting the same counts it always had. Found because a merged file was 35 KB smaller with 178 more quotations. One format now, written by both, read through both, and tested twice - because the first pass looked right.
+
+
+### 066 - a view contains no logic
+
+[`ADR-066-a-view-contains-no-logic.md`](ADR-066-a-view-contains-no-logic.md)
+
+Every layering test followed dependencies inward and none asked whether logic had leaked outward, which is what ADR-065 cost: both writers of the corpus format in `cli.py`, the reader in `core`, free to drift apart with the suite green. "Logic" has no syntax, so the rule is stated by its opposite - a function in a view that never touches the presentation, directly or through anything it calls, is not part of the view. It named twelve functions and the first two were the two writers. A vertical slice per capability over a hexagon that stays horizontal, because counting refused the other half: nine of fourteen core modules are genuinely shared and cutting them would invent boundaries the code does not have.

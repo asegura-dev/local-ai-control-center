@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from local_ai_control_center.cli import _assembled, _collected_markdown
 from local_ai_control_center.core.corpus import CollectedClaim, about, parse_corpus
 from local_ai_control_center.core.grounding import CheckedClaim, Claim
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction
 from local_ai_control_center.cycle import RunResult
+from local_ai_control_center.features.corpus import assembled, collected_markdown
 
 
 def _result(*checked: CheckedClaim) -> RunResult:
@@ -30,7 +30,7 @@ def test_what_the_writer_produces_is_read_back_unchanged() -> None:
         _checked("an unplaceable one", "it is there", "page_unknown"),
         _checked("one that is nowhere", "it is not there", "not_found"),
     )
-    written = _collected_markdown("extract_claims", "a-model", [("paper.md", result)])
+    written = collected_markdown("extract_claims", "a-model", [("paper.md", result)])
     read_back = parse_corpus(written)
 
     assert [c.quote for c in read_back] == [
@@ -46,7 +46,7 @@ def test_what_the_writer_produces_is_read_back_unchanged() -> None:
 def test_several_documents_keep_their_claims_apart() -> None:
     first = _result(_checked("from the first", "a", "verified", 1))
     second = _result(_checked("from the second", "b", "verified", 2))
-    written = _collected_markdown("extract_claims", "m", [("one.md", first), ("two.md", second)])
+    written = collected_markdown("extract_claims", "m", [("one.md", first), ("two.md", second)])
     read_back = parse_corpus(written)
     assert [(c.document, c.quote) for c in read_back] == [
         ("one.md", "from the first"),
@@ -57,7 +57,7 @@ def test_several_documents_keep_their_claims_apart() -> None:
 def test_a_document_that_was_not_collected_contributes_nothing() -> None:
     """Its section names a failure, not a claim, and an empty entry would be a lie."""
     good = _result(_checked("a real one", "a", "verified", 1))
-    written = _collected_markdown(
+    written = collected_markdown(
         "extract_claims", "m", [("broken.md", "Cannot reach Ollama."), ("ok.md", good)]
     )
     read_back = parse_corpus(written)
@@ -92,19 +92,19 @@ def test_nearest_text_is_carried_back() -> None:
             nearest="what the document does say",
         )
     )
-    written = _collected_markdown("extract_claims", "m", [("paper.md", result)])
+    written = collected_markdown("extract_claims", "m", [("paper.md", result)])
     assert parse_corpus(written)[0].nearest == "what the document does say"
 
 
 def test_marking_a_subject_folds_the_spacing_extraction_invents() -> None:
     result = _result(_checked("The PSM A PET/CT protocol", "c", "verified", 1))
-    claims = parse_corpus(_collected_markdown("extract_claims", "m", [("p.md", result)]))
+    claims = parse_corpus(collected_markdown("extract_claims", "m", [("p.md", result)]))
     assert about(claims, ("psma",)) == frozenset({"The PSM A PET/CT protocol"})
 
 
 def test_marking_with_no_words_marks_nothing() -> None:
     result = _result(_checked("anything at all", "c", "verified", 1))
-    claims = parse_corpus(_collected_markdown("extract_claims", "m", [("p.md", result)]))
+    claims = parse_corpus(collected_markdown("extract_claims", "m", [("p.md", result)]))
     assert about(claims, ()) == frozenset()
     assert about(claims, ("  ",)) == frozenset()
 
@@ -136,7 +136,7 @@ def test_a_marked_quotation_is_still_readable(tmp_path: Path) -> None:
 
 def _assemble(claims: list[CollectedClaim]) -> str:
     """Run the corpus assembler over claims, re-checking nothing."""
-    return _assembled([(claim, True) for claim in claims], frozenset(), [Path("a.md")])
+    return assembled([(claim, True) for claim in claims], frozenset(), [Path("a.md")])
 
 
 def test_the_other_writer_is_read_back_unchanged_too() -> None:
@@ -160,7 +160,7 @@ def test_the_other_writer_is_read_back_unchanged_too() -> None:
 def test_assembling_twice_keeps_what_each_quotation_was_taken_to_mean() -> None:
     """The loss only appears on the second pass, which is why once was not enough.
 
-    `_assembled` put the paraphrase on the page line, where `parse_corpus` matched it as a
+    `assembled` put the paraphrase on the page line, where `parse_corpus` matched it as a
     verdict - and a recorded verdict is correctly never carried forward (ADR-042). So the
     first assembly looked right and the second silently stripped every paraphrase in the
     corpus, while reporting the same counts it always had (ADR-065).
@@ -189,7 +189,7 @@ def test_assembling_twice_keeps_what_each_quotation_was_taken_to_mean() -> None:
 
 def test_both_writers_say_the_same_thing_about_a_placed_quotation() -> None:
     """One format, written by both, is what closes the round trip."""
-    by_collect = _collected_markdown(
+    by_collect = collected_markdown(
         "extract_claims", "a-model", [("paper.md", _result(_checked("q", "c", "verified", 7)))]
     )
     by_corpus = _assemble([CollectedClaim(document="paper.md", quote="q", claim="c", page=7)])
