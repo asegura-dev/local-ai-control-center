@@ -97,6 +97,10 @@ from local_ai_control_center.cycle import (
     run_skill,
     write_new_file,
 )
+from local_ai_control_center.features.appearance import (
+    WINDOW_PREFERENCES,
+    preferences_from,
+)
 from local_ai_control_center.features.ask import as_material, might_support
 from local_ai_control_center.features.bibliography import bibliography
 from local_ai_control_center.features.corpus import (
@@ -106,7 +110,9 @@ from local_ai_control_center.features.corpus import (
 )
 from local_ai_control_center.features.measure import spread
 from local_ai_control_center.features.review import (
+    FINDINGS_SUFFIX,
     Finding,
+    Reviewed,
     concluded,
     paragraphs_in,
     report,
@@ -2190,8 +2196,53 @@ def review(
     )
     written_report = report(findings, draft.name, against.name, 0)
     if into:
-        write_new_file(workspace.resolve_within(into), written_report)
+        destination = workspace.resolve_within(into)
+        write_new_file(destination, written_report)
+        # The same findings as data, beside the report, so the window can paint them over
+        # the draft without re-running an engine (ADR-069).
+        reviewed = Reviewed(draft=draft.name, corpus=against.name, findings=tuple(findings))
+        write_new_file(
+            destination.with_suffix(FINDINGS_SUFFIX),
+            reviewed.model_dump_json(indent=2),
+        )
         _show(f"-> {into}")
+
+
+@app.command()
+def window(
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Open a window on the reviews in your workspace.
+
+    **It reads. It runs nothing** - no skill, no model call, nothing written. A review is
+    produced by `lacc review --into`, which leaves its findings beside the report; this opens
+    them and paints them over the draft (ADR-069).
+
+    Needs the optional toolkit: `pip install local-ai-control-center[gui]`.
+    """
+    _, workspace = _load(config_path)
+    try:
+        from local_ai_control_center.window import show
+    except ImportError:  # noqa: F401 - the toolkit is optional by design
+        # The brackets are escaped because Rich reads `[gui]` as markup and prints
+        # nothing at all - which turned this very message into instructions that left
+        # out the one part that matters.
+        _show(
+            "[red]The window needs CustomTkinter.[/red] Install it with "
+            r"`pip install local-ai-control-center\[gui]`, or with uv: "
+            r"`uv sync --extra gui` and run it as `uv run --extra gui lacc window`. "
+            "Everything else works without it."
+        )
+        raise typer.Exit(code=1) from None
+    # Hidden, in the workspace: the window's own preferences are not the user's documents
+    # and should not appear among them, and they are not configuration either (ADR-069).
+    saved = workspace.root / WINDOW_PREFERENCES
+    preferences = preferences_from(saved)
+    if not preferences.configuration:
+        preferences = preferences.model_copy(update={"configuration": config_path.name})
+    show(workspace.root, config_path.parent, preferences, saved)
 
 
 @app.command()

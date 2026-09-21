@@ -13,6 +13,7 @@ appears, not once in a legend.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
@@ -77,6 +78,26 @@ class Finding(BaseModel):
     def worth_a_look(self) -> bool:
         """Whether a person should read this paragraph again before submitting it."""
         return self.verdict != "supported"
+
+
+FINDINGS_SUFFIX = ".findings.json"
+"""Where a review leaves what it concluded, for a second view to read (ADR-069).
+
+Beside the report, the way the registry cache sits beside the bibliography. The report is for
+a person; this is the same findings as data, so the window can paint them over the draft
+without re-running anything - and so that if the window and the CLI ever disagree about what
+a finding means, the disagreement is visible in a file both of them read.
+"""
+
+
+class Reviewed(BaseModel):
+    """A whole review, as the file that carries it between views."""
+
+    model_config = ConfigDict(frozen=True)
+
+    draft: str
+    corpus: str
+    findings: tuple[Finding, ...] = ()
 
 
 def paragraphs_in(text: str) -> tuple[Paragraph, ...]:
@@ -233,3 +254,25 @@ def report(findings: list[Finding], draft: str, corpus: str, skipped: int) -> st
                 "",
             ]
     return chr(10).join(lines)
+
+
+def reviews_in(folder: Path) -> tuple[Path, ...]:
+    """Every review left in ``folder``, newest first.
+
+    Here rather than in a view because finding and ordering them is a decision, and a view
+    that made it would be a view containing logic (ADR-066).
+    """
+    found = sorted(folder.glob(f"*{FINDINGS_SUFFIX}"), key=lambda p: p.stat().st_mtime)
+    return tuple(reversed(found))
+
+
+def reviewed_from(path: Path) -> Reviewed | None:
+    """Read one review back, or nothing if the file is not one.
+
+    A damaged findings file is reported as unreadable rather than partially rendered: half a
+    review painted over a draft would say some paragraphs are uncovered when nobody checked.
+    """
+    try:
+        return Reviewed.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None

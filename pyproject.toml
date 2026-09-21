@@ -14,6 +14,9 @@ dependencies = [
     "typer>=0.27.0",
 ]
 
+[project.optional-dependencies]
+gui = ["customtkinter>=5.2.2"]
+
 [project.scripts]
 lacc = "local_ai_control_center.cli:main"
 
@@ -44,6 +47,20 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 python_version = "3.11"
 strict = true
 files = ["src", "tests"]
+
+# CustomTkinter ships no type information. Narrow, named, and the rest of src stays strict
+# (ADR-069).
+[[tool.mypy.overrides]]
+module = "customtkinter.*"
+ignore_missing_imports = true
+
+# The window subclasses a toolkit class that carries no annotations, so under `strict` it is
+# a subclass of `Any`. Scoped to the one module that touches the toolkit; everything the
+# window would otherwise decide lives in `features/review.py` and is checked normally
+# (ADR-069).
+[[tool.mypy.overrides]]
+module = "local_ai_control_center.window"
+disallow_subclassing_any = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

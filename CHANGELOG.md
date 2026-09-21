@@ -8,6 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`lacc window`: a second view, and it reads** (ADR-069). Most of what LACC produces belongs
+  in a terminal. A review does not - it is a document with a second document painted over it,
+  and reading that as a scrolling report means holding the draft in your head while the
+  verdicts go past.
+
+  **CustomTkinter, in a window of its own, with nothing listening.** Tk ships with Python, the
+  window talks to Python because it *is* Python, no socket is opened and no page is served.
+  The material this project protects is private research, and an interface that opened a port
+  on the machine holding it would buy convenience with attack surface.
+
+  **It reads and runs nothing.** A review takes minutes and an engine; a window that ran one
+  would need threads, progress, cancellation and a way to report an engine that went away -
+  four new ways to be wrong, in a view, on day one. `lacc review --into` now also writes the
+  findings as data beside the report, and the window paints those over the draft.
+
+  Four sections, all reading what is already on disk: reviews, corpora (what one holds and
+  which documents it came from), documents (size and the same token estimate the budget uses),
+  and the chosen configuration. **Choosing a configuration changes which one is read, never
+  what is in it** - editing is writing, and writing has a preview and a confirmation
+  everywhere else here.
+
+  **Themes are data.** Three palettes are built in and one written in YAML replaces a built-in
+  by name. The window keeps its theme and last configuration in `.lacc-window.yaml` inside the
+  workspace, never in `Config`: that model is frozen, validated with `extra="forbid"` and
+  describes what may run, and a colour has no business in it. The appearance is the window's
+  and it may save it; everything else is the user's.
+
+  The optional install `[gui]` keeps the toolkit off a server that only wants the CLI.
+
+  **ADR-066 bound this window before its first line was written**, which is why its exception
+  list was emptied first. It caught two things immediately: a colour lookup that was a decision
+  rather than a widget, and it moved to the palette; and a preferences field the program never
+  set, which `test_reachable` named and which belongs with the other models read from a file.
+
+### Added
 - **`lacc review`: your draft against your own sources** (ADR-068). Everything this project
   verifies, it verifies about text a *model* produced. This turns the same machinery around
   and asks, of each paragraph **you** wrote: is there anything in my corpus that holds this

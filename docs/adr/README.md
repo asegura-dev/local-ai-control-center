@@ -1,6 +1,6 @@
 # Decision records
 
-Sixty-eight records, in the order they were decided. The number is the identity: it is how
+Sixty-nine records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -426,3 +426,10 @@ Asked for a journal name with an instruction not to guess, a 14B invented twelve
 [`ADR-068-the-check-turned-around.md`](ADR-068-the-check-turned-around.md)
 
 Everything here verifies text a model produced. `lacc review` asks the same question of a draft a person wrote: is there anything in my own corpus that holds this paragraph up? Nothing new is invented - the corpus reader, the ranking and the judge all exist and all point the other way. It reads and reports, never rewrites, because a tool that told you a sentence was unsupported and then rewrote it would hand you a fluent unsupported sentence. The unit is the paragraph, which is how scientific prose carries its references. **Uncovered is not false**, and the wording says so wherever it appears. Graded on five paragraphs whose answers were written down first, it caught both planted errors - and the one disagreement was the prediction's fault: the paragraph had a causal clause no quotation supports, and its author had not noticed writing it.
+
+
+### 069 - a window that reads
+
+[`ADR-069-a-window-that-reads.md`](ADR-069-a-window-that-reads.md)
+
+Most of what LACC produces belongs in a terminal. A review does not: it is a document with a second document painted over it. CustomTkinter, in a window of its own, with **nothing listening** - Tk ships with Python, the window talks to Python because it is Python, and the material this project protects is private research. It reads and runs nothing: a review takes minutes and an engine, and a window that ran one would need threads, progress, cancellation and a way to report an engine that went away, all in a view, on day one. So a review is read from the findings file the CLI writes beside its report. Four sections, all reading what is already on disk. Choosing a configuration changes which is read, never what is in it. Themes are data in the window's own file, because a colour has no business in a frozen `Config`. **ADR-066 bound this window before its first line existed**, which was the point of emptying that exception list first.

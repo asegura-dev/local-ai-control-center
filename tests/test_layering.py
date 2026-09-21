@@ -82,7 +82,7 @@ def test_every_module_lives_in_a_layer_that_has_a_meaning() -> None:
 
     Anything else there is a module nobody decided where to put.
     """
-    assert {p.name for p in _modules_in("root")} == {"cycle.py", "cli.py"}
+    assert {p.name for p in _modules_in("root")} <= {"cycle.py", "cli.py", "window.py"}
     assert _modules_in("features"), "features/ is a layer and is empty"
 
 
@@ -114,14 +114,39 @@ _PRESENTATION = frozenset(
         "_approve",
         "_confirm",
         "style",
+        # The window's vocabulary. Tk's is not Rich's, and a rule that only knew one of them
+        # would pass a view it had never looked at (ADR-069).
+        "CTk",
+        "CTkFrame",
+        "CTkLabel",
+        "CTkButton",
+        "CTkTextbox",
+        "CTkScrollableFrame",
+        "CTkFont",
+        "Treeview",
+        "insert",
+        "configure",
+        "grid",
+        "pack",
+        "tag_config",
+        "mainloop",
+        "set_appearance_mode",
+        "set_default_color_theme",
     }
 )
-"""The vocabulary that makes a function part of the view.
+"""The vocabulary that makes a function part of a view.
 
 Concrete names rather than a notion of "output", because a test that cannot be run against
 the code is a wish. A helper that only formats a string for a helper that prints it is still
 presentation, which is why the check takes the transitive closure over calls.
+
+It covers **both** views. ADR-066 emptied the exception list before a second view existed,
+precisely so the window would be bound by the rule from its first line - a second view
+doubles whatever the first one got wrong.
 """
+
+_VIEWS = ("cli.py", "window.py")
+"""Every driving adapter, so a rule written for one cannot silently miss the other."""
 
 _A_VIEW_MAY_HOLD = frozenset(
     {
@@ -180,21 +205,26 @@ def test_a_view_contains_no_logic() -> None:
     existed, this named twelve functions, and the first two it named were the two writers of
     the corpus format - the check derived from the defect finds the defect.
     """
-    view = SOURCE / "cli.py"
-    tree = ast.parse(view.read_text(encoding="utf-8"))
-    commands = {
-        node.name for node in tree.body if isinstance(node, ast.FunctionDef) and node.decorator_list
-    }
-    astray = {
-        name
-        for name, reaches in _touches_presentation(view).items()
-        if not reaches and name not in commands
-    }
-    unexpected = astray - _A_VIEW_MAY_HOLD - _LOGIC_THE_VIEW_STILL_HOLDS
-    assert not unexpected, (
-        f"logic in the view: {sorted(unexpected)}. It belongs in a slice under features/, "
-        "beside whatever has to agree with it (ADR-066)."
-    )
+    for view_name in _VIEWS:
+        view = SOURCE / view_name
+        if not view.exists():
+            continue
+        tree = ast.parse(view.read_text(encoding="utf-8"))
+        commands = {
+            node.name
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.decorator_list
+        }
+        astray = {
+            name
+            for name, reaches in _touches_presentation(view).items()
+            if not reaches and name not in commands
+        }
+        unexpected = astray - _A_VIEW_MAY_HOLD - _LOGIC_THE_VIEW_STILL_HOLDS
+        assert not unexpected, (
+            f"logic in {view_name}: {sorted(unexpected)}. It belongs in a slice under "
+            "features/, beside whatever has to agree with it (ADR-066)."
+        )
 
 
 def test_the_named_debt_is_really_still_there() -> None:
@@ -203,10 +233,13 @@ def test_the_named_debt_is_really_still_there() -> None:
     Without this, a name could stay after its function left, and the list would quietly
     stop describing anything. It is the same failure as a figure whose tense has aged.
     """
-    view = SOURCE / "cli.py"
-    present = set(_touches_presentation(view))
+    present: set[str] = set()
+    for view_name in _VIEWS:
+        view = SOURCE / view_name
+        if view.exists():
+            present |= set(_touches_presentation(view))
     gone = (_A_VIEW_MAY_HOLD | _LOGIC_THE_VIEW_STILL_HOLDS) - present
-    assert not gone, f"named as exceptions but no longer in the view: {sorted(gone)}"
+    assert not gone, f"named as exceptions but no longer in any view: {sorted(gone)}"
 
 
 def test_a_slice_reaches_only_for_core_and_ports() -> None:

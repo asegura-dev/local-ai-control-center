@@ -24,7 +24,7 @@ was written and needs re-checking like any other measurement.
 | An environment variable can never widen reach | `OLLAMA_HOST` is honoured only when it resolves to loopback, and refused otherwise | **held** |
 | A `.env` cannot override a variable already set | The loader writes only where the name is absent from the environment | **held** |
 | `.env` supplies secrets, never destinations | The ntfy address is a `server_url` in the configuration; the topic and token stay named (ADR-060) | **held by test** |
-| No arbitrary code execution | No `eval`, `exec`, `pickle`, `subprocess` or `os.system` anywhere in the source; both YAML loads are `safe_load` | **held** |
+| No arbitrary code execution | No `eval`, `exec`, `pickle`, `subprocess` or `os.system` anywhere in the source; every YAML load is `safe_load`, and the window's preferences are written with `safe_dump` | **held** |
 | A document cannot forge a fence | Fence markers are fixed strings holding no user text (ADR-038), tested against a real model | **held by test** |
 | Text a reader cannot see is reported | Detection of invisible render modes and off-page positioning (ADR-040) | **held by test** |
 | A registry is reached only with two switches on | `registry_url` is empty by default and `network_access` is the ceiling; neither implies the other, and the command refuses each case by name (ADR-067) | **held by test** |

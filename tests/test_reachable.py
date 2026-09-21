@@ -25,6 +25,7 @@ FROM_A_FILE = frozenset(
         "DeclaredSkill",
         "DeclaredField",
         "AuditEvent",
+        "Preferences",
     }
 )
 """Models a user's file or a stored record fills in, so nothing in the source need set them.
