@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Text in the window did not fit the window** (ADR-069). Wrapping was a fixed number, so a
+  record ran past the edge of a narrow window and stopped short of a wide one. Labels now
+  re-wrap to the width the panel actually has, debounced because Tk sends a configure event
+  for every pixel of a drag.
+
+- **The rule that a view contains no logic was looking at less than it claimed** (ADR-066).
+  It walked top-level functions, which covered `cli.py` - mostly module-level - and **barely
+  touched `window.py`, which is almost entirely methods**. The rule read as complete for as
+  long as there was only one view of that shape.
+
+  It now walks the methods of a view's classes, resolving `self.other()` through the bare name
+  so the closure crosses a class. Against the window it named exactly one, `_clear`, which
+  destroys widgets and reaches nothing else - answered by admitting `destroy` and
+  `winfo_children` to the vocabulary, since taking widgets away is as much presentation as
+  putting them there.
+
+  Found by writing the second view and then asking what the check had actually looked at. It
+  is the same shape as ADR-065 one level up: a check written for the case that existed,
+  meeting a case that came later.
+
+### Added
+- **A command can be copied from the window** (ADR-072). The window still runs nothing;
+  remembering the flags and typing the paths stops being the tedious part.
+
 ### Added
 - **`scripts/`: three launchers, and digests the suite enforces** (ADR-071). One opens the
   window, one starts the engine with `OLLAMA_KV_CACHE_TYPE=q8_0` - the roughly four gigabytes

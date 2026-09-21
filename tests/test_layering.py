@@ -132,6 +132,15 @@ _PRESENTATION = frozenset(
         "mainloop",
         "set_appearance_mode",
         "set_default_color_theme",
+        # Destroying and enumerating widgets is as much presentation as creating them, and
+        # a method that only does that reaches no other name at all.
+        "destroy",
+        "winfo_children",
+        "winfo_width",
+        "clipboard_clear",
+        "clipboard_append",
+        "bind",
+        "after",
     }
 )
 """The vocabulary that makes a function part of a view.
@@ -172,10 +181,26 @@ empty the rule is absolute (ADR-066).
 """
 
 
+def _functions_in(tree: ast.Module) -> dict[str, ast.FunctionDef]:
+    """Every function a view defines, including the methods of its classes.
+
+    Methods were missed at first, and a window is almost entirely methods - so the rule read
+    as covering `window.py` while barely touching it. Found by writing the window and then
+    asking what the check had actually looked at (ADR-066).
+    """
+    found = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            for inner in node.body:
+                if isinstance(inner, ast.FunctionDef) and inner.name != "__init__":
+                    found.setdefault(f"{node.name}.{inner.name}", inner)
+    return found
+
+
 def _touches_presentation(module: pathlib.Path) -> dict[str, bool]:
-    """For each top-level function, whether it reaches the view, directly or through a call."""
+    """For each function and method, whether it reaches the view, directly or through a call."""
     tree = ast.parse(module.read_text(encoding="utf-8"))
-    functions = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+    functions = _functions_in(tree)
 
     def mentioned(node: ast.AST) -> set[str]:
         found: set[str] = set()
@@ -186,8 +211,14 @@ def _touches_presentation(module: pathlib.Path) -> dict[str, bool]:
                 found.add(inner.attr)
         return found
 
+    plain = {name.split(".")[-1]: name for name in functions}
     reaches = {name: bool(mentioned(fn) & _PRESENTATION) for name, fn in functions.items()}
-    calls = {name: mentioned(fn) & set(functions) for name, fn in functions.items()}
+    # A method calls another as `self.other`, which `mentioned` sees as the attribute
+    # `other`. Resolving through the bare name is what lets the closure cross a class.
+    calls = {
+        name: {plain[called] for called in mentioned(fn) & set(plain)}
+        for name, fn in functions.items()
+    }
     changed = True
     while changed:  # a helper that feeds a printer is presentation too
         changed = False
@@ -214,6 +245,15 @@ def test_a_view_contains_no_logic() -> None:
             node.name
             for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.decorator_list
+        }
+        # A property or a cached lookup on a class is presentation by position: it belongs
+        # to the widget that holds it. Only plain methods are asked about.
+        commands |= {
+            f"{node.name}.{inner.name}"
+            for node in tree.body
+            if isinstance(node, ast.ClassDef)
+            for inner in node.body
+            if isinstance(inner, ast.FunctionDef) and inner.decorator_list
         }
         astray = {
             name

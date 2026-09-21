@@ -124,6 +124,28 @@ leave and another arrive. A baseline that is a list of names cannot.
   the reason to do it now rather than alongside: a second view doubles whatever the first one
   got wrong.
 
+## What it missed, and how that was found
+
+**The check looked at top-level functions, and a window is almost entirely methods.** For as
+long as `cli.py` was the only view that was invisible - it is mostly module-level functions -
+and the rule read as complete. The second view arrived as a class, so the rule covered it in
+name and barely touched it in fact.
+
+Found the way most things here are found: by writing the window and then asking what the check
+had actually looked at. It now walks the methods of a view's classes too, resolving
+`self.other()` through the bare name so the transitive closure crosses a class. Run against the
+window it named exactly one, `_clear`, which destroys widgets and reaches nothing else - a
+false positive answered by admitting `destroy` and `winfo_children` to the vocabulary, since
+taking widgets away is as much presentation as putting them there.
+
+Properties and decorated methods are treated as presentation by position: they belong to the
+widget that holds them.
+
+**The lesson is the one this project keeps relearning.** A rule is enforced over whatever the
+check happens to walk, and the boundary of *that* is invisible until something outside it
+arrives. It is the same shape as ADR-065, one level up: a check written for the case that
+existed, meeting a case that came later.
+
 ## Trade-off
 
 **The rule can be satisfied without being obeyed.** A function that calls `_show` once is

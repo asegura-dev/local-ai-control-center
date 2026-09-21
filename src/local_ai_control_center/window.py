@@ -51,6 +51,14 @@ from local_ai_control_center.features.review import (
 WIDTH, HEIGHT = 1280, 820
 RAIL, SIDE = 214, 330
 
+MARGIN = 96
+"""Room a wrapped label leaves for the padding around it.
+
+Wrapping was a fixed number first, so text ran past the edge of a narrow window and stopped
+short of a wide one. A reading application that cannot be resized without spoiling what is in
+it is not a reading application.
+"""
+
 VERDICT_SAID = {
     "contradicted": "your corpus says otherwise",
     "supported": "held up by your corpus",
@@ -201,6 +209,7 @@ class Window(ctk.CTk):
         commands: tuple[Command, ...] = (),
     ) -> None:
         super().__init__()
+        self._pending: str | None = None
         self.commands = commands
         self.folder = folder
         self.configs = configs
@@ -220,6 +229,7 @@ class Window(ctk.CTk):
         self._rail(available)
         self._middle()
         self._panel()
+        self.right.bind("<Configure>", self._reflow)
         self._go(SECTIONS[0])
 
     # --- the three columns ---------------------------------------------------------------
@@ -346,6 +356,39 @@ class Window(ctk.CTk):
 
     # --- what the controls do ------------------------------------------------------------
 
+    def _reflow(self, _event: object = None) -> None:
+        """Re-wrap every label to the width the panel actually has.
+
+        Debounced: Tk sends a configure event for every pixel of a drag, and re-wrapping a
+        long record on each of them makes the window crawl.
+        """
+        if self._pending is not None:
+            self.after_cancel(self._pending)
+        self._pending = self.after(90, self._rewrap)
+
+    def _rewrap(self) -> None:
+        """Walk the panel and give every label the width it now has."""
+        self._pending = None
+        width = max(self.right.winfo_width() - MARGIN, 280)
+
+        def walk(widget: object) -> None:
+            for child in getattr(widget, "winfo_children", list)():
+                if isinstance(child, ctk.CTkLabel):
+                    child.configure(wraplength=width)
+                walk(child)
+
+        walk(self.right)
+
+    def _copy(self, words: str) -> None:
+        """Put a command on the clipboard. Copying is not running it.
+
+        The honest middle while the window still runs nothing: remembering the flags and
+        typing the paths stops being the tedious part (ADR-072).
+        """
+        self.clipboard_clear()
+        self.clipboard_append(words)
+        self.summary.configure(text=f"Copied:  {words}")
+
     def _clear(self) -> None:
         for child in self.body.winfo_children():
             child.destroy()
@@ -353,6 +396,7 @@ class Window(ctk.CTk):
     def _said(self, title: str, summary: str) -> None:
         self.title_label.configure(text=title)
         self.summary.configure(text=summary)
+        self._reflow()
 
     def _theme(self, name: str) -> None:
         """Remember the theme. It applies when the window is opened again."""
@@ -463,14 +507,28 @@ class Window(ctk.CTk):
                 continue
             self._said(f"lacc {command.name}", command.summary)
             body = _card(self.body, self.skin)
+            line = ctk.CTkFrame(body, fg_color="transparent")
+            line.pack(fill="x")
             ctk.CTkLabel(
-                body,
+                line,
                 text=command.usage,
                 anchor="w",
                 justify="left",
                 text_color=self.skin.accent,
                 font=ctk.CTkFont(family="Consolas", size=12),
-            ).pack(fill="x")
+            ).pack(side="left")
+            ctk.CTkButton(
+                line,
+                text="copy",
+                width=54,
+                height=24,
+                corner_radius=6,
+                fg_color=self.skin.rail,
+                hover_color=self.skin.accent,
+                text_color=self.skin.dim,
+                font=ctk.CTkFont(size=10),
+                command=lambda words=command.usage: self._copy(words),
+            ).pack(side="left", padx=10)
             if command.parameters:
                 required = [p.shown for p in command.parameters if p.required]
                 optional = [p.shown for p in command.parameters if not p.required]
