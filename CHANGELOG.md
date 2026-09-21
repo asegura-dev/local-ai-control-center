@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A prompts section: exactly what each skill would ask** (ADR-074). Almost every measured
+  finding in this project is about the distance between what somebody meant to ask and what
+  was actually sent - an instruction not to guess that produced twelve invented journal names,
+  a schema that delivered the shape and lost the answer, a declared skill whose prompt never
+  carried the question at all, and a schema that left the prompt byte-identical.
+
+  **Every one of those was invisible for exactly as long as nobody looked at the prompt**, and
+  two of them were found by printing it. The prompt has always been printable: a plan is pure
+  and produces the template with no effects, so reading one calls no model and reaches no
+  engine.
+
+  It shows the instruction, the capabilities the skill would ask you to allow, whether its
+  quotations are checked, the labels it asks the answer to carry, and how many words the
+  asking is before any document is added.
+
+  **The document's place is shown rather than left as a marker** - `CONTENT_PLACEHOLDER` is a
+  token nobody would recognise, and leaving it raw makes the single most important fact about
+  a prompt the least visible thing on the page: the document arrives *inside* it, surrounded
+  by instructions. A skill that cannot be planned says why in place of its template, because
+  one that cannot be planned will fail when it is run and a list that omitted it would lie by
+  absence.
+
+### Added
 - **`tools/measure.py`: the measurements this project argues from, in one run.** Layers and
   their sizes, logic that has drifted into a view, records against their index, the suite, and
   for a workspace every document with its tokens, pages and structure and every corpus with

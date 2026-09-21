@@ -110,6 +110,7 @@ from local_ai_control_center.features.corpus import (
     recheck,
 )
 from local_ai_control_center.features.measure import spread
+from local_ai_control_center.features.prompts import prompts_of
 from local_ai_control_center.features.review import (
     FINDINGS_SUFFIX,
     Finding,
@@ -2223,7 +2224,7 @@ def window(
 
     Needs the optional toolkit: `pip install local-ai-control-center[gui]`.
     """
-    _, workspace = _load(config_path)
+    config, workspace = _load(config_path)
     try:
         from local_ai_control_center.window import show
     except ImportError:  # noqa: F401 - the toolkit is optional by design
@@ -2243,7 +2244,14 @@ def window(
     preferences = preferences_from(saved)
     if not preferences.configuration:
         preferences = preferences.model_copy(update={"configuration": config_path.name})
-    show(workspace.root, config_path.parent, preferences, saved, commands_of(app))
+    show(
+        workspace.root,
+        config_path.parent,
+        preferences,
+        saved,
+        commands_of(app),
+        prompts_of(_known_skills(config_path), config),
+    )
 
 
 @app.command()

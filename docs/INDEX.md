@@ -16,7 +16,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Seventy-three records front to back is a history. These are the threads through them, for
+Seventy-four records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -149,6 +149,7 @@ not to reach for an approximate algorithm to find them.
 | 071 | [launchers-and-their-digests](adr/ADR-071-launchers-and-their-digests.md) | Three launchers, including the one that starts the engine with the 8-bit KV cache that had been a pending task for weeks. The decision is that **the suite enforces their digests**: a checksum nobody checks is decoration. What that proves is stated plainly - the files match the digests, not that the digests are honest. Also tested for what they must not do: no download, loopback by default. |
 | 072 | [the-commands-describe-themselves](adr/ADR-072-the-commands-describe-themselves.md) | The window can show what LACC does, derived from the application rather than listed - a hand-written copy would be a second writer of the same thing, which is what cost ADR-065 a corpus. It does not import the CLI; the application is passed in. Typer's naming is copied exactly, including where it looks wrong. |
 | 073 | [one-engine-for-every-markdown](adr/ADR-073-one-engine-for-every-markdown.md) | A Markdown engine existed for the records while the window could only count the workspace full of Markdown beside it. One engine for all of it; what LACC wrote listed apart from what the user brought, recognised by its heading rather than its filename; long documents cut at 250 blocks and saying by how much. Adding it found a re-read of the whole workspace on every click. |
+| 074 | [what-it-is-about-to-ask](adr/ADR-074-what-it-is-about-to-ask.md) | Nearly every finding here is the distance between what somebody meant to ask and what was sent, and each was invisible until somebody printed the prompt. A section showing every skill's instruction, what it would ask you to allow, and how long the asking is. The document's place is shown, not left as a marker - the one important fact about a prompt is that the document arrives inside it. |
 
 ## Guides (`docs/guides/`)
 

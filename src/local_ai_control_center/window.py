@@ -36,6 +36,7 @@ from local_ai_control_center.features.overview import (
     documents_in,
     settings_of,
 )
+from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.reading import (
     Block,
     blocks_in,
@@ -73,6 +74,7 @@ SECTIONS = (
     "Corpora",
     "Documents",
     "Commands",
+    "Prompts",
     "Documentation",
     "Configuration",
 )
@@ -217,11 +219,13 @@ class Window(ctk.CTk):
         preferences: Preferences,
         saved: Path,
         commands: tuple[Command, ...] = (),
+        prompts: tuple[Prompt, ...] = (),
     ) -> None:
         super().__init__()
         self._pending: str | None = None
         self._seen: tuple[DocumentSeen, ...] = ()
         self.commands = commands
+        self.prompts = prompts
         self.folder = folder
         self.configs = configs
         self.preferences = preferences
@@ -452,6 +456,8 @@ class Window(ctk.CTk):
             self._list_files("document", "Documents", "Everything else in the workspace.")
         elif section == "Commands":
             self._list_commands()
+        elif section == "Prompts":
+            self._list_prompts()
         elif section == "Documentation":
             self._list_documentation()
         else:
@@ -505,6 +511,8 @@ class Window(ctk.CTk):
             self._read_markdown(path, "")
         elif self.section == "Commands":
             self._show_command(selected[0])
+        elif self.section == "Prompts":
+            self._show_prompt(selected[0])
         elif self.section == "Documentation":
             self._show_page(path)
         else:
@@ -560,6 +568,56 @@ class Window(ctk.CTk):
                     _text(body, f"optional: {', '.join(optional)}", self.skin.faint, 11)
             for block in blocks_in(command.detail):
                 _block(self.body, self.skin, block)
+            return
+
+    def _list_prompts(self) -> None:
+        """What each skill would ask, planned against one example document."""
+        for prompt in self.prompts:
+            mark = "  " if prompt.planned else "  ! "
+            self.tree.insert("", "end", iid=f"prompt:{prompt.skill}", text=f"{mark}{prompt.skill}")
+        self._said(
+            "Prompts",
+            f"{len(self.prompts)} skills, and exactly what each one asks - planned against an "
+            "example document, with no model called and nothing sent.\n"
+            "A plan is pure by design, which is why reading one is free.",
+        )
+
+    def _show_prompt(self, chosen: str) -> None:
+        """One prompt in full, with what it would need and what it checks."""
+        name = chosen.removeprefix("prompt:")
+        for prompt in self.prompts:
+            if prompt.skill != name:
+                continue
+            self._said(prompt.skill, prompt.summary)
+            facts = _card(self.body, self.skin)
+            _text(facts, f"needs        {', '.join(prompt.needs) or 'nothing'}", self.skin.dim, 11)
+            _text(
+                facts,
+                f"quotations   {'checked against the source' if prompt.checks_quotes else 'not checked'}",
+                self.skin.dim,
+                11,
+            )
+            if prompt.fields:
+                _text(facts, f"asks for     {', '.join(prompt.fields)}", self.skin.dim, 11)
+            if prompt.temperature is not None:
+                _text(facts, f"temperature  {prompt.temperature}", self.skin.dim, 11)
+            _text(
+                facts,
+                f"instruction  {prompt.words} words before your document",
+                self.skin.faint,
+                11,
+            )
+
+            body = _card(self.body, self.skin, stripe=self.skin.accent)
+            ctk.CTkLabel(
+                body,
+                text=prompt.template,
+                anchor="w",
+                justify="left",
+                wraplength=700,
+                text_color=self.skin.ink if prompt.planned else self.skin.contradicted,
+                font=ctk.CTkFont(family="Consolas", size=11),
+            ).pack(fill="x")
             return
 
     def _list_documentation(self) -> None:
@@ -695,10 +753,11 @@ def show(
     preferences: Preferences,
     saved: Path,
     commands: tuple[Command, ...] = (),
+    prompts: tuple[Prompt, ...] = (),
 ) -> None:
     """Open the window and hand control to Tk until it closes.
 
     The commands are passed in rather than read here, so that a view never imports another
     view and the list has exactly one source: the application the CLI builds (ADR-072).
     """
-    Window(folder, configs, preferences, saved, commands).mainloop()
+    Window(folder, configs, preferences, saved, commands, prompts).mainloop()

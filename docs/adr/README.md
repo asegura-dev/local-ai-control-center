@@ -1,6 +1,6 @@
 # Decision records
 
-Seventy-three records, in the order they were decided. The number is the identity: it is how
+Seventy-four records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -460,3 +460,10 @@ The window could show a workspace, its corpora and this project's records, but n
 [`ADR-073-one-engine-for-every-markdown.md`](ADR-073-one-engine-for-every-markdown.md)
 
 The Markdown engine built for this project's records was one import away from a workspace full of Markdown the window could only count. A corpus, a bibliography, a review report, a paper and a decision record are the same format, so they are read the same way. What LACC **wrote** is listed apart from what the user brought, recognised by the heading its writer put at the top rather than by filename. A long document is cut at 250 blocks and says by how much, because a widget per block over a 284 KB corpus freezes the window - and the cut lives in the slice, since how many and whether-at-all are decisions. Adding it found a defect nobody had reported: selecting a document re-read the entire workspace, corpus included, on every click.
+
+
+### 074 - what it is about to ask
+
+[`ADR-074-what-it-is-about-to-ask.md`](ADR-074-what-it-is-about-to-ask.md)
+
+Almost every measured finding here is about the distance between what somebody meant to ask and what was sent: an instruction not to guess that produced twelve invented journal names, a schema that delivered the shape and lost the answer, a declared skill whose prompt never carried the question. Each was invisible for exactly as long as nobody looked at the prompt - and the prompt has always been printable, because a plan is pure by design (ADR-014). A section that shows, for every skill, the instruction, the capabilities it would ask you to allow, what it checks, and how long the asking is before any document is added. The document's place is **shown rather than left as a marker**, because the one important fact about a prompt is that the document arrives inside it, surrounded by instructions. A skill that cannot be planned says why in place of its template.
