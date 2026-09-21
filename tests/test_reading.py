@@ -106,3 +106,20 @@ def test_a_page_is_titled_by_its_own_first_heading() -> None:
     assert folder is not None
     titles = {page.title for page in pages_in(folder)}
     assert any("Roadmap" in title for title in titles)
+
+
+def test_a_long_document_is_cut_and_says_by_how_much() -> None:
+    """A widget per block over a 284 KB corpus freezes the window (ADR-073)."""
+    from local_ai_control_center.features.reading import Block, opening
+
+    many = tuple(Block(kind="text", text=f"block {n}") for n in range(400))
+    shown, left = opening(many, most=250)
+    assert len(shown) == 250
+    assert left == 150
+
+
+def test_a_short_document_is_not_cut() -> None:
+    from local_ai_control_center.features.reading import Block, opening
+
+    few = tuple(Block(kind="text", text="x") for _ in range(3))
+    assert opening(few) == (few, 0)

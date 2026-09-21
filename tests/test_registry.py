@@ -189,3 +189,11 @@ def test_the_cache_round_trips_through_json(tmp_path: Path) -> None:
     first.write()
     assert json.loads(cache.read_text(encoding="utf-8"))["10.1000/x"]["title"] == "T"
     assert RememberedRegistry(_Counting({}), cache).about("10.1000/x") == work
+
+
+def test_a_bibliography_is_recognised_as_something_lacc_wrote() -> None:
+    """The window groups what LACC produced apart from the papers (ADR-073)."""
+    from local_ai_control_center.features.overview import BIBLIOGRAPHY_MARK
+
+    written = bibliography([], [], [], "https://api.crossref.org")
+    assert written.startswith(BIBLIOGRAPHY_MARK)

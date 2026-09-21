@@ -29,6 +29,7 @@ import customtkinter as ctk
 from local_ai_control_center.features.appearance import Palette, Preferences, remember
 from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.overview import (
+    DocumentSeen,
     Setting,
     configurations_in,
     corpus_seen,
@@ -39,6 +40,7 @@ from local_ai_control_center.features.reading import (
     Block,
     blocks_in,
     documentation_near,
+    opening,
     pages_in,
 )
 from local_ai_control_center.features.review import (
@@ -65,7 +67,15 @@ VERDICT_SAID = {
     "nothing": "not covered - which is not the same as wrong",
 }
 
-SECTIONS = ("Reviews", "Corpora", "Documents", "Commands", "Documentation", "Configuration")
+SECTIONS = (
+    "Reviews",
+    "Written",
+    "Corpora",
+    "Documents",
+    "Commands",
+    "Documentation",
+    "Configuration",
+)
 
 
 def _text(
@@ -210,6 +220,7 @@ class Window(ctk.CTk):
     ) -> None:
         super().__init__()
         self._pending: str | None = None
+        self._seen: tuple[DocumentSeen, ...] = ()
         self.commands = commands
         self.folder = folder
         self.configs = configs
@@ -429,8 +440,14 @@ class Window(ctk.CTk):
         self._clear()
         if section == "Reviews":
             self._list_reviews()
+        elif section == "Written":
+            self._list_files(
+                "written",
+                "Written by LACC",
+                "Bibliographies and review reports. Choose one to read it.",
+            )
         elif section == "Corpora":
-            self._list_files("corpus", "Corpora", "Choose one to count what it holds.")
+            self._list_files("corpus", "Corpora", "Choose one to count what it holds and read it.")
         elif section == "Documents":
             self._list_files("document", "Documents", "Everything else in the workspace.")
         elif section == "Commands":
@@ -455,7 +472,10 @@ class Window(ctk.CTk):
             )
 
     def _list_files(self, kind: str, title: str, said: str) -> None:
-        for seen in documents_in(self.folder):
+        # Read once per listing rather than once per selection: `documents_in` opens every
+        # Markdown file to estimate its tokens, and a corpus here is 284 KB.
+        self._seen = documents_in(self.folder)
+        for seen in self._seen:
             if seen.kind == kind:
                 self.tree.insert("", "end", iid=str(seen.path), text=f"  {seen.name}")
         self._said(title, said)
@@ -481,6 +501,8 @@ class Window(ctk.CTk):
             self._show_review(path)
         elif self.section == "Corpora":
             self._show_corpus(path)
+        elif self.section == "Written":
+            self._read_markdown(path, "")
         elif self.section == "Commands":
             self._show_command(selected[0])
         elif self.section == "Documentation":
@@ -611,15 +633,60 @@ class Window(ctk.CTk):
         _text(body, "Where they came from", self.skin.ink, 13, bold=True)
         for name, count in seen.documents:
             _text(body, f"{count:>5}   {name}", self.skin.dim, 11)
+        ctk.CTkButton(
+            self.body,
+            text="read the file",
+            width=130,
+            height=28,
+            corner_radius=8,
+            fg_color=self.skin.card,
+            hover_color=self.skin.accent,
+            text_color=self.skin.dim,
+            font=ctk.CTkFont(size=11),
+            command=lambda where=path: self._open_corpus(where),
+        ).pack(anchor="w", padx=18, pady=(4, 10))
+
+    def _open_corpus(self, path: Path) -> None:
+        """Read a corpus as text, after its counts have been seen."""
+        self._clear()
+        self._read_markdown(path, "")
 
     def _show_document(self, path: Path) -> None:
-        for seen in documents_in(self.folder):
+        """A document of the user's own, with its size and then its text."""
+        for seen in self._seen:
             if seen.path != path:
                 continue
             size = f"{seen.bytes_on_disk / 1024:,.0f} KB"
             tokens = f"{seen.tokens:,} tokens (estimated)" if seen.tokens else "not text"
-            self._said(seen.name, f"{size}   ·   {tokens}")
+            self._read_markdown(path, f"{size}   ·   {tokens}")
             return
+
+    def _read_markdown(self, path: Path, said: str) -> None:
+        """Read any Markdown in the workspace with the engine the records are read with.
+
+        The same parser, so a corpus, a bibliography and a decision record all look like what
+        they are. Long files are cut and say by how much: a widget per block over a corpus of
+        284 KB freezes the window drawing what nobody reads to the end (ADR-073).
+        """
+        if path.suffix != ".md":
+            self._said(path.name, said or "Not a text file.")
+            return
+        blocks = blocks_in(path.read_text(encoding="utf-8", errors="replace"))
+        shown, left = opening(blocks)
+        first = next((b.text for b in shown if b.kind == "heading"), path.stem)
+        note = f"   ·   showing the first {len(shown)} blocks of {len(blocks)}" if left else ""
+        self._said(first if first != path.stem else path.name, f"{said}{note}")
+        for block in shown:
+            if block.kind == "heading" and block.text == first:
+                continue
+            _block(self.body, self.skin, block)
+        if left:
+            _text(
+                self.body,
+                f"   {left} more blocks are in the file and are not drawn here.",
+                self.skin.faint,
+                11,
+            )
 
 
 def show(

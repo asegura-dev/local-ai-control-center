@@ -21,6 +21,8 @@ from local_ai_control_center.core.corpus import parse_corpus
 
 CORPUS_MARK = "# Collected quotations"
 COLLECTED_MARK = "# Claims collected by"
+BIBLIOGRAPHY_MARK = "# Bibliography"
+REVIEW_MARK = "# Review of"
 """How a file says it is a corpus: by the heading its writer put at the top.
 
 Recognised by content rather than by filename, because a corpus is whatever `collect` or
@@ -132,6 +134,10 @@ def _kind_of(path: Path) -> str:
         return "other"
     if opening.startswith((CORPUS_MARK, COLLECTED_MARK)):
         return "corpus"
+    if opening.startswith((BIBLIOGRAPHY_MARK, REVIEW_MARK)):
+        # Written by LACC, read by a person: grouped with what LACC produced rather than
+        # with the papers, because they answer different questions about the workspace.
+        return "written"
     return "document"
 
 

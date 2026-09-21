@@ -1,6 +1,6 @@
 # Decision records
 
-Seventy-two records, in the order they were decided. The number is the identity: it is how
+Seventy-three records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -453,3 +453,10 @@ Three `.bat` files in `scripts/`: one opens the window, one starts the engine wi
 [`ADR-072-the-commands-describe-themselves.md`](ADR-072-the-commands-describe-themselves.md)
 
 The window could show a workspace, its corpora and this project's records, but not what LACC can do. The list is **derived from the application, never written down twice** - a hand-written copy would be a second writer of the same thing, which is precisely what cost ADR-065 a corpus. `commands_of` reads the registered commands, the name Typer gives each, its docstring and its parameters; a command added appears, one renamed changes, one without a docstring fails a test. It does not import the CLI: the application is passed in, so a view never imports another view. Typer's naming is copied exactly including where it looks wrong, because the point is what the CLI answers to rather than what it ought to.
+
+
+### 073 - one engine for every Markdown
+
+[`ADR-073-one-engine-for-every-markdown.md`](ADR-073-one-engine-for-every-markdown.md)
+
+The Markdown engine built for this project's records was one import away from a workspace full of Markdown the window could only count. A corpus, a bibliography, a review report, a paper and a decision record are the same format, so they are read the same way. What LACC **wrote** is listed apart from what the user brought, recognised by the heading its writer put at the top rather than by filename. A long document is cut at 250 blocks and says by how much, because a widget per block over a 284 KB corpus freezes the window - and the cut lives in the slice, since how many and whether-at-all are decisions. Adding it found a defect nobody had reported: selecting a document re-read the entire workspace, corpus included, on every click.

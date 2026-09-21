@@ -189,3 +189,22 @@ def pages_in(folder: Path) -> tuple[Page, ...]:
         section = path.parent.name if path.parent != folder else ""
         found.append(Page(path=path, title=_title_of(path), section=section))
     return tuple(sorted(found, key=lambda page: (page.section, page.path.name)))
+
+
+SHOWN_AT_ONCE = 250
+"""How many blocks are drawn before a document is cut off.
+
+A corpus here is 284 KB and thousands of blocks, and a widget per block would freeze the
+window drawing a file nobody reads to the end anyway. The cut is a **decision** - the number
+and the fact that there is one - so it lives with the other decisions, and what is not shown
+is counted and said rather than silently dropped (ADR-073).
+"""
+
+
+def opening(blocks: tuple[Block, ...], most: int = SHOWN_AT_ONCE) -> tuple[tuple[Block, ...], int]:
+    """The first blocks of a document, and how many were left out.
+
+    Returning the remainder rather than a flag: a reader deciding whether to open the file
+    properly wants to know whether it is ten more or ten thousand.
+    """
+    return blocks[:most], max(len(blocks) - most, 0)

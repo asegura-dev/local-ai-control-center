@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **The window reads every Markdown in the workspace, not just the records** (ADR-073). A
+  Markdown engine had been built for this project's own documentation and was one import away
+  from a workspace full of Markdown the window could only count: a corpus of 832 quotations
+  reported as a number, a bibliography filed under "other", the user's own notes shown as a
+  size in kilobytes.
+
+  One engine for all of it. **What LACC wrote is listed apart from what the user brought** -
+  a new section, recognised by the heading its writer put at the top rather than by filename,
+  because people rename files. The two answer different questions: what did I collect, versus
+  what did this produce.
+
+  A long document is **cut at 250 blocks and says by how much**, never silently: a widget per
+  block over a 284 KB corpus freezes the window drawing what nobody reads to the end. The
+  remainder is returned as a count rather than a flag, because a reader deciding whether to
+  open the file properly wants to know whether it is ten more or ten thousand. How many, and
+  whether there is a limit at all, live in the slice - a window that chose them would be a
+  window containing logic.
+
+  A corpus shows its counts first and its text behind a button: the counts are what it is for,
+  the text is what it says.
+
+### Fixed
+- **Selecting a document re-read the entire workspace** (ADR-073). `documents_in` opens every
+  Markdown file to estimate its tokens, and it was being called on every selection rather than
+  once per listing - so clicking a paper re-read the 284 KB corpus beside it. Nobody reported
+  it; it was found while building the reader, which is the route most defects here are found
+  by.
+
 ### Fixed
 - **Text in the window did not fit the window** (ADR-069). Wrapping was a fixed number, so a
   record ran past the edge of a narrow window and stopped short of a wide one. Labels now
