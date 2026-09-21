@@ -34,6 +34,12 @@ from local_ai_control_center.features.overview import (
     documents_in,
     settings_of,
 )
+from local_ai_control_center.features.reading import (
+    Block,
+    blocks_in,
+    documentation_near,
+    pages_in,
+)
 from local_ai_control_center.features.review import (
     Finding,
     Reviewed,
@@ -50,7 +56,7 @@ VERDICT_SAID = {
     "nothing": "not covered - which is not the same as wrong",
 }
 
-SECTIONS = ("Reviews", "Corpora", "Documents", "Configuration")
+SECTIONS = ("Reviews", "Corpora", "Documents", "Documentation", "Configuration")
 
 
 def _text(
@@ -134,6 +140,52 @@ def _paragraph_card(parent: ctk.CTkFrame, skin: Palette, finding: Finding) -> No
         _text(body, "Closest in your corpus, and judged not to hold it:", skin.faint, 10)
         for document, quote in finding.considered:
             _text(body, f"• {quote}\n   {document}", skin.faint, 10, wrap=690)
+
+
+def _block(parent: ctk.CTkFrame, skin: Palette, block: Block) -> None:
+    """One block of a document, given a font rather than a meaning.
+
+    What each block *is* was decided in `features/reading.py`. This gives it a size and a
+    colour, which is the whole of a view's job (ADR-066).
+    """
+    if block.kind == "rule":
+        line = ctk.CTkFrame(parent, fg_color=skin.card, height=1)
+        line.pack(fill="x", padx=18, pady=14)
+        return
+    if block.kind == "heading":
+        size = {1: 22, 2: 17, 3: 14}.get(block.level, 13)
+        holder = ctk.CTkFrame(parent, fg_color="transparent")
+        holder.pack(fill="x", padx=18, pady=(18 if block.level < 3 else 12, 4))
+        _text(holder, block.text, skin.ink, size, bold=True, wrap=760)
+        return
+    if block.kind == "code":
+        body = _card(parent, skin)
+        ctk.CTkLabel(
+            body,
+            text=block.text,
+            anchor="w",
+            justify="left",
+            text_color=skin.dim,
+            font=ctk.CTkFont(family="Consolas", size=11),
+        ).pack(fill="x")
+        return
+    holder = ctk.CTkFrame(parent, fg_color="transparent")
+    holder.pack(fill="x", padx=18, pady=2)
+    if block.kind == "quote":
+        _text(holder, f"   │  {block.text}", skin.dim, 12, wrap=740)
+    elif block.kind == "item":
+        _text(holder, f"   •  {block.text}", skin.ink, 12, wrap=740)
+    elif block.kind == "table":
+        ctk.CTkLabel(
+            holder,
+            text=block.text,
+            anchor="w",
+            justify="left",
+            text_color=skin.dim,
+            font=ctk.CTkFont(family="Consolas", size=11),
+        ).pack(fill="x")
+    else:
+        _text(holder, block.text, skin.ink, 12, wrap=770)
 
 
 class Window(ctk.CTk):
@@ -328,6 +380,8 @@ class Window(ctk.CTk):
             self._list_files("corpus", "Corpora", "Choose one to count what it holds.")
         elif section == "Documents":
             self._list_files("document", "Documents", "Everything else in the workspace.")
+        elif section == "Documentation":
+            self._list_documentation()
         else:
             self._show_configuration()
 
@@ -372,8 +426,47 @@ class Window(ctk.CTk):
             self._show_review(path)
         elif self.section == "Corpora":
             self._show_corpus(path)
+        elif self.section == "Documentation":
+            self._show_page(path)
         else:
             self._show_document(path)
+
+    def _list_documentation(self) -> None:
+        """Group this project's own records the way the folders group them."""
+        folder = documentation_near(Path(__file__).parent)
+        if folder is None:
+            self._said(
+                "No documentation here",
+                "The records live in the repository. Installed as a package on its own, "
+                "there is nothing local to read - which is said rather than guessed at.",
+            )
+            return
+        pages = pages_in(folder)
+        groups: dict[str, str] = {}
+        for page in pages:
+            where = page.section or "overview"
+            if where not in groups:
+                groups[where] = self.tree.insert(
+                    "", "end", text=f"  {where}", open=where == "overview"
+                )
+            self.tree.insert(groups[where], "end", iid=str(page.path), text=f"  {page.title}")
+        self._said(
+            "Documentation",
+            f"{len(pages)} documents in {folder}. Decision records, chapters, guides - and "
+            "the book, which is in .gitignore and is why nobody has read it.",
+        )
+
+    def _show_page(self, path: Path) -> None:
+        """Paint one document, block by block."""
+        if not path.is_file():
+            return
+        blocks = blocks_in(path.read_text(encoding="utf-8", errors="replace"))
+        first = next((b.text for b in blocks if b.kind == "heading"), path.stem)
+        self._said(first, str(path.name))
+        for block in blocks:
+            if block.kind == "heading" and block.text == first:
+                continue
+            _block(self.body, self.skin, block)
 
     def _show_review(self, path: Path) -> None:
         reviewed = reviewed_from(path)

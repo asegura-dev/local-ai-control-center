@@ -16,7 +16,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Sixty-nine records front to back is a history. These are the threads through them, for
+Seventy records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -145,6 +145,7 @@ not to reach for an approximate algorithm to find them.
 | 067 | [metadata-from-a-registry](adr/ADR-067-metadata-from-a-registry.md) | A model asked for a journal name invented twelve of twenty-four with an instruction not to, so `lacc resolve` asks whoever assigns DOIs. The first non-local destination here: a DOI leaves and nothing else, two switches must both be on, a preview says how many and where, no contact address is sent, and no abstract is read. |
 | 068 | [the-check-turned-around](adr/ADR-068-the-check-turned-around.md) | Every check here verifies what a model wrote. `lacc review` asks it of what **you** wrote: does anything in your own corpus hold this paragraph up? Reads and reports, never rewrites. Uncovered is not false, said wherever it appears. Graded on five paragraphs answered in advance; the one disagreement was the prediction's fault. |
 | 069 | [a-window-that-reads](adr/ADR-069-a-window-that-reads.md) | A review is a document with a second document painted over it, and a terminal cannot show that. CustomTkinter, a window of its own, **nothing listening**. It reads and runs nothing - a review is read from the findings file the CLI leaves beside its report. Choosing a configuration changes which is read, never what is in it. Themes are data; a colour has no business in a frozen `Config`. |
+| 070 | [the-records-become-readable](adr/ADR-070-the-records-become-readable.md) | The thing this project has most of - seventy records, six chapters, the guides and a gitignored book - was the one thing it could not show. A section in the window that reads them. The folder is found by walking up from the package, never configured, because a setting naming a folder could name anywhere. Markdown becomes blocks in a slice; the window only picks a font. Parsed against every record here. |
 
 ## Guides (`docs/guides/`)
 

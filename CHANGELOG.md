@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The window reads this project own documentation** (ADR-070). Seventy decision records,
+  six chapters, the guides, and a book of eight chapters that sits in `.gitignore` and that
+  nobody has read - the thing LACC has most of was the one thing it could not show.
+
+  Grouped the way the folders group it, each document titled by its own first heading. **The
+  folder is found, never configured**: a setting naming where to read documentation from would
+  be a setting that could name anywhere, in a project whose first rule is that nothing outside
+  the workspace is touched. It walks up from the package to see whether a repository is around
+  it, and says plainly when there is not.
+
+  Markdown becomes blocks in a slice and the window gives blocks a font, because what a line
+  *is* - a heading and its depth, an item, a quotation, code - is a decision. Inline emphasis
+  is flattened to the words it wrapped and heading structure is kept, since structure is what
+  makes a long record navigable. No generation step and no browser: a build to keep in sync and
+  a browser to open it in are the two things the window exists to avoid.
+
+  The parser is run against **every Markdown file in the repository** rather than a fixture,
+  because a parser that works on an example and not on the corpus it was written for is the
+  defect this project has found seven times by using the tool instead of testing it.
+
+### Added
 - **`lacc window`: a second view, and it reads** (ADR-069). Most of what LACC produces belongs
   in a terminal. A review does not - it is a document with a second document painted over it,
   and reading that as a scrolling report means holding the draft in your head while the

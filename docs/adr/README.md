@@ -1,6 +1,6 @@
 # Decision records
 
-Sixty-nine records, in the order they were decided. The number is the identity: it is how
+Seventy records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -433,3 +433,10 @@ Everything here verifies text a model produced. `lacc review` asks the same ques
 [`ADR-069-a-window-that-reads.md`](ADR-069-a-window-that-reads.md)
 
 Most of what LACC produces belongs in a terminal. A review does not: it is a document with a second document painted over it. CustomTkinter, in a window of its own, with **nothing listening** - Tk ships with Python, the window talks to Python because it is Python, and the material this project protects is private research. It reads and runs nothing: a review takes minutes and an engine, and a window that ran one would need threads, progress, cancellation and a way to report an engine that went away, all in a view, on day one. So a review is read from the findings file the CLI writes beside its report. Four sections, all reading what is already on disk. Choosing a configuration changes which is read, never what is in it. Themes are data in the window's own file, because a colour has no business in a frozen `Config`. **ADR-066 bound this window before its first line existed**, which was the point of emptying that exception list first.
+
+
+### 070 - the records become readable
+
+[`ADR-070-the-records-become-readable.md`](ADR-070-the-records-become-readable.md)
+
+Sixty-nine records, six chapters, the guides, and a book of eight chapters in `.gitignore` that nobody has read - the thing this project has most of was the one thing the tool could not show. A section in the window, reading the Markdown from the repository, grouped the way the folders group it. The folder is **found, never configured**: a setting naming where to read from would be a setting that could name anywhere, so it walks up from the package to see whether a repository is around it, and says so plainly when there is not. Markdown becomes blocks in a slice and the window gives blocks a font, because what a line *is* is a decision (ADR-066). Inline emphasis is flattened and heading structure kept, since structure is what makes a long record navigable. The parser is tested against every record in the repository rather than a fixture.
