@@ -1,6 +1,6 @@
 # Decision records
 
-Eighty records, in the order they were decided. The number is the identity: it is how
+Eighty-one records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -509,3 +509,12 @@ Nothing new was built: `sections` found 154 parts of a guideline and `Retriever`
 [`ADR-080-where-the-work-stands.md`](ADR-080-where-the-work-stands.md)
 
 `tools/measure.py` reports the project; nothing reported the **work**. `lacc status` does: six stages, each with what it produced **and what it has not**, counted from the files every time. "832 quotations" reads like success; "832 quotations, 3 documents with none" is the same fact with the part still needing doing attached. The record of getting it wrong three times is most of what is worth reading: **236 works resolved** counted the two failure lists as successes and the real figure was 172; **six documents with no quotation** counted three extracted sections, the user's notes and a test fixture; and the extracted sections were still miscounted because one opens `5.2.4` with nothing after it and the pattern wanted a space. A stage with no material is no longer settled - with an empty workspace, References read "0 of 0 parse" and called itself done.
+
+
+### 081 - an escape is not an invention
+
+[`ADR-081-an-escape-is-not-an-invention.md`](ADR-081-an-escape-is-not-an-invention.md)
+
+The sixth time a defect of this project has been reported as the model's dishonesty, found the same way as the others: by auditing a real corpus. Of 881 quotations, 110 were marked absent and one document failed ten of ten - its text read `31 043 15.0%
+2nd Prostate`, where that `
+` is two characters and the page has a line break. A JSON escape had survived the answer being parsed. **Eight of the 110, not a hundred**: the first impression was out by an order of magnitude in the direction that flatters the record. The other 102 are the model joining sentences that are not adjacent, caught correctly, and nothing changed to let them through. A literal escape now folds to the whitespace it stands for, as a fifth transformation beside the four that each remove a difference nobody can see and touch no content.

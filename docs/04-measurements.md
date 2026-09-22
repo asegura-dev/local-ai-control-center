@@ -91,6 +91,19 @@ already catching three. A sentence stated as a fact in a planning document is a 
 measurement behind it, and it is harder to notice than a wrong number because it never looked
 like a number.
 
+**The sixth one, and the audit that found it.** A corpus of 881 quotations carried 110 marked
+as absent from their document, and nobody had looked at why. One document failed ten of ten -
+its quotations read `31 043 15.0%
+2nd Prostate`, where that `
+` is a backslash and an `n`
+and the page has a line break. A JSON escape had survived the answer being parsed, and the
+check reported the difference as an invention (ADR-081).
+
+**Eight of the 110, not a hundred.** The first reading assumed it explained most of them and
+was out by an order of magnitude, in the direction that would have made the finding sound
+larger. The other 102 are the model joining sentences that are not adjacent in the page -
+caught correctly, and the reason the check exists.
+
 ## What was tested rather than reasoned about
 
 **Prompt injection: both attempts worked.** The fence's docstring claimed that markers

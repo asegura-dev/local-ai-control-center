@@ -325,3 +325,21 @@ def test_a_fabricated_quotation_is_neither_found_nor_held() -> None:
     checked = check_claim(invented, _SOURCE)
     assert checked.found is False
     assert checked.holds is False
+
+
+def test_a_literal_escape_is_the_whitespace_it_stands_for() -> None:
+    """A model answers in JSON, and an escape can survive being parsed (ADR-081).
+
+    Found by auditing a real corpus: eight of 881 quotations were marked absent whose text
+    read `31 043 15.0%\n2nd Prostate`. The model had quoted the page correctly.
+    """
+    page = "1st Breast 31 043 15.0%\n2nd Prostate 26 565 12.8%"
+    quoted = "1st Breast 31 043 15.0%\n2nd Prostate 26 565 12.8%"
+    assert check_claim(Claim(claim="a claim", quote=quoted), page).found
+
+
+def test_un_escaping_does_not_excuse_a_changed_word() -> None:
+    """The whole point of the five foldings: none of them touches content."""
+    page = "the sensitivity was 94.7%\nin that cohort"
+    changed = "the sensitivity was 97.4%\nin that cohort"
+    assert not check_claim(Claim(claim="a claim", quote=changed), page).found

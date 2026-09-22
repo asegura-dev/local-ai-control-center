@@ -271,21 +271,38 @@ def parse_claims(
     return tuple(claims)
 
 
+_LITERAL_ESCAPE = re.compile(r"\\[nrt]")
+"""A backslash followed by `n`, `r` or `t`: the two characters, not the whitespace.
+
+Transport, never content. A model answers in JSON and an escape can survive being parsed, so
+the quotation carries `\n` where the page has a line break. Nothing in a paper legitimately
+reads that way, and a corpus of 881 had eight of them - each reported as an invention when
+the model had quoted correctly (ADR-081).
+"""
+
+
 def _normalized(text: str) -> str:
     """Reduce text to what a reader sees, so representation cannot hide a real quotation.
 
-    Four transformations, and every one of them removes a difference nobody can see: curly
-    quotes and typographic dashes fold to the ASCII a model writes, words the typesetter
-    broke across a line are rejoined, whitespace collapses, and case folds. None of them
-    touches content - a changed word or a changed number survives all four and still fails,
-    which is the whole point (ADR-035).
+    Five transformations, and every one of them removes a difference nobody can see: a
+    literal escape becomes the space it stands for, curly quotes and typographic dashes fold
+    to the ASCII a model writes, words the typesetter broke across a line are rejoined,
+    whitespace collapses, and case folds. None of them touches content - a changed word or a
+    changed number survives all five and still fails, which is the whole point (ADR-035).
 
     Rejoining was added after a real paper produced two "fabrications" that were nothing of
     the kind. The model had quoted faithfully; the PDF held `sensi- tivity` and
     `avail - able` across line breaks, and LACC's own ingestion preserved them. The check
     was reporting a defect in this project as dishonesty in the model (ADR-034).
+
+    Un-escaping was added for the same reason, found the same way: auditing a corpus of 881
+    quotations showed eight marked absent whose text read `31 043 15.0%\n2nd Prostate`. The
+    model had quoted the page correctly and a backslash-n had survived the answer being
+    parsed, so the check compared a two-character sequence against a line break and reported
+    the difference as an invention (ADR-081).
     """
-    folded = text.translate(_LOOK_ALIKES)
+    unescaped = _LITERAL_ESCAPE.sub(" ", text)
+    folded = unescaped.translate(_LOOK_ALIKES)
     joined = _HYPHEN_BETWEEN_LETTERS.sub(lambda m: m.group(1) + m.group(2), folded)
     return _WHITESPACE.sub(" ", joined).casefold().strip()
 

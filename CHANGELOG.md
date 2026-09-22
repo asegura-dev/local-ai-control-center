@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A JSON escape was being reported as an invention** (ADR-081). Auditing a real corpus of
+  881 quotations - 110 marked as no longer in their document, and nobody had looked at why -
+  found one document failing **ten of ten**, with quotations reading
+  `31 043 15.0%
+2nd Prostate`. That `
+` is two characters where the page has a line break:
+  an escape had survived the answer being parsed, and the check compared it against a newline
+  and called the difference a fabrication.
+
+  `_normalized` folds a literal escape to the whitespace it stands for now, as a fifth
+  transformation beside the four that were already there - each of which removes a difference
+  nobody can see and touches no content. A number quoted as `97.4%` where the page says
+  `94.7%` still fails, and the test that says so sits beside the one that added this.
+
+  **Eight of the 110, not a hundred.** The first reading assumed it explained most of them and
+  was out by an order of magnitude, in the direction that would have made the finding sound
+  larger than it is. **The other 102 are the model joining sentences that are not adjacent in
+  the page** - caught correctly, and the reason the check exists. Re-assembling took the corpus
+  from 771 citable to 777.
+
+  It is the sixth defect of this project that had been reported as the model's dishonesty.
+
 ### Added
 - **`lacc status`: where the work stands, stage by stage** (ADR-080). `tools/measure.py`
   reports the project - layers, tests, records. Nothing reported the **work**: how far a
