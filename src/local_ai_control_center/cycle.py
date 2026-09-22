@@ -451,6 +451,7 @@ def _ask(
     run_id: str,
     temperature: float,
     schema: dict[str, Any] | None = None,
+    template: str = "",
 ) -> Completion:
     """Measure a prompt, refuse it if it will not fit, send it, and record all three.
 
@@ -500,6 +501,10 @@ def _ask(
             "estimated_tokens": estimate,
             "temperature": temperature,
             "prompt_sha256": digest_of(prompt),
+            # The template apart from the prompt, because the prompt holds the document too:
+            # change the wording a skill asks with and `prompt_sha256` changes, but so does
+            # reading a different file, and nothing distinguished the two (ADR-078).
+            "template_sha256": digest_of(template) if template else "",
             "completion_sha256": digest_of(completion.text),
             "measured_prompt_tokens": completion.prompt_tokens,
             "measured_answer_tokens": completion.answer_tokens,
@@ -545,7 +550,9 @@ def run_action(
 
     read, prompt = _prepare(prompt_template, action, config, workspace, audit, run_id, uses_context)
 
-    completion = _ask(prompt, action, config, provider, audit, run_id, temperature, schema)
+    completion = _ask(
+        prompt, action, config, provider, audit, run_id, temperature, schema, prompt_template
+    )
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})
 
     checked: tuple[CheckedClaim, ...] = ()
@@ -905,6 +912,7 @@ def run_in_passes(
             run_id,
             temperature,
             schema,
+            prompt_template,
         )
         answers.append(completion.text)
         asked += completion.answer_tokens or 0

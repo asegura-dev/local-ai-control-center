@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`template_sha256` in the audit trail** (ADR-078). `prompt_sha256` covers the template and
+  the document together, because a prompt is the template with the document inside it. So
+  changing the wording a skill asks with changed the digest - and so did reading a different
+  file, and **nothing distinguished the two**. A person asking *"did the instruction change
+  between these runs?"* could not answer it from the trail, which is what a trail is for.
+
+  Two runs over different documents now share a template digest; two runs over the same
+  document with an edited skill do not.
+
+  The record also says what was **refused**: no digest file for the Python, which Git already
+  hashes and dates better, and none for the configuration, whose effect the trail already
+  records. The launchers are a special case precisely because they run outside Git *and*
+  outside the trail.
+
+### Fixed
+- **An answer from a third party was read without a limit** (ADR-078). A timeout stops a slow
+  answer, not an endless one. A Crossref record for one work is a few kilobytes; two megabytes
+  is the ceiling now and anything past it is refused by name. The same unbounded read in the
+  Ollama adapter is deliberately left: that endpoint is a machine the user owns, named in
+  their own configuration.
+
+### Added
 - **A status bar along the bottom of the window** (ADR-077). What is on disk on the left -
   documents, quotations in the largest corpus - and what this configuration may reach on the
   right: the engine's address, whether the network is on, whether a registry is named.

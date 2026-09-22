@@ -32,6 +32,13 @@ from local_ai_control_center.ports.registry import Registry, RegistryError, Work
 TIMEOUT = 20.0
 """Seconds to wait for one answer. A registry that is slow is not a registry that is down."""
 
+MOST_BYTES = 2_000_000
+"""How much of an answer is read before giving up on it.
+
+A record for one work is a few kilobytes. Reading an unbounded stream from a third party is
+the one thing in this module that a timeout does not already bound - a slow answer stops, an
+endless one does not (ADR-078)."""
+
 _LONGEST_TITLE = 500
 _LONGEST_NAME = 120
 _LONGEST_CONTAINER = 300
@@ -158,7 +165,13 @@ class CrossrefRegistry(Registry):
         )
         try:
             with urllib.request.urlopen(request, timeout=self._timeout) as response:  # noqa: S310
-                payload = json.loads(response.read().decode("utf-8", errors="replace"))
+                body = response.read(MOST_BYTES + 1)
+                if len(body) > MOST_BYTES:
+                    raise RegistryError(
+                        f"{self._url} answered with more than {MOST_BYTES:,} bytes "
+                        f"for {doi}, which no record of one work is."
+                    )
+                payload = json.loads(body.decode("utf-8", errors="replace"))
         except urllib.error.HTTPError as error:
             if error.code == 404:
                 return None

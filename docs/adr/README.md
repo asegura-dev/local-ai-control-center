@@ -1,6 +1,6 @@
 # Decision records
 
-Seventy-seven records, in the order they were decided. The number is the identity: it is how
+Seventy-eight records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -488,3 +488,10 @@ A PDF does not say what a heading is - measured, seven of eight papers carry non
 [`ADR-077-a-line-along-the-bottom.md`](ADR-077-a-line-along-the-bottom.md)
 
 A bar with what is on disk on the left and what the configuration may reach on the right. The only interesting decision is when **not** to act: **the engine is not asked when the window opens**, only when somebody presses `check`. A window that pings on opening is a window that talks to the network because somebody looked at it, and reaching anywhere here is deliberate. `not checked` and `unreachable` are different words, because the engine may be perfectly fine and simply never have been asked. The check is passed in as a function rather than performed, so a view never touches an adapter.
+
+
+### 078 - what a digest is for
+
+[`ADR-078-what-a-digest-is-for.md`](ADR-078-what-a-digest-is-for.md)
+
+Written in answer to a good question - if the launchers carry SHA-256 sums, should the skills and the code? - and most of the answer is **no**. The launchers are a special case in two ways: they run outside Git, and outside the audit trail. Neither is true of anything else. Git already hashes the whole tree and says when it changed; the trail already records `prompt_sha256`, `completion_sha256` and the digest of every file read and written, in a chain `lacc verify` walks. A `SHA256SUMS` of the Python would restate that less well and be one more file to go out of step. **But one gap was real**: `prompt_sha256` covers the template and the document together, so changing a skill's wording and reading a different file were indistinguishable. `template_sha256` is recorded beside it now, which is what lets the trail answer *did the instruction change between these runs*. And a third-party answer is bounded at two megabytes, because a timeout stops a slow answer and not an endless one.

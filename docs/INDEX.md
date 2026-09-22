@@ -16,7 +16,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Seventy-seven records front to back is a history. These are the threads through them, for
+Seventy-eight records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -153,6 +153,7 @@ not to reach for an approximate algorithm to find them.
 | 075 | [a-section-is-a-piece](adr/ADR-075-a-section-is-a-piece.md) | Adding a window section meant editing four places, and getting three right produced a button that did nothing at all - the route by which `cli.py` reached 2,610 lines. A section is now declared rather than wired, and the window iterates over them knowing nothing else. 763 lines and 28 methods to 330 and 17. Accepted because the risk was countable, not because it was tidier. |
 | 076 | [the-sections-a-document-numbers](adr/ADR-076-the-sections-a-document-numbers.md) | A PDF does not say what a heading is, but numbering survives extraction. The record **is** the measurement: four rules, counts of 16, 18, 10 and 6 of 24, and the one that rose was the worst - every numbered list is consecutive, so it counted affiliations and bibliographies. Detected, never written in. Took 42,149 tokens out of a 348,276-token guideline without cutting the file. |
 | 077 | [a-line-along-the-bottom](adr/ADR-077-a-line-along-the-bottom.md) | What is on disk, and what the configuration may reach. The decision is when **not** to act: the engine is asked only when somebody presses check, because a window that pings on opening talks to the network because somebody looked at it. `not checked` and `unreachable` are different words. |
+| 078 | [what-a-digest-is-for](adr/ADR-078-what-a-digest-is-for.md) | Should the skills and the code carry SHA-256 sums like the launchers? Mostly no: Git hashes the tree and the trail already digests every prompt and file. The launchers were special because they run outside both. One gap was real - `prompt_sha256` mixed the template with the document, so `template_sha256` is recorded beside it. A third-party answer is bounded at two megabytes. |
 
 ## Guides (`docs/guides/`)
 
