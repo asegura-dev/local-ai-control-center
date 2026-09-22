@@ -532,6 +532,37 @@ extracted sections currently carry 111 quotations.
 This is the release where the project stops investigating and starts **delivering**: a
 bibliography whose entries can be written down without checking each one by hand.
 
+### What v2.0.0 turned out to be, which is not what this section planned
+
+**This is a correction, left visible.** The route above was written one morning and says v2.0
+is the vertical cut plus coverage. The cut happened. **Coverage did not**, and what arrived
+instead was better, so the plan is wrong and the record of being wrong is worth more than a
+tidy plan.
+
+What the version actually holds:
+
+| | |
+|---|---|
+| `lacc resolve` | metadata from the registry that assigns DOIs, not from a model (ADR-067) |
+| `lacc review` | **your** draft against **your** sources - the check turned around (ADR-068) |
+| `lacc sections` | a document's own numbering, and one part taken out of it (ADR-076) |
+| `lacc window` | a second view: eight sections, and it reads (ADR-069 to ADR-075, ADR-077) |
+| `scripts/` | launchers whose digests the gate enforces (ADR-071) |
+| the method | measured, written down, and followable without being explained |
+
+**And the reason it is a major version is `review`.** Everything here verified text a *model*
+produced. `review` asks the same question of text a *person* wrote, which is not one more
+command: it is a different answer to what this tool is for.
+
+**Why coverage did not happen, stated rather than rescheduled.** The work went where it was
+asked to go, and each thing asked for turned out to matter more than clustering: a
+bibliography that can be handed in, a reviewer for your own prose, a guideline that can be
+read one section at a time, and an interface for somebody who is a researcher rather than an
+operator. Coverage is still the right idea and still carries its precondition - **a gap
+measured over an incomplete corpus is a false gap** - and it is still not built.
+
+### What this section planned, and still argues for
+
 ### v2.0.0 - the core takes back what is its own, and coverage becomes a thing that exists
 
 **Coverage is the only remaining phase that produces a paragraph nobody could write before.**
