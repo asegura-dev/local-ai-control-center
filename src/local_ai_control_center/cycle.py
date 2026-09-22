@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import difflib
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -41,8 +42,9 @@ from local_ai_control_center.core.preview import ExecutionPreview, IntendedActio
 from local_ai_control_center.core.run import Progress, ProgressFn
 from local_ai_control_center.core.skill import Skill, SkillPlan, grant_for
 from local_ai_control_center.core.workspace import Workspace
+from local_ai_control_center.features.ask import Asked, Prepared, readings_from
 from local_ai_control_center.ports.converter import ConversionError, Converter
-from local_ai_control_center.ports.provider import Completion, Provider
+from local_ai_control_center.ports.provider import Completion, Provider, ProviderError
 from local_ai_control_center.system.audit import AuditLog, digest_of, digest_of_file
 
 Outcome = Literal["completed", "refused", "declined"]
@@ -1058,4 +1060,83 @@ def ask_once(
         lambda _preview: True,
         verify_quotes=False,
         temperature=plan.temperature,
+    )
+
+
+def answer_prepared(
+    prepared: Prepared,
+    resolved: Skill,
+    plan: SkillPlan,
+    config: Config,
+    workspace: Workspace,
+    provider: Provider,
+    audit: AuditLog,
+    run_id: str,
+) -> Asked:
+    """Send a question that has already been previewed, and give back what happened (ADR-085).
+
+    Orchestration, so it lives here for the reason `ask_once` does: it runs an action through
+    the whole system, and this project has one place for that (ADR-029). What makes it
+    different from `ask_once` is that **nothing it can do raises**. An engine that is not
+    there, a prompt too large for the window, an answer that used no format: each comes back
+    as a field rather than as an exception, because the caller is a worker thread and an
+    exception crossing a thread boundary into Tk is a window that stops repainting with no
+    sign of why.
+
+    It performs no confirmation. The confirmation already happened: a `Prepared` exists
+    because somebody was shown what would be sent and then pressed the control that only
+    appears once they have been.
+    """
+    audit.record(
+        run_id,
+        "passages_selected",
+        f"Selected {prepared.selected} of {prepared.considered} passages",
+        {
+            "question": prepared.question,
+            "retriever": prepared.how,
+            "selected": prepared.selected,
+            "set_aside": prepared.set_aside,
+            "considered": prepared.considered,
+        },
+    )
+    started = time.monotonic()
+    try:
+        result = ask_once(
+            resolved, plan, prepared.material, config, workspace, provider, audit, run_id
+        )
+    except (ProviderError, PromptTooLargeError) as error:
+        return Asked(prepared=prepared, failure=str(error), seconds=time.monotonic() - started)
+    taken = time.monotonic() - started
+
+    if result.completion is None:
+        return Asked(
+            prepared=prepared,
+            failure=f"The run ended as {result.outcome} and produced no answer.",
+            seconds=taken,
+        )
+
+    # Against the passages that were sent, not against the documents. Those were checked when
+    # the corpus was built; what is unknown here is whether the model quoted what it was shown
+    # or something it remembers.
+    checked = without_repeats(
+        check_answer(result.completion.text, prepared.material, plan.fields, plan.quote_field)
+    )
+    if checked:
+        invented = sum(1 for claim in checked if not claim.found)
+        audit.record(
+            run_id,
+            "quotations_checked",
+            f"Checked {len(checked)} quotations against the passages sent",
+            {
+                "action": plan.action.name,
+                "quotations": len(checked),
+                "verified": len(checked) - invented,
+                "not_in_the_document": invented,
+            },
+        )
+    return Asked(
+        prepared=prepared,
+        answer=result.completion.text,
+        readings=readings_from(checked),
+        seconds=taken,
     )

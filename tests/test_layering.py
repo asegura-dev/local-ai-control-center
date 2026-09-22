@@ -171,6 +171,8 @@ _A_VIEW_MAY_HOLD = frozenset(
         "_words",  # parsing this view's own argument
         "Window._state",  # composition: gathering what a section is handed (ADR-075)
         "_engine_seen",  # composition: an adapter's answer as the window's contract
+        "_asking_for_the_window",  # composition: the one action the window runs (ADR-085)
+        "_retriever_for",  # composition: word ranking, or that fused with an embedder
     }
 )
 """What belongs in a view although it never prints. Each is named, never a category."""
@@ -211,6 +213,7 @@ def _touches_presentation(module: pathlib.Path) -> dict[str, bool]:
     functions = _functions_in(tree)
 
     def mentioned(node: ast.AST) -> set[str]:
+        """Every name a function names, for the direct check."""
         found: set[str] = set()
         for inner in ast.walk(node):
             if isinstance(inner, ast.Name):
@@ -219,12 +222,32 @@ def _touches_presentation(module: pathlib.Path) -> dict[str, bool]:
                 found.add(inner.attr)
         return found
 
+    def called(node: ast.AST) -> set[str]:
+        """Only names in call position: `f(...)` and `x.f(...)`.
+
+        **A variable is not a call**, and reading it as one made this rule blind. Three
+        functions in `cli.py` were exempt for years because they took a parameter named
+        `corpus` - which is also the name of a command that prints, so the closure joined
+        them to it and called them presentation. One of the three was a third copy of a
+        decision the slice already held, which is the defect this whole rule exists to
+        catch (ADR-086).
+        """
+        found: set[str] = set()
+        for inner in ast.walk(node):
+            if not isinstance(inner, ast.Call):
+                continue
+            if isinstance(inner.func, ast.Name):
+                found.add(inner.func.id)
+            elif isinstance(inner.func, ast.Attribute):
+                found.add(inner.func.attr)
+        return found
+
     plain = {name.split(".")[-1]: name for name in functions}
     reaches = {name: bool(mentioned(fn) & _PRESENTATION) for name, fn in functions.items()}
-    # A method calls another as `self.other`, which `mentioned` sees as the attribute
-    # `other`. Resolving through the bare name is what lets the closure cross a class.
+    # A method calls another as `self.other`, which `called` sees as the attribute `other`.
+    # Resolving through the bare name is what lets the closure cross a class.
     calls = {
-        name: {plain[called] for called in mentioned(fn) & set(plain)}
+        name: {plain[reached] for reached in called(fn) & set(plain)}
         for name, fn in functions.items()
     }
     changed = True
@@ -280,14 +303,29 @@ def test_the_named_debt_is_really_still_there() -> None:
 
     Without this, a name could stay after its function left, and the list would quietly
     stop describing anything. It is the same failure as a figure whose tense has aged.
+
+    **And an exception that is no longer needed is the same failure one level up.** Checking
+    only that the name still exists let an entry stay after its function started touching
+    the presentation - a name excused from a rule it now obeys. Found the day `ADR-085` added
+    one that never needed excusing (ADR-086).
     """
     present: set[str] = set()
+    astray: set[str] = set()
     for view_name in _VIEWS:
         view = SOURCE / view_name
-        if view.exists():
-            present |= set(_touches_presentation(view))
-    gone = (_A_VIEW_MAY_HOLD | _LOGIC_THE_VIEW_STILL_HOLDS) - present
+        if not view.exists():
+            continue
+        reaches = _touches_presentation(view)
+        present |= set(reaches)
+        astray |= {name for name, touches in reaches.items() if not touches}
+    named = _A_VIEW_MAY_HOLD | _LOGIC_THE_VIEW_STILL_HOLDS
+    gone = named - present
     assert not gone, f"named as exceptions but no longer in any view: {sorted(gone)}"
+    unneeded = named - astray
+    assert not unneeded, (
+        f"named as exceptions but they touch the presentation now: {sorted(unneeded)}. "
+        "Take them off the list - an excuse nobody needs is an excuse nobody checks."
+    )
 
 
 def test_a_section_reaches_only_for_what_a_view_may_reach() -> None:
@@ -317,7 +355,7 @@ def test_every_section_can_list_and_is_named() -> None:
     pytest.importorskip("customtkinter", reason="the window is an optional install")
     from local_ai_control_center.window import SECTIONS
 
-    assert len(SECTIONS) >= 8
+    assert len(SECTIONS) >= 9
     names = [section.name for section in SECTIONS]
     assert len(names) == len(set(names)), f"two sections share a name: {names}"
     for section in SECTIONS:

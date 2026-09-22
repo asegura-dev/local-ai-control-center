@@ -14,6 +14,7 @@ import os
 import re
 import sys
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -96,6 +97,7 @@ from local_ai_control_center.cycle import (
     PromptTooLargeError,
     ReadError,
     RunResult,
+    answer_prepared,
     ask_once,
     run_conversion,
     run_skill,
@@ -105,7 +107,12 @@ from local_ai_control_center.features.appearance import (
     WINDOW_PREFERENCES,
     preferences_from,
 )
-from local_ai_control_center.features.ask import as_material, might_support
+from local_ai_control_center.features.ask import (
+    Asked,
+    Prepared,
+    might_support,
+    prepare,
+)
 from local_ai_control_center.features.bibliography import bibliography
 from local_ai_control_center.features.commands import commands_of
 from local_ai_control_center.features.corpus import (
@@ -127,11 +134,10 @@ from local_ai_control_center.features.review import (
 from local_ai_control_center.features.stages import TAKEN_FROM, stages_in
 from local_ai_control_center.features.status import EngineSeen, status_of
 from local_ai_control_center.ports.converter import ConversionError, Converter
-from local_ai_control_center.ports.embedder import EmbeddingError
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
 from local_ai_control_center.ports.provider import Provider, ProviderError
 from local_ai_control_center.ports.registry import RegistryError, Work
-from local_ai_control_center.ports.retriever import Passage, Retriever, Selection
+from local_ai_control_center.ports.retriever import Passage, Retriever
 from local_ai_control_center.system.audit import (
     AnchorCheck,
     AuditLog,
@@ -1454,10 +1460,8 @@ def measure(
     # is the model and not the selection.
     material: str | None = None
     if corpus_file is not None:
-        selection, material = _passages_for(requests[0], corpus_file, config, workspace)
-        _report_the_selection(selection)
-        if not selection.chosen:
-            raise typer.Exit(code=1)
+        made = _prepared_or_exit(requests[0], corpus_file, config, workspace)
+        material = made.material
         plan = _plan_or_exit(resolved, (requests[0],), config)
     preview = preview_action(
         plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
@@ -1724,22 +1728,6 @@ def _corpus_skill(name: str, config_path: Path) -> Skill:
     return skill
 
 
-def _passages_for(
-    question: str, corpus_file: Path, config: Config, workspace: Workspace
-) -> tuple[Selection, str]:
-    """Read a corpus, select for the question, and render what would be sent."""
-    text = workspace.resolve_within(corpus_file).read_text(encoding="utf-8", errors="replace")
-    collected = [c for c in parse_corpus(text) if "NOT IN THE DOCUMENT" not in c.recorded_verdict]
-    passages = tuple(
-        Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
-    )
-    window = config.context_tokens or 0
-    budget = (window - answer_reserve(window)) // 2 if window else 0
-    resolved = workspace.resolve_within(corpus_file)
-    selection = _retriever_for(config, resolved).select(question, passages, budget)
-    return selection, as_material(selection)
-
-
 @app.command()
 def ask(
     question: Annotated[str, typer.Argument(help="What you want answered.")],
@@ -1780,42 +1768,8 @@ def ask(
     """
     config, workspace = _load(config_path)
     audit = AuditLog(workspace, config)
-    if config.context_tokens is None:
-        console.print(
-            "[red]No context window is configured,[/red] so there is no budget to select "
-            "against. Set context_tokens to the window the model actually has."
-        )
-        raise typer.Exit(code=1)
-
-    try:
-        text = workspace.resolve_within(corpus_file).read_text(encoding="utf-8", errors="replace")
-    except (ValueError, OSError) as error:
-        console.print(f"[red]Cannot read {corpus_file}: {error}[/red]")
-        raise typer.Exit(code=1) from error
-
-    # Only what was found in its document is eligible. Retrieving over unverified text and
-    # checking afterwards would verify what the model echoed, not what it was shown.
-    collected = [c for c in parse_corpus(text) if "NOT IN THE DOCUMENT" not in c.recorded_verdict]
-    if not collected:
-        console.print(f"[yellow]{corpus_file} holds no usable quotations.[/yellow]")
-        raise typer.Exit(code=1)
-
-    passages = tuple(
-        Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
-    )
-    budget = (config.context_tokens - answer_reserve(config.context_tokens)) // 2
+    made = _prepared_or_exit(question, corpus_file, config, workspace)
     chosen_by = _retriever_for(config, workspace.resolve_within(corpus_file))
-    try:
-        selection = chosen_by.select(question, passages, budget)
-    except EmbeddingError as error:
-        # Refused rather than quietly falling back to words: a selection made by a
-        # different method than the one configured is a different answer, and saying so
-        # after the fact is worse than not answering (ADR-061).
-        console.print(f"[red]{error}[/red]")
-        raise typer.Exit(code=1) from error
-    _report_the_selection(selection)
-    if not selection.chosen:
-        raise typer.Exit(code=1)
 
     resolved: Skill = AskCorpusSkill()
     if using is not None:
@@ -1839,17 +1793,17 @@ def ask(
     audit.record(
         run_id,
         "passages_selected",
-        f"Selected {len(selection.chosen)} of {selection.considered} passages",
+        f"Selected {made.selected} of {made.considered} passages",
         {
             "question": question,
-            "retriever": selection.how,
-            "selected": len(selection.chosen),
-            "set_aside": selection.set_aside,
-            "considered": selection.considered,
+            "retriever": made.how,
+            "selected": made.selected,
+            "set_aside": made.set_aside,
+            "considered": made.considered,
         },
     )
 
-    material = as_material(selection)
+    material = made.material
     started = time.monotonic()
     try:
         with console.status("Asking..."):
@@ -1869,11 +1823,11 @@ def ask(
         audit,
         run_id,
         provider if judge else None,
-        selection.chosen,
+        made.chosen,
         chosen_by,
     )
     console.print(
-        f"[dim]{selection.set_aside} of {selection.considered} passages were not sent. An "
+        f"[dim]{made.set_aside} of {made.considered} passages were not sent. An "
         "answer drawn from a selection is an answer about that selection.[/dim]"
     )
 
@@ -1897,19 +1851,34 @@ def _retriever_for(config: Config, corpus: Path | None) -> Retriever:
     return FusedRetriever(words, DenseRetriever(embedder, cache))
 
 
-def _report_the_selection(selection: Selection) -> None:
-    """Say what was chosen and what was not, before anything is sent."""
-    if not selection.chosen:
-        console.print(
-            f"[yellow]Nothing in those {selection.considered} passages matches that "
-            "question.[/yellow] The ranking is by the words you used, and it does not cross "
-            "languages - a question in Spanish will not find quotations in English."
-        )
-        return
+def _prepared_or_exit(
+    question: str, corpus_file: Path, config: Config, workspace: Workspace
+) -> Prepared:
+    """Rank a corpus against a question, say what was chosen, or exit saying why not.
+
+    **The one path `ask`, `measure` and the window all take.** Three copies of this decision
+    existed - two here and one in the slice - and the rule that should have caught it did
+    not, because one of them mentioned a variable named `corpus` and that is also the name
+    of a command that prints (ADR-086).
+    """
+    try:
+        resolved = workspace.resolve_within(corpus_file)
+        text = resolved.read_text(encoding="utf-8", errors="replace")
+    except (ValueError, OSError) as error:
+        console.print(f"[red]Cannot read {corpus_file}: {error}[/red]")
+        raise typer.Exit(code=1) from error
+    made = prepare(question, corpus_file.name, text, config, _retriever_for(config, resolved))
+    if made.refusal:
+        # Includes a ranking that could not be made: refused rather than quietly falling back
+        # to words, because a selection made by a different method is a different answer and
+        # saying so afterwards is worse than not answering (ADR-061).
+        console.print(f"[red]{made.refusal}[/red]")
+        raise typer.Exit(code=1)
     console.print(
-        f"[green]{len(selection.chosen)} passages selected[/green] of {selection.considered}; "
-        f"{selection.set_aside} set aside. [dim]{selection.how}[/dim]"
+        f"[green]{made.selected} passages selected[/green] of {made.considered}; "
+        f"{made.set_aside} set aside. [dim]{made.how}[/dim]"
     )
+    return made
 
 
 def _judge_the_readings(
@@ -2268,17 +2237,66 @@ def _engine_seen(config: Config) -> EngineSeen:
     )
 
 
+def _asking_for_the_window(
+    config: Config, workspace: Workspace
+) -> tuple[Callable[[str, str], Prepared], Callable[[Prepared], Asked]]:
+    """Compose the one action the window may run (ADR-085).
+
+    Composition, which is the driving adapter's job (ADR-029), and why this sits in a view
+    although it draws nothing. A slice may reach only `core` and `ports`, and a section only
+    those plus `features/` - so neither can build a provider, open an audit log or call the
+    cycle. The window is handed the ability to run one thing and cannot obtain it for itself.
+    """
+    skill = AskCorpusSkill()
+
+    def prepare_one(question: str, corpus: str) -> Prepared:
+        """Rank a corpus against a question. The prompt is not sent."""
+        try:
+            path = workspace.resolve_within(Path(corpus))
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except (ValueError, OSError) as error:
+            return Prepared(question=question.strip(), corpus=corpus, refusal=str(error))
+        return prepare(question, corpus, text, config, _retriever_for(config, path))
+
+    def send_one(prepared: Prepared) -> Asked:
+        """Send a question that was previewed. **This never raises**, by contract.
+
+        It runs on a worker thread, and an exception crossing a thread boundary into Tk is a
+        window that stops repainting with nothing on the screen to say why. Every way this
+        can fail becomes a sentence the section draws where an answer would go.
+        """
+        try:
+            provider = _build_provider(ProviderChoice.ollama, config, skill.name)
+            plan = skill.plan((prepared.question,), config)
+            return answer_prepared(
+                prepared,
+                skill,
+                plan,
+                config,
+                workspace,
+                provider,
+                AuditLog(workspace, config),
+                new_run_id(),
+            )
+        except Exception as error:  # noqa: BLE001 - see the docstring; nothing may escape
+            return Asked(prepared=prepared, failure=str(error))
+
+    return prepare_one, send_one
+
+
 @app.command()
 def window(
     config_path: Annotated[
         Path, typer.Option("--config", "-c", help="Path to the configuration file.")
     ] = DEFAULT_CONFIG_PATH,
 ) -> None:
-    """Open a window on the reviews in your workspace.
+    """Open a window on the work in your workspace, and ask it one kind of question.
 
-    **It reads. It runs nothing** - no skill, no model call, nothing written. A review is
-    produced by `lacc review --into`, which leaves its findings beside the report; this opens
-    them and paints them over the draft (ADR-069).
+    **Eight sections read; one asks.** No skill is run from here and nothing is written - the
+    single action available is a question against a corpus that is already there, behind a
+    preview that has to be drawn before the control that sends it exists (ADR-085). A review
+    is still produced by `lacc review --into`; this opens the findings and paints them over
+    the draft (ADR-069).
 
     Needs the optional toolkit: `pip install local-ai-control-center[gui]`.
     """
@@ -2311,6 +2329,7 @@ def window(
         prompts_of(_known_skills(config_path), config),
         status_of(workspace.root, config),
         lambda: _engine_seen(config),
+        *_asking_for_the_window(config, workspace),
     )
 
 

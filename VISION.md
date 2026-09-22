@@ -55,10 +55,15 @@ Each release is one honest step, not a leap. Much of this is done:
 - **Documentation for adoption, and a project that can be cited**, so the work can be built
   on by someone else.
 
-v1 is met there, and deliberately not further. Working with a whole library rather than a
-handful of sources, holding a conversation across turns, letting the model choose what to
-do next - these are real and they are v2. A smaller v1 that is true beats a larger one that
-is late.
+v1 is met there, and deliberately not further. A smaller v1 that is true beats a larger one
+that is late.
+
+**Working with a whole library arrived** - `collect` across a bibliography, `corpus` to
+assemble it, retrieval to choose what a question is answered from, passes and extracted
+sections for documents too large for any window. The other two are **refused rather than
+deferred**: a conversation across turns and a model choosing what to do next are both ways of
+letting something act on its own answer, and this project's whole claim is that nothing here
+does that.
 
 ## What it will never become
 

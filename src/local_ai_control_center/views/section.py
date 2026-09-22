@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from local_ai_control_center.features.appearance import Palette
+from local_ai_control_center.features.ask import Asked, Prepared
 from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.prompts import Prompt
 
@@ -60,6 +61,18 @@ class State:
     chosen_configuration: str
     commands: tuple[Command, ...] = ()
     prompts: tuple[Prompt, ...] = ()
+
+    prepare_question: Callable[[str, str], Prepared] | None = None
+    """Rank a corpus against a question and report what would be sent. Sends no prompt."""
+
+    send_question: Callable[[Prepared], Asked] | None = None
+    """Run a question that has already been previewed. Never raises (ADR-085).
+
+    Both arrive from `cli.py` for the reason `check_engine` does: a section may reach
+    `features/` and `core`, and neither can build a provider or call the cycle. The window
+    is handed the ability to run one thing and cannot obtain it for itself. When they are
+    absent the section says so and the rest of the window is unaffected.
+    """
 
 
 WIDEST_ROW = 44

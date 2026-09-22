@@ -538,3 +538,17 @@ Forty DOIs resolved to nothing and none was a work that does not exist: three we
 [`ADR-084-the-environment-belongs-outside.md`](ADR-084-the-environment-belongs-outside.md)
 
 `uv sync` failed four times in one day with `Access is denied`, once leaving the environment broken with two empty `dist-info` directories. **The project had already solved this**: `run.ps1` puts the environment outside the checkout and its own documentation describes the failure exactly. A 111 MB `.venv` existed inside a synchronised folder because commands were run as `uv` rather than through the wrapper - and `scripts/lacc-window.bat` called `uv` directly too, so the launcher written to make this easy would have rebuilt the problem on the first double-click. Measurable result: the suite went from 726 passed and 1 skipped to **727 passed**, because the window's test had been skipping for a toolkit that was in the wrong environment. Two defects found by using the window are fixed alongside: the panel scrolled only after a click, and monospaced text ran off the right edge.
+
+
+### 085 - a window that runs one thing
+
+[`ADR-085-a-window-that-runs-one-thing.md`](ADR-085-a-window-that-runs-one-thing.md)
+
+Reverses the first sentence of ADR-069, which said the window reads and runs nothing. One command runs from it now - `ask`, against a corpus already there - because it is the only action this program takes that leaves the workspace exactly as it found it. **The preview is not a dialog, it is what produces the button**: the control that sends is created by the drawing of what would be sent, so there is no path from typing to an engine call that skips it. The call runs on a worker thread that touches no widget and the window polls a queue with `after`; cancelling stops the window waiting and says plainly that the engine was not told. First real run: 214 of 777 passages, an answer in 28 seconds, 2 of 2 quotations found in what was sent - and the waiting text's "about forty seconds" was a figure written from memory, now replaced with the measured one.
+
+
+### 086 - a variable is not a call
+
+[`ADR-086-a-variable-is-not-a-call.md`](ADR-086-a-variable-is-not-a-call.md)
+
+The converse rule (ADR-066) drew its call graph from every name a function writes down, so a parameter named `corpus` counted as a call to the `corpus` command - which prints. Three functions in `cli.py` inherited presentation from a variable name and were invisible to the check for as long as it has existed. Two are composition and are named; the third was a **third copy** of the decision the slice already held, which is the very shape ADR-065 cost a corpus to learn. Edges come from call sites now, `ask`/`measure`/the window take one path, an unneeded exception fails the test rather than sitting there, and `tools/measure.py` reads the vocabulary from the rule instead of a copy that had drifted thirteen names behind it.

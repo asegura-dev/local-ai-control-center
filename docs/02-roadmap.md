@@ -252,6 +252,12 @@ answer rather than defer.
 the same core. It arrives once the core keeps its promise, so that the interface is
 built on something finished rather than becoming the place where behaviour is decided.
 
+> **This arrived in v2.0.0 and grew in v2.1.0**, as a desktop window rather than a terminal
+> UI or a web application. The condition held: `views/` draws and decides nothing, and
+> `tests/test_layering.py` enforces that in both directions. It read and ran nothing for
+> eight sections; the ninth asks one question, behind a preview that has to be drawn before
+> the control that sends it exists (ADR-069 to ADR-077, ADR-085).
+
 Converting the finished Markdown to LaTeX is not on this list. Pandoc does that well
 already, and LACC has no reason to reimplement it.
 
@@ -457,7 +463,7 @@ was not built. The reason is worth more than the feature would have been.
 
 It was planned on a premise: *"the corpus has near-duplicates between documents."* That
 sentence sat in a planning document reading like something already known, and nobody had
-looked. Measured over all 654 quotations across all 26 documents, the corpus holds **zero**
+looked. Measured over all 654 quotations across all 26 documents it held then, the corpus had **zero**
 near-duplicates across a document boundary. Every repeat in it is inside a single document,
 and there are six.
 
@@ -476,7 +482,7 @@ near-duplicate threshold is 0.80. The highest-similarity non-identical pair in t
 one that must be kept.
 
 **The lesson for this roadmap is about plans rather than about duplication.** This project
-has a section counting ten figures it got wrong, and it learned to check numbers. The premise
+has a section counting twelve figures it got wrong, and it learned to check numbers. The premise
 above was never a number. It was a claim about the world, written in the sentence justifying
 the work, and it was invisible for exactly that reason - nothing in a plan looks like a
 figure. **A plan is where unmeasured claims hide.** The question that catches them is asked
@@ -484,7 +490,8 @@ of sentences, not of tables: *has anyone looked?*
 
 ## Retrieval, built - and what using it found
 
-The wall named throughout this document: 654 quotations do not fit a window, and the largest
+The wall named throughout this document: a corpus of this size - 654 quotations then, 777
+citable of 881 now - does not fit a window, and the largest
 documents had to be read in passes to enter it at all. Choosing by meaning is built (ADR-061), measured, and honest
 about its size: decisive across languages - eight relevant of the first eight against about
 three by words - better in English on one question, which is a story, and blunted at this
@@ -561,6 +568,7 @@ What the version actually holds:
 | `lacc review` | **your** draft against **your** sources - the check turned around (ADR-068) |
 | `lacc sections` | a document's own numbering, and one part taken out of it (ADR-076) |
 | `lacc window` | a second view: eight sections, and it reads (ADR-069 to ADR-075, ADR-077) |
+| and in v2.1.0 | a ninth that asks, behind a preview, on a thread (ADR-085) |
 | `scripts/` | launchers whose digests the gate enforces (ADR-071) |
 | the method | measured, written down, and followable without being explained |
 

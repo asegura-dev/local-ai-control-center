@@ -19,6 +19,7 @@ is decoration.
 from __future__ import annotations
 
 import ast
+import importlib.util
 import pathlib
 import re
 import subprocess
@@ -81,37 +82,13 @@ def _view_logic() -> None:
         "logic in the views",
         "Has anything that decides something drifted into a view? (ADR-066)",
     )
-    presentation = {
-        "Console",
-        "_console",
-        "_show",
-        "Progress",
-        "Panel",
-        "Table",
-        "Text",
-        "print",
-        "echo",
-        "confirm",
-        "_approve",
-        "_confirm",
-        "CTk",
-        "CTkFrame",
-        "CTkLabel",
-        "CTkButton",
-        "CTkFont",
-        "CTkScrollableFrame",
-        "Treeview",
-        "configure",
-        "pack",
-        "grid",
-        "insert",
-        "destroy",
-        "winfo_children",
-        "mainloop",
-        "bind",
-        "after",
-    }
-    for name in ("cli.py", "window.py"):
+    rule = _the_rule()
+    if rule is None:
+        print("  tests/test_layering.py could not be read, so this is not measured.")
+        print("  It holds the rule; a copy here would be a second thing to keep true.")
+        return
+    presentation, views, excused = rule
+    for name in views:
         path = SOURCE / name
         if not path.exists():
             continue
@@ -132,9 +109,21 @@ def _view_logic() -> None:
                     found.add(x.attr)
             return found
 
+        def calls_in(fn: ast.AST) -> set[str]:
+            """Only names in call position. A variable is not a call (ADR-086)."""
+            found: set[str] = set()
+            for x in ast.walk(fn):
+                if not isinstance(x, ast.Call):
+                    continue
+                if isinstance(x.func, ast.Name):
+                    found.add(x.func.id)
+                elif isinstance(x.func, ast.Attribute):
+                    found.add(x.func.attr)
+            return found
+
         reaches = {k: bool(names(v) & presentation) for k, v in functions.items()}
         plain = {k.split(".")[-1]: k for k in functions}
-        calls = {k: {plain[c] for c in names(v) & set(plain)} for k, v in functions.items()}
+        calls = {k: {plain[c] for c in calls_in(v) & set(plain)} for k, v in functions.items()}
         changed = True
         while changed:
             changed = False
@@ -144,11 +133,40 @@ def _view_logic() -> None:
         astray = sorted(k for k, v in reaches.items() if not v)
         print(f"  {name:12} {len(functions):3} functions, {len(astray):2} never touch presentation")
         for found in astray:
-            print(f"                 {found}")
+            mark = "" if found in excused else "   <- not excused by the rule"
+            print(f"                 {found}{mark}")
     print()
     print("  Names here are not defects on their own: the entry point, composition and the")
-    print("  parsing of a view's own arguments belong in a view. `tests/test_layering.py`")
-    print("  holds the list of which, one by one, and fails on anything else (ADR-066).")
+    print("  parsing of a view's own arguments belong in a view. The vocabulary and the")
+    print("  list of which names are excused are read from `tests/test_layering.py`, which")
+    print("  is what enforces them - this tool kept its own copy and it fell thirteen names")
+    print("  behind, so it reported a function as logic that the rule did not (ADR-086).")
+
+
+def _the_rule() -> tuple[frozenset[str], tuple[str, ...], frozenset[str]] | None:
+    """The presentation vocabulary, the views, and the excused names - from the test.
+
+    Read rather than copied. This tool held its own copy of the vocabulary and it drifted
+    thirteen names behind the one that is enforced, which is the same defect as two writers
+    of one file format living apart (ADR-065, ADR-086). If the test cannot be read, nothing
+    is printed: a stale answer is worse than none.
+    """
+    rule = ROOT / "tests" / "test_layering.py"
+    if not rule.exists():
+        return None
+    spec = importlib.util.spec_from_file_location("_layering_rule", rule)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception:  # noqa: BLE001 - a tool that cannot read the rule says so
+        return None
+    return (
+        frozenset(module._PRESENTATION),
+        tuple(module._VIEWS),
+        frozenset(module._A_VIEW_MAY_HOLD | module._LOGIC_THE_VIEW_STILL_HOLDS),
+    )
 
 
 def _records() -> None:

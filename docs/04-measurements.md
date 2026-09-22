@@ -84,8 +84,9 @@ the feature is not there (ADR-055).
 The tenth is the ninth's twin and it cost more, because it had been written into a plan as a
 premise rather than as a prediction. The plan's next piece was approximate deduplication, on
 the stated grounds that the corpus held near-duplicates between documents. Nobody had looked.
-**It holds none** - all 654 quotations, all 26 documents, zero pairs across a document
-boundary - and the entire exact comparison it was to be an approximation of takes 133
+**It held none** - all 654 quotations, all 26 documents at the time, zero pairs across a
+document boundary; the corpus has since grown to 881 collected and 777 citable across 31
+documents, and this has not been re-run over them - and the entire exact comparison it was to be an approximation of takes 133
 milliseconds. What it does hold is six repeats inside a document, of which equality was
 already catching three. A sentence stated as a fact in a planning document is a figure with no
 measurement behind it, and it is harder to notice than a wrong number because it never looked
@@ -349,10 +350,12 @@ is building for a cost that is not there, which is the lesson ADR-054 already pa
 first result a sentence the word ranking missed entirely; about seven of eight on topic
 against about six. Four runs would be a measurement.
 
-**And the budget blunts all of it at this size.** With a 32k window the selection admits
-**218 of 654 passages** - a third of the corpus enters whatever the ranking says - so
-retrieval decides order and discards rather than membership. It becomes decisive as the corpus
-grows, and saying otherwise now would be the thirteenth wrong figure.
+**And the budget blunts much of it at this size.** With a 32k window the selection admits
+**214 of 777 citable passages** - re-taken 22 September; it was 218 of 654 when this was first
+written - so between a quarter and a third of the corpus enters whatever the ranking says, and
+retrieval decides order and discards rather than membership. The share falls as the corpus
+grows, which is the direction that makes retrieval decisive; saying it already is would be the
+thirteenth wrong figure.
 
 **Fusion is not measured against either ranking alone.** It is built and tested for mechanism
 and no figure says it wins.
@@ -414,7 +417,7 @@ tense was not.
 
 ## How to read a figure from this project
 
-**Ask what the check could not see.** Six of the seven wrong figures above were the check
+**Ask what the check could not see.** Six of the twelve wrong figures above were the check
 reporting its own blind spot. The question that found every one of them was not "what is the
 rate" but "what did it reject, and was it right to".
 

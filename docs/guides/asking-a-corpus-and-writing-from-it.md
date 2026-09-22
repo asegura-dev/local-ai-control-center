@@ -62,7 +62,7 @@ want the premise tested, put it in the question.
 
 Four things arrive, and each answers a different question.
 
-**`218 passages selected of 654; 436 set aside`** - what the answer is an answer *about*. It
+**`214 passages selected of 777; 563 set aside`** - what the answer is an answer *about*. It
 appears before the preview, on purpose: a selection made on your behalf is something to see
 before you approve sending it.
 
@@ -118,9 +118,10 @@ spends about 48 seconds embedding it and writes the vectors to a file beside it;
 question after that is about three seconds. The vectors are a cache - delete the file and it
 rebuilds.
 
-It matters most across languages and as the corpus grows. At 654 quotations with a 32k window
-the budget admits a third of the corpus whatever the ranking says, so what retrieval decides
-at that size is the order and the discards rather than what gets in at all.
+It matters most across languages and as the corpus grows. At 777 citable quotations with a
+32k window the budget admits about 214 of them whatever the ranking says, so what retrieval
+decides at that size is the order and the discards rather than what gets in at all. The share
+falls as you collect more, which is when the ranking starts deciding membership too.
 
 ## Drafting
 

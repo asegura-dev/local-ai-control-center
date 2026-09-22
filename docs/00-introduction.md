@@ -44,6 +44,10 @@ This book grows with the code, one decision at a time:
 - **Ch. 1** - architecture: core-first, flat modules, contracts at the boundary.
 - **Ch. 2** - roadmap: where LACC is and where it is heading.
 - **Ch. 3** - development: setup, the quality gate, and documentation discipline.
+- **Ch. 4** - measurements: what this project measured about itself, including the twelve
+  published figures that turned out to be wrong and which way each one leaned.
+- **Ch. 5** - assurance: every claim this project makes about itself, paired with what
+  actually holds it up, and a verdict on each.
 
 Decisions are recorded separately as ADRs (`adr/`), each with its context, the
 choice, the trade-off, and the alternative rejected. The one-line-per-file map is

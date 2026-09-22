@@ -76,9 +76,14 @@ wrong.
 
 The test suite also enforces a promise the documentation used to make on its own: it
 installs a guard that fails any test opening a connection to an address that is not
-loopback (ADR-022). LACC does not use the network, and a dependency or a future feature
-that reaches outward fails the build rather than shipping. Talking to a local engine over
-loopback is inter-process communication and stays allowed.
+loopback (ADR-022). A dependency that reaches outward fails the build rather than shipping,
+and talking to a local engine over loopback is inter-process communication and stays allowed.
+
+The guard constrains **the suite**, not the product, and the difference matters. LACC does
+reach other machines - an engine you own, an ntfy server you host, the registry that assigns
+DOIs - and the rule is not *no network*: it is that **every destination is written down in a
+file the user wrote**, with `network_access` as a ceiling that is off by default and that no
+environment variable can lift (ADR-030, ADR-067).
 
 `uv run mypy` and `uv run pytest` may fail with `failed to canonicalize script path` when
 uv has just reinstalled the project; invoking them as `python -m` avoids it.
@@ -99,8 +104,10 @@ The virtual environment has its own version of this problem, for different reaso
 
 ## Taking the measurements
 
-    .un.ps1 run python tools/measure.py                  the project
-    .un.ps1 run python tools/measure.py ~/lacc-workspace  the project and the material
+    .
+un.ps1 run python tools/measure.py                  the project
+    .
+un.ps1 run python tools/measure.py ~/lacc-workspace  the project and the material
 
 Layers and their sizes, logic that has drifted into a view, records against their index, the
 suite, and for a workspace: every document with its tokens, pages and structure, and every

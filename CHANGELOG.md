@@ -7,7 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-22
+
+### Added
+- **The window asks a question** (ADR-085). Eight sections read; a ninth runs the one action
+  in this program that leaves the workspace exactly as it found it. Type a question, press
+  **Prepare** - nothing is sent, the corpus is ranked and what *would* go is drawn: which
+  model, which host, how many passages of how many, how many set aside, how large the
+  material is. The **Send** button does not exist until that has been drawn, which is how a
+  confirmation defaulting to no survives becoming a button.
+
+  The call runs on a worker thread that touches no widget; the window polls a queue with
+  `after`, so it keeps repainting and never becomes *Not Responding*. **Stop waiting** stops
+  the window waiting and says so on its own line - the engine keeps generating and the answer
+  is discarded unread. An unreachable engine, a prompt too large, a corpus with nothing
+  citable and a question matching nothing are all drawn where an answer would be, not raised.
+
+  Measured on the first real run: **214 of 777 passages, about 14,800 tokens, an answer after
+  28 seconds, 2 of 2 quotations found in what was sent.** The waiting text had said "about
+  forty seconds", which was a figure written from memory; it now says what was measured.
+
 ### Fixed
+- **The rule that guards the views had a blind spot, and it hid a triplicated decision**
+  (ADR-086). `test_a_view_contains_no_logic` drew its call graph from **every name a function
+  writes down**, so a parameter named `corpus` was read as a call to the `corpus` command -
+  which prints. Three functions in `cli.py` inherited presentation from a variable name and
+  became invisible to the rule: two are composition and are now named as exceptions, and the
+  third, `_passages_for`, was a **third copy** of the decision `features/ask.py` already held.
+
+  Edges are drawn from call sites now. `ask`, `measure` and the window take one path, so the
+  terminal and the window answer the same question the same way by construction.
+
+  Two related repairs: an exception that is no longer *needed* now fails the test, not only
+  one whose function has left; and `tools/measure.py` stops keeping its own copy of the
+  presentation vocabulary - the copy had fallen **thirteen names behind** the enforced one and
+  was reporting a function as logic that the rule did not.
+
 - **Text still ran off the right edge, and a screenshot showed why** (ADR-084). Wrapping to
   the panel was wrong, and wrapping to the label's own holder was wrong too: **inside a
   scrollable frame a child can be wider than what is on screen**, so both measure something

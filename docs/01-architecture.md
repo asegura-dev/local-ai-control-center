@@ -38,7 +38,7 @@ The reverse is not allowed: the core must not depend on the CLI or the
 dashboard. This is intended to keep the core testable in isolation and to let
 interfaces change without touching business logic.
 
-## Five directories that mean something
+## Seven directories that mean something
 
 Until v0.35.0 the package was fifteen modules flat, and the seam the design is organised
 around - what the core decides, and what the world does - had to be inferred by reading
@@ -49,15 +49,19 @@ imports. It is now visible:
 | `core/` | The rules: configuration contracts, permissions, previews, plans, the fence, quotation checking, the workspace boundary. Depends on nothing outside itself. |
 | `ports/` | An abstract class and the contracts that cross it. Nothing else. |
 | `adapters/` | Implementations of those ports: Ollama, a mock, PDF and Word, ntfy, word and dense retrieval, an asking judge, an embedder, and the vector cache beside a corpus. |
+| `features/` | One capability each, as a vertical slice: the corpus format, review, the sections of a document, what each skill will ask, where the work stands, asking. Whatever has to agree with something else lives beside it (ADR-066). |
+| `views/` | The window's sections: one module each, a name and a list and what to draw for a selection. They draw; they decide nothing (ADR-075). |
 | `system/` | Machine-facing code that is not behind a port: the audit trail, the profiler. |
-| top level | `cycle.py`, the application service, and `cli.py`, the driving adapter. |
+| top level | `cycle.py`, the application service, and **two** driving adapters: `cli.py` and `window.py`. |
 
-**Six ports, and each one had to earn the abstraction.** `Provider` turns a prompt into an
+**Seven ports, and each one had to earn the abstraction.** `Provider` turns a prompt into an
 answer; `Converter` turns a document into text; `Notifier` says a run finished; `Retriever`
 chooses which passages go into a prompt and must declare what it set aside (ADR-050);
 `Judge` says whether a reading follows from the quotation under it, and says plainly that
 this is an opinion rather than a check (ADR-053); `Embedder` turns text into a vector so a
-question can be answered by meaning as well as by shared words (ADR-061).
+question can be answered by meaning as well as by shared words (ADR-061); `Registry` asks
+whoever assigns DOIs what a reference actually is, rather than asking a model - which is the
+first destination in this program that is not the user's own machine (ADR-067).
 
 `Retriever` is worth noting as the one that paid off twice: it was written with a word
 ranking behind it and the record said an embedding model *"may well do better; nobody here
@@ -84,7 +88,7 @@ document. The slot is part of a prompt's shape, so it moved to `core.fence`, and
 did `core` stop reaching downward. Measuring the import graph again after each move is what
 found the second one.
 
-The layering is enforced by a test rather than described in this chapter. Five directories
+The layering is enforced by a test rather than described in this chapter. Seven directories
 whose names carry meaning are five directories somebody will eventually break, and a layout
 in a document is a wish.
 
@@ -495,15 +499,26 @@ first look at an actual rejected quotation said otherwise.
 ## Future direction
 
 The subpackage split this section used to anticipate has happened: `core/`, `ports/`,
-`adapters/` and `system/` are described above and enforced by `tests/test_layering.py`
-(ADR-029).
+`adapters/`, `features/`, `views/` and `system/` are described above and enforced by
+`tests/test_layering.py`, in both directions (ADR-029, ADR-066).
 
-What the structure does not yet have is a way to work at the scale of a library. A
-bibliography of two dozen papers exceeds any context window this runs against, and the
-largest and most central documents are the ones refused. That needs a selection step before
-the provider, which is a port rather than a rewrite: something that decides what to send.
+**Two gaps this section used to name are closed**, and what replaced them is more useful than
+the plan was.
 
-The other gap is factual metadata. Asked for a journal, a model supplies one from memory and
-does not say that it did - measured at twelve fabrications in twenty-four, with an explicit
-instruction not to. Author, year, journal and DOI belong to an authority reached over the
-network, behind a port like any other, not to generation.
+*Working at the scale of a library.* A bibliography of two dozen papers exceeds any context
+window this runs against, and the largest documents were the ones refused. The selection step
+is the `Retriever` port with two implementations behind it - words, and words fused with
+meaning (ADR-050, ADR-061) - and the documents that did not fit enter either in passes
+(ADR-045) or as one numbered section taken out of them (ADR-076). The honest limit is the
+budget rather than the ranking: over a corpus of 777 checked quotations a 32k window admits
+about 214 of them, so roughly a quarter enters whatever the ranking says.
+
+*Factual metadata.* Asked for a journal, a model supplied one from memory and did not say
+that it had - twelve fabrications in twenty-four, with an explicit instruction not to. It now
+comes from the `Registry` port and `lacc resolve`: a DOI goes out and nothing else, behind
+two switches that both have to be on, with a preview that names how many and where
+(ADR-067, ADR-083).
+
+What the structure still does not have is coverage - which parts of a subject a bibliography
+speaks to and which it does not. Its precondition is unchanged and is why it has not been
+built: **a gap measured over an incomplete corpus is a false gap.**

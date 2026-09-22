@@ -82,8 +82,10 @@ will not fit, rather than letting it be truncated. What fits, computed from the 
 
 A quarter of the window is held back for the answer, and the estimate runs deliberately
 high, so these are conservative. Most single papers fit comfortably at 32,768. A whole
-thesis does not - splitting documents too large for a window is deferred to v2, and until
-then LACC refuses the run instead of quietly answering from a fragment.
+thesis does not, and LACC refuses such a run by default rather than quietly answering from a
+fragment. There are two ways through it: `--in-passes --pages-per-pass N` reads it in
+overlapping passes and says how many it took, and `lacc sections <document> --take <number>`
+writes one numbered section out beside it, without touching the document itself.
 
 The window costs memory. `lacc profile` prints the cost per model, and the same 3B model
 held 2.0 GB at 4,096 tokens and 3.5 GB at 32,768.

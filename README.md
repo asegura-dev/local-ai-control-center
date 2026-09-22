@@ -94,7 +94,7 @@ in [`docs/adr/`](docs/adr/) with its context, its trade-off and the alternative 
 
 ## Status
 
-v1.0, working end to end against a real local model and measured against a real
+v2.1.0, working end to end against a real local model and measured against a real
 bibliography rather than against documents written for the test.
 
 Every run takes the same shape: LACC plans the action, shows a preview, asks for
@@ -128,6 +128,21 @@ append-only, hash-chained audit log.
 - `--judge` adds a second opinion on whether each reading follows from the quotation
   under it, and shows passages that might support the ones it flags. This is a model
   judging a model - weaker than the quotation check, and reported as such.
+- `lacc review <draft> --against <corpus> --into <report>` reads **your** writing against
+  **your** sources and says, paragraph by paragraph, what your corpus holds up, what it
+  contradicts and what it does not cover - with *not covered* stated as not covered rather
+  than as wrong.
+- `lacc resolve <documents>` asks the registry that assigns DOIs what each reference
+  actually is, instead of asking a model. It is the first destination in this program that
+  is not your own machine, and it needs both `network_access` and a `registry_url` written
+  in your configuration.
+- `lacc sections <document>` lists the sections a document numbers for itself, `--about`
+  ranks them by a question, and `--take` writes one out - so a guideline too large for any
+  window can be read one part at a time without cutting the file.
+- `lacc status` says where the work stands, stage by stage, with **what each stage is still
+  missing** rather than only what it produced. Counted from the files every time.
+- `lacc window` opens a desktop window on all of it: eight sections that read, and one that
+  asks a question behind a preview you have to see before the button that sends it exists.
 - `lacc preview` shows what would happen without doing it, `lacc profile` reports what
   the machine offers, `lacc verify` walks the audit chain, and `lacc notify test`
   checks notification settings before you rely on them.
@@ -147,9 +162,10 @@ implementation, the hash-chained audit log, execution previews, the execution cy
 skills, document conversion, quotation checking, a notifier port, and the
 command-line interface.
 
-Six ports now, each with an implementation and none of them assumed: the provider, the
+Seven ports now, each with an implementation and none of them assumed: the provider, the
 document converter, the notifier, a retriever that must declare what it set aside, a
-judge of whether a reading follows from its quotation, and an embedder. Naming an
+judge of whether a reading follows from its quotation, an embedder, and a registry that is
+asked what a reference is rather than a model. Naming an
 `embedding_model` lets a question be answered by meaning as well as by shared words -
 measured on a real corpus, a question asked in Spanish against English quotations
 reached eight relevant passages of the first eight, where word matching reached about
@@ -162,8 +178,11 @@ can say when it finished through an ntfy server you host yourself. No destinatio
 ever contacted unless it is written down in your configuration, and no environment
 variable can widen that.
 
-What remains for v1 is adoption: guides, a clear install, and a citable record - see
-the [roadmap](docs/02-roadmap.md).
+v1.0 shipped, and v2.0 turned out not to be what its plan said: the roadmap keeps the wrong
+plan visible beside what actually arrived - `review`, `resolve`, `sections` and the window.
+What has **not** been built is coverage, and the reason is stated rather than rescheduled:
+a gap measured over an incomplete corpus is a false gap. See the
+[roadmap](docs/02-roadmap.md).
 
 ## Citing LACC
 

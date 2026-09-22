@@ -1,9 +1,11 @@
-"""The second view: a window that reads (ADR-069, ADR-075).
+"""The second view: a window that reads, and runs one thing (ADR-069, ADR-075, ADR-085).
 
-**It reads and runs nothing.** No skill, no model call, no document written. A review takes
-minutes and an engine; a window that ran one would need threads, progress, cancellation and a
-way to report an engine that went away - four new ways to be wrong, in a view, on day one.
-Running stays in the CLI.
+**Eight sections read. One asks.** No skill is run from here, no document written, nothing
+converted - the single action the window may take is a question against a corpus that is
+already there, which is the only thing this program does that leaves the workspace exactly as
+it found it. It happens behind a preview, on a worker thread, and the ability to do it is
+handed in rather than obtained: `cli.py` passes the two callables, and without them the
+section says so and the rest is unaffected (ADR-085).
 
 **And it decides nothing.** Which reviews exist, what a finding means, which files are
 corpora, what a configuration declares, which colours a theme has: all answered in
@@ -32,11 +34,12 @@ from tkinter import ttk
 import customtkinter as ctk
 
 from local_ai_control_center.features.appearance import Palette, Preferences, remember
+from local_ai_control_center.features.ask import Asked, Prepared
 from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.overview import configurations_in
 from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.status import EngineSeen, Status
-from local_ai_control_center.views import paint, program, records, workspace
+from local_ai_control_center.views import asking, paint, program, records, workspace
 from local_ai_control_center.views.section import Section, State, shortened
 
 WIDTH, HEIGHT = 1280, 820
@@ -57,7 +60,12 @@ INSET = 28
 LINES_PER_NOTCH = 3
 """How far one notch of the wheel scrolls, which is what the rest of the system does."""
 
-SECTIONS: tuple[Section, ...] = (*workspace.SECTIONS, *program.SECTIONS, *records.SECTIONS)
+SECTIONS: tuple[Section, ...] = (
+    *workspace.SECTIONS,
+    *asking.SECTIONS,
+    *program.SECTIONS,
+    *records.SECTIONS,
+)
 """Every section, in the order they appear. The frame knows nothing else about them."""
 
 
@@ -74,6 +82,8 @@ class Window(ctk.CTk):
         prompts: tuple[Prompt, ...] = (),
         status: Status | None = None,
         check_engine: Callable[[], EngineSeen] | None = None,
+        prepare_question: Callable[[str, str], Prepared] | None = None,
+        send_question: Callable[[Prepared], Asked] | None = None,
     ) -> None:
         super().__init__()
         self._pending: str | None = None
@@ -86,6 +96,8 @@ class Window(ctk.CTk):
         # one by that name, so the assignment went somewhere else and the read failed.
         self.seen = status
         self.check_engine = check_engine
+        self.prepare_question = prepare_question
+        self.send_question = send_question
         self.engine = EngineSeen()
         self.preferences = preferences
         self.saved = saved
@@ -142,6 +154,8 @@ class Window(ctk.CTk):
             chosen_configuration=self.chosen,
             commands=self.commands,
             prompts=self.prompts,
+            prepare_question=self.prepare_question,
+            send_question=self.send_question,
         )
 
     # --- the three columns -----------------------------------------------------------------
@@ -417,6 +431,8 @@ def show(
     prompts: tuple[Prompt, ...] = (),
     status: Status | None = None,
     check_engine: Callable[[], EngineSeen] | None = None,
+    prepare_question: Callable[[str, str], Prepared] | None = None,
+    send_question: Callable[[Prepared], Asked] | None = None,
 ) -> None:
     """Open the window and hand control to Tk until it closes.
 
@@ -424,4 +440,15 @@ def show(
     adapter's job, and a view that did it would be a view reaching past `features/`
     (ADR-066). It is also never called until somebody presses the button (ADR-077).
     """
-    Window(folder, configs, preferences, saved, commands, prompts, status, check_engine).mainloop()
+    Window(
+        folder,
+        configs,
+        preferences,
+        saved,
+        commands,
+        prompts,
+        status,
+        check_engine,
+        prepare_question,
+        send_question,
+    ).mainloop()

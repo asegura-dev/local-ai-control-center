@@ -7,8 +7,8 @@ aspirations.
 
 ## Architecture
 
-- **The core contains no interface code.** Presentation (Typer, Rich, any future
-  UI) lives only at the edges. The core does not print, prompt, or render. A change
+- **The core contains no interface code.** Presentation (Typer and Rich in the CLI,
+  CustomTkinter in the window) lives only at the edges. The core does not print, prompt, or render. A change
   that puts interface code in the core is wrong by construction.
 
 - **A skill's plan is pure.** `plan` describes intent and touches nothing: it reads

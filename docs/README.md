@@ -35,7 +35,7 @@ for decision records.
 
 ## How the docs are organized
 
-The **numbered chapters (00-03)** above are the linear *book* and live flat in
+The **numbered chapters (00-05)** above are the linear *book* and live flat in
 `docs/`. Decisions are recorded separately:
 
 - [`adr/`](adr/) - Architecture Decision Records: the *why* behind each decision,
