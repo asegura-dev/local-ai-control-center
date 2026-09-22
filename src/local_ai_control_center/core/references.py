@@ -151,3 +151,39 @@ def without_truncations(dois: frozenset[str]) -> frozenset[str]:
     return frozenset(
         doi for doi in dois if not any(other != doi and other.startswith(doi) for other in dois)
     )
+
+
+_ANOTHER_DOI = re.compile(r"(?<=.)10\.\d{4,9}/")
+"""A second DOI prefix inside one string: `10.1007/x-010.1007/x-0` is one printed twice."""
+
+_RUN_ON = re.compile(r"\.(?:\d{1,3})?[a-z]{4,}$")
+"""A tail of words, with or without a reference number in front: `.17afsharoromieha`.
+
+What the next entry's number and first author look like when the folding runs two references
+together. A DOI can end in letters, so this is a candidate to *try*, never a certainty - the
+registry decides (ADR-083).
+"""
+
+
+def shortened(doi: str) -> tuple[str, ...]:
+    """Cuts of ``doi`` worth asking a registry about, longest first.
+
+    **Only where there is evidence the string was contaminated**, never for one that is
+    merely short. A truncated DOI is missing information and cutting it further can only
+    produce a different work - and a wrong DOI in a bibliography is worse than a missing one.
+
+    Returns nothing when the string shows no sign of having something stuck to it.
+    """
+    candidates: list[str] = []
+    second = _ANOTHER_DOI.search(doi)
+    if second:
+        candidates.append(doi[: second.start()])
+    trimmed = _RUN_ON.sub("", doi)
+    if trimmed != doi and trimmed not in candidates:
+        candidates.append(trimmed)
+    # A tail that is a word after a dot, with no number: `.publisher`, `.short`.
+    if "." in doi:
+        head, _, tail = doi.rpartition(".")
+        if tail.isalpha() and len(tail) >= 4 and head not in candidates and len(head) > 12:
+            candidates.append(head)
+    return tuple(dict.fromkeys(c.rstrip(".,;:()") for c in candidates if len(c) > 12))

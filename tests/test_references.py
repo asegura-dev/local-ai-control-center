@@ -170,3 +170,37 @@ def test_nothing_is_guessed_about_which_part_is_the_title() -> None:
     wrongness this module exists to avoid. The whole entry survives."""
     entry = Reference(text="7. Eiber M, Weirich G. Simultaneous PET/MRI. Eur Urol. 2016.")
     assert as_one_line(entry) == "7. Eiber M, Weirich G. Simultaneous PET/MRI. Eur Urol. 2016."
+
+
+def test_a_doi_printed_twice_is_cut_at_the_second_copy() -> None:
+    """`10.1007/x10.1007/x` is one DOI the folding ran into itself (ADR-083)."""
+    from local_ai_control_center.core.references import shortened
+
+    doubled = "10.1007/s00259-016-3346-010.1007/s00259-016-3346-0"
+    assert shortened(doubled)[0] == "10.1007/s00259-016-3346-0"
+
+
+def test_the_next_entrys_number_and_author_are_offered_as_a_cut() -> None:
+    from local_ai_control_center.core.references import shortened
+
+    assert "10.1007/s00259-012-2298-2" in shortened("10.1007/s00259-012-2298-2.17afsharoromieha")
+
+
+def test_a_word_run_on_after_a_dot_is_offered_as_a_cut() -> None:
+    from local_ai_control_center.core.references import shortened
+
+    assert "10.1007/s00259-021-05473-2" in shortened("10.1007/s00259-021-05473-2.publisher")
+
+
+def test_a_merely_truncated_doi_is_left_alone() -> None:
+    """Cutting a truncated DOI further can only produce a different work (ADR-083)."""
+    from local_ai_control_center.core.references import shortened
+
+    assert shortened("10.1016/j.euo.2021") == ()
+    assert shortened("10.1016/j.ijrobp.2006.04") == ()
+
+
+def test_a_clean_doi_offers_no_cuts() -> None:
+    from local_ai_control_center.core.references import shortened
+
+    assert shortened("10.1016/s0140-6736(20)30314-7") == ()

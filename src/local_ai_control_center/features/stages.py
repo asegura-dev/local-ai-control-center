@@ -17,6 +17,7 @@ doing still attached. This project has measured what the first kind of sentence 
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -29,6 +30,18 @@ CORPUS_MARKS = ("# Collected quotations", "# Claims collected by")
 BIBLIOGRAPHY_MARK = "# Bibliography"
 REVIEW_MARK = "# Review of"
 RESOLVED_MARK = "## Resolved"
+TAKEN_FROM = ".from.json"
+"""Where a section written by `--take` records the document it came from.
+
+Beside the file, the way findings sit beside a report and the registry cache beside a
+bibliography. Nothing is written *into* the extract: hundreds of quotations are checked
+against these files as they are (ADR-076), and this is a fact **about** the file rather than
+part of it.
+
+Without it, `status` called a guideline "with no quotation" while seven sections taken out of
+it were collected - a pending item that was not pending (ADR-082).
+"""
+
 _SAMPLE = 200
 
 _SECTION_OPENING = re.compile(r"^\s{0,3}\d{1,2}(?:\.\d{1,2}){0,2}\.?(?:\s|$)")
@@ -90,10 +103,15 @@ def _kind(path: Path) -> str:
     return "document"
 
 
-def stages_in(workspace: Path) -> Work:
+def stages_in(workspace: Path, context_file: str = "") -> Work:
     """Read the workspace and say where each stage of the work stands.
 
     Counted from files: no model is called, nothing is written, and nothing leaves.
+
+    ``context_file`` is excluded from the documents. A workspace names one in its own
+    configuration, and standing context is something every run carries rather than something
+    to quote from - counting it as a document with no quotation invents a pending item out
+    of a setting the user wrote (ADR-082).
     """
     if not workspace.is_dir():
         return Work(workspace=str(workspace))
@@ -108,6 +126,8 @@ def stages_in(workspace: Path) -> Work:
     for path in sorted(workspace.glob("*.md")):
         if path.name.startswith("."):
             continue
+        if context_file and path.name == context_file:
+            continue
         by_kind[_kind(path)].append(path)
 
     documents = by_kind["document"]
@@ -118,6 +138,18 @@ def stages_in(workspace: Path) -> Work:
     claims = parse_corpus(biggest.read_text(encoding="utf-8", errors="replace")) if biggest else ()
     refused = sum(1 for c in claims if "NOT IN THE DOCUMENT" in c.recorded_verdict)
     covered = {c.document for c in claims}
+    # A document whose extracted sections are collected is covered *through* them. The
+    # extract says which document it came from, in a file beside it (ADR-082).
+    for extract in by_kind["extract"]:
+        if extract.name not in covered:
+            continue
+        beside = extract.with_suffix(extract.suffix + TAKEN_FROM)
+        try:
+            noted = json.loads(beside.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(noted, dict) and isinstance(noted.get("document"), str):
+            covered.add(noted["document"])
     uncovered = [p.name for p in documents if p.name not in covered]
 
     dois: set[str] = set()

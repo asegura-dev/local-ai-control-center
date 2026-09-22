@@ -9,10 +9,12 @@ a skill, previews it, asks for confirmation (defaulting to no), and executes;
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import re
 import sys
 import time
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -66,6 +68,7 @@ from local_ai_control_center.core.preview import ExecutionPreview, IntendedActio
 from local_ai_control_center.core.references import (
     as_one_line,
     references_in,
+    shortened,
     without_truncations,
 )
 from local_ai_control_center.core.run import Progress, ProgressFn, new_run_id
@@ -121,7 +124,7 @@ from local_ai_control_center.features.review import (
     paragraphs_in,
     report,
 )
-from local_ai_control_center.features.stages import stages_in
+from local_ai_control_center.features.stages import TAKEN_FROM, stages_in
 from local_ai_control_center.features.status import EngineSeen, status_of
 from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.embedder import EmbeddingError
@@ -1085,6 +1088,7 @@ def resolve(
 
     resolved: list[Work] = []
     unknown: list[str] = []
+    repaired = 0
     for doi in sorted(wanted):
         try:
             answer = registry.about(doi)
@@ -1093,6 +1097,18 @@ def resolve(
             _show("Nothing was written. What had been answered is kept, so a retry asks less.")
             registry.write()
             raise typer.Exit(code=1) from error
+        if answer is None:
+            # The registry does not hold it. Where the string shows evidence of having
+            # something stuck to it - a second DOI, a run-on word - try the cut and let the
+            # registry decide. A merely truncated DOI offers no cuts (ADR-083).
+            for cut in shortened(doi):
+                try:
+                    answer = registry.about(cut)
+                except RegistryError:
+                    break
+                if answer and answer.says_anything:
+                    repaired += 1
+                    break
         if answer and answer.says_anything:
             resolved.append(answer)
         else:
@@ -1101,6 +1117,11 @@ def resolve(
 
     write_new_file(destination, bibliography(resolved, unknown, silent, config.registry_url))
     _show(f"[green]{len(resolved)} of {len(wanted)} resolved[/green] -> {into}")
+    if repaired:
+        _show(
+            f"[dim]{repaired} were recovered by cutting what extraction had stuck to them, "
+            "and the registry confirmed each cut.[/dim]"
+        )
     if unknown:
         _show(f"[yellow]{len(unknown)} the registry does not hold.[/yellow] Usually a mangled DOI.")
     if silent:
@@ -2365,7 +2386,22 @@ def sections(
     if into is None:
         _show("[red]Name where to write it with --into.[/red]")
         raise typer.Exit(code=1)
-    write_new_file(workspace.resolve_within(into), wanted)
+    destination = workspace.resolve_within(into)
+    write_new_file(destination, wanted)
+    # Which document this came out of, beside the file rather than inside it. Nothing is
+    # written into an extract: the quotations checked against these files stay checked
+    # (ADR-076), and this is a fact about the file (ADR-082).
+    write_new_file(
+        destination.with_suffix(destination.suffix + TAKEN_FROM),
+        json.dumps(
+            {
+                "document": source.name,
+                "section": take,
+                "taken_on": datetime.now(UTC).strftime("%Y-%m-%d"),
+            },
+            indent=2,
+        ),
+    )
     _show(
         f"[green]Section {take}[/green] -> {into}   "
         f"[dim]{estimate_tokens(wanted):,} tokens of {estimate_tokens(text):,}[/dim]"
@@ -2388,8 +2424,8 @@ def status(
     success; "832 quotations, 2 documents with none" is the same fact with the part that
     still needs doing attached (ADR-080).
     """
-    _, workspace = _load(config_path)
-    work = stages_in(workspace.root)
+    config, workspace = _load(config_path)
+    work = stages_in(workspace.root, config.context_file)
     if not work.stages:
         _show(f"[red]{workspace.root} is not a folder.[/red]")
         raise typer.Exit(code=1)

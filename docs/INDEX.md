@@ -16,7 +16,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Eighty-one records front to back is a history. These are the threads through them, for
+Eighty-three records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -157,6 +157,8 @@ not to reach for an approximate algorithm to find them.
 | 079 | [opening-a-document-at-the-right-part](adr/ADR-079-opening-a-document-at-the-right-part.md) | The sections a document numbers, ranked against a question with the retriever already configured. A section is represented by its title **and** the opening of its body, because titles arrive cut - ranking `Imag` and `N-st` would fail on exactly the documents that need this. Every section is returned, not the best few. |
 | 080 | [where-the-work-stands](adr/ADR-080-where-the-work-stands.md) | `lacc status`: six stages of the work, each with what it produced **and what it has not**, counted from the files every time. The record of getting it wrong three times is most of it - 236 resolved counted the failure lists as successes, and six documents with no quotation counted extracted sections and a test fixture. A stage with no material no longer calls itself done. |
 | 081 | [an-escape-is-not-an-invention](adr/ADR-081-an-escape-is-not-an-invention.md) | The sixth defect of this project reported as the model's dishonesty. A JSON escape survived being parsed, so a quotation carried `
+| 082 | [a-pending-item-that-was-not-pending](adr/ADR-082-a-pending-item-that-was-not-pending.md) | `status` reported a guideline as unquoted while seven sections taken out of it were collected. An extract records its origin beside itself, never inside it. A status report that invents pending work sends somebody to do a job that is done. |
+| 083 | [the-registry-decides-the-cut](adr/ADR-083-the-registry-decides-the-cut.md) | Forty DOIs resolved to nothing and none was a missing work. Where there is evidence of contamination a cut is offered and **the registry decides** - a truncated DOI offers none, because a wrong DOI is worse than a missing one. Recovered 16, from 172 of 212 to 188. |
 ` where the page had a line break. **Eight of 110, not a hundred** - the first impression was out by an order of magnitude. The other 102 are the model joining sentences that are not adjacent, caught correctly. |
 
 ## Guides (`docs/guides/`)

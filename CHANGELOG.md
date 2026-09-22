@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`lacc status` invented pending work** (ADR-082). It reported a guideline as having no
+  quotation while **seven sections taken out of it** were collected, and reported the
+  workspace's own `context_file` as a document nobody had quoted from. A status report that
+  invents pending work is worse than none: it sends somebody to do a job that is done.
+
+  An extract records its origin **beside itself**, in `<name>.md.from.json` - a fact about the
+  file, never part of it, because the corpus points at these files as they are. Three pending
+  documents became one, and the one is a test fixture.
+
+### Added
+- **A contaminated DOI is repaired with the registry as arbiter** (ADR-083). Of 212 DOIs,
+  forty resolved to nothing and **none was a work that does not exist**: three were the DOI
+  printed twice and run together, eight carried the next entry's number and author, nine a
+  word run on, and twenty were genuinely truncated.
+
+  Where there is **evidence of contamination**, a cut is offered and the registry decides.
+  Nothing here guesses what the DOI is - it asks. A merely truncated DOI offers no cuts,
+  deliberately: cutting one further can only produce a *different* work, and **a wrong DOI in
+  a bibliography is worse than a missing one**.
+
+  Recovered **16**, taking the bibliography from 172 of 212 to **188**. The estimate before
+  building was "up to 20", and being under it is the side to be wrong on.
+
+### Fixed
 - **A JSON escape was being reported as an invention** (ADR-081). Auditing a real corpus of
   881 quotations - 110 marked as no longer in their document, and nobody had looked at why -
   found one document failing **ten of ten**, with quotations reading

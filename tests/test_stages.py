@@ -87,3 +87,27 @@ def test_an_empty_workspace_says_what_to_run(tmp_path: Path) -> None:
 
 def test_a_workspace_that_is_not_there_yields_no_stages(tmp_path: Path) -> None:
     assert stages_in(tmp_path / "nowhere").stages == ()
+
+
+def test_the_context_file_is_not_a_document_with_no_quotation(tmp_path: Path) -> None:
+    """A workspace names it in its own configuration; it is carried, not quoted (ADR-082)."""
+    (tmp_path / "paper.md").write_text("prose", encoding="utf-8")
+    (tmp_path / "contexto.md").write_text("Standing context for every run.", encoding="utf-8")
+    (tmp_path / "corpus.md").write_text(_corpus("paper.md"), encoding="utf-8")
+    by_name = {s.name: s for s in stages_in(tmp_path, context_file="contexto.md").stages}
+    assert not by_name["Quotations"].missing
+    assert "1 brought in" in by_name["Documents"].done
+
+
+def test_a_document_covered_through_its_extracts_is_covered(tmp_path: Path) -> None:
+    """Seven sections of a guideline were collected while the guideline read as pending."""
+    import json
+
+    (tmp_path / "guideline.md").write_text("A very long guideline.", encoding="utf-8")
+    (tmp_path / "part.md").write_text("5.8\n Staging\nThe body of it.\n", encoding="utf-8")
+    (tmp_path / "part.md.from.json").write_text(
+        json.dumps({"document": "guideline.md", "section": "5.8"}), encoding="utf-8"
+    )
+    (tmp_path / "corpus.md").write_text(_corpus("part.md"), encoding="utf-8")
+    by_name = {s.name: s for s in stages_in(tmp_path).stages}
+    assert not by_name["Quotations"].missing, "the guideline is covered through its extract"

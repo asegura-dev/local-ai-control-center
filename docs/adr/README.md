@@ -1,6 +1,6 @@
 # Decision records
 
-Eighty-one records, in the order they were decided. The number is the identity: it is how
+Eighty-three records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -518,3 +518,16 @@ Nothing new was built: `sections` found 154 parts of a guideline and `Retriever`
 The sixth time a defect of this project has been reported as the model's dishonesty, found the same way as the others: by auditing a real corpus. Of 881 quotations, 110 were marked absent and one document failed ten of ten - its text read `31 043 15.0%
 2nd Prostate`, where that `
 ` is two characters and the page has a line break. A JSON escape had survived the answer being parsed. **Eight of the 110, not a hundred**: the first impression was out by an order of magnitude in the direction that flatters the record. The other 102 are the model joining sentences that are not adjacent, caught correctly, and nothing changed to let them through. A literal escape now folds to the whitespace it stands for, as a fifth transformation beside the four that each remove a difference nobody can see and touch no content.
+
+
+### 082 - a pending item that was not pending
+
+[`ADR-082-a-pending-item-that-was-not-pending.md`](ADR-082-a-pending-item-that-was-not-pending.md)
+
+`lacc status` reported a guideline as having no quotation while seven sections taken out of it were collected, and reported the workspace's own `context_file` as a document nobody had quoted. A status report that invents pending work is worse than none: it sends somebody to do a job that is done. An extract now records its origin **beside itself**, never inside it, because the corpus points at these files as they are. Three pending documents became one, and the one is a test fixture.
+
+### 083 - the registry decides the cut
+
+[`ADR-083-the-registry-decides-the-cut.md`](ADR-083-the-registry-decides-the-cut.md)
+
+Forty DOIs resolved to nothing and none was a work that does not exist: three were the DOI printed twice, eight carried the next entry's number and author, nine a word run on, and twenty were genuinely truncated. Where there is **evidence of contamination** a cut is offered and the registry decides - nothing guesses what the DOI is, it asks. A merely truncated DOI offers no cuts, because cutting one further can only produce a different work, and **a wrong DOI in a bibliography is worse than a missing one**. Recovered 16, taking 172 of 212 to 188; the estimate beforehand was "up to 20", and being under it is the side to be wrong on.
