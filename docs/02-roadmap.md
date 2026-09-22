@@ -520,6 +520,20 @@ v2.5.0  an interface that reads
 v3.0.0  discovery, and an interface that acts
 ```
 
+**That numbering did not survive, and the record says so rather than being edited to fit.**
+Three planned versions ended up in one tree: v1.9.0's registry arrived, v2.0.0's vertical cut
+arrived, v2.5.0's interface arrived **early and whole**, and coverage did not arrive at all.
+Separating them afterwards would mean rewriting history to match a plan rather than the other
+way round.
+
+**So v2.0.0 absorbs v1.9.0 and v2.5.0**, and what each was for is said below where it was
+written. What is left of v1.9.0 is not code: two documents that have no quotation in the
+corpus, which is a run rather than a release - **a version of the software does not depend on
+the state of somebody's corpus**, and putting it on the release checklist was a mistake of
+judgement corrected here.
+
+v3.0.0 keeps its meaning: what can happen without you typing.
+
 ### v1.9.0 - the material becomes complete, and citable
 
 Two things, and neither is design work. **Reference metadata comes from an authority instead

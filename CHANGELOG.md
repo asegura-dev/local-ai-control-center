@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-21
+
+**The check turned around.** Everything in this project verified text a *model* produced. This
+version asks the same question of text a *person* wrote, and that is why the number changes:
+`lacc review` is not one more command, it is a different answer to what the tool is for.
+
+It absorbs two planned versions. v1.9.0's registry arrived, v2.5.0's interface arrived early
+and whole, and **coverage - which this route said v2.0 was - did not arrive at all**. The
+roadmap says so rather than being edited to fit.
+
+Four commands: `resolve`, `review`, `sections`, `window`. A second view with eight sections
+that reads and runs nothing. A registry port, the first destination outside the user's own
+machine. Launchers whose digests the gate enforces. And the working method, written down
+followably.
+
 ### Added
 - **`template_sha256` in the audit trail** (ADR-078). `prompt_sha256` covers the template and
   the document together, because a prompt is the template with the document inside it. So
