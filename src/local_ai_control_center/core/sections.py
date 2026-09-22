@@ -207,3 +207,36 @@ def section_of(text: str, number: str) -> str:
     ]
     ends_at = after[0].line - 1 if after else len(lines)
     return chr(10).join(lines[start.line - 1 : ends_at]).strip() + chr(10)
+
+
+OPENING_LINES = 25
+"""Lines of a section's body used to represent it when ranking against a question.
+
+A title alone will not do. Extraction leaves them cut - `5.2.4 Imag`, `5.1.1 Pr` - so a
+ranking over titles would be a ranking over fragments. Twenty-five lines is enough for a
+section to say what it is about and few enough that a 154-section guideline stays cheap to
+rank (ADR-079).
+"""
+
+LONGEST_SUMMARY = 1200
+"""Characters kept per section, so one long section cannot dominate a ranking by size."""
+
+
+def summaries_in(text: str, lines_each: int = OPENING_LINES) -> tuple[tuple[Section, str], ...]:
+    """Every section with the opening of its body, for ranking or for showing.
+
+    Pure, and it stops at the next section rather than at a line count alone: a section
+    shorter than ``lines_each`` must not borrow the next one's words, or a ranking would
+    credit it with what its neighbour says.
+    """
+    found = sections_in(text)
+    if not found:
+        return ()
+    lines = text.splitlines()
+    summaries: list[tuple[Section, str]] = []
+    for position, section in enumerate(found):
+        ends_at = found[position + 1].line - 1 if position + 1 < len(found) else len(lines)
+        body = " ".join(lines[section.line - 1 : min(section.line + lines_each, ends_at + 1)])
+        whole = f"{section.number} {section.title}. {' '.join(body.split())}"
+        summaries.append((section, whole[:LONGEST_SUMMARY]))
+    return tuple(summaries)

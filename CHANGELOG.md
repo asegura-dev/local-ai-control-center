@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`lacc sections --about "<question>"`: open a document at the part that answers it**
+  (ADR-079). Nothing new was built. `sections` already found 154 parts of the EAU guideline
+  and `Retriever` has ranked passages against a question since ADR-061; they were pointed at
+  each other.
+
+  **A section is represented by its title *and* the opening of its body**, which is the part
+  that makes it work. Ranking titles alone would be ranking fragments - `Imag`, `Pr`, `N-st` -
+  and would fail on exactly the documents that need this most, because the worst extraction is
+  in the largest files. A summary stops at the next section, so a short one cannot borrow its
+  neighbour's words.
+
+  **Every section is returned, in order, not the best few.** Which to read is the reader's
+  decision.
+
+  Measured on the real guideline, asked about nodal staging: the section that answers it comes
+  **fourth of 154** and a closely related one second. That is *154 down to a handful with the
+  right one among them* - not "it finds the section", and the record says the weaker thing.
+  Taking it out gives 3,561 tokens of 348,276.
+
 ## [2.0.0] - 2026-09-21
 
 **The check turned around.** Everything in this project verified text a *model* produced. This

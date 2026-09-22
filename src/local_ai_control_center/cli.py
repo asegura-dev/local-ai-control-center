@@ -111,6 +111,7 @@ from local_ai_control_center.features.corpus import (
     recheck,
 )
 from local_ai_control_center.features.measure import spread
+from local_ai_control_center.features.navigate import ranked
 from local_ai_control_center.features.prompts import prompts_of
 from local_ai_control_center.features.review import (
     FINDINGS_SUFFIX,
@@ -2294,6 +2295,10 @@ def window(
 @app.command()
 def sections(
     source: Annotated[Path, typer.Argument(help="A document inside the workspace.")],
+    about: Annotated[
+        str | None,
+        typer.Option("--about", help="Order them by what a question is about."),
+    ] = None,
     take: Annotated[
         str | None, typer.Option("--take", help="Write one section out, by its number.")
     ] = None,
@@ -2313,7 +2318,7 @@ def sections(
     reported rather than worked around. **Nothing is written into the document** - the
     quotations already checked against it stay checked (ADR-076).
     """
-    _, workspace = _load(config_path)
+    config, workspace = _load(config_path)
     try:
         path = workspace.resolve_within(source)
     except ValueError as error:
@@ -2334,11 +2339,22 @@ def sections(
         raise typer.Exit(code=1)
 
     if take is None:
+        if about:
+            # Ranked, and **all** of them: which to read is the reader's decision, and a
+            # list that showed only the top would be making it for them (ADR-079).
+            found = ranked(text, about, _retriever_for(config, None))
+            _show(f"[bold]{len(found)} sections[/bold] in {source.name}, most about it first")
+            for section in found[:12]:
+                _show(f"  [dim]{section.line:>6}[/dim]  {section.number}  {section.title}")
+            if len(found) > 12:
+                _show(f"  [dim]and {len(found) - 12} more, in the same order[/dim]")
+            _show("[dim]Nothing was read but this document. Take one with --take.[/dim]")
+            return
         _show(f"[bold]{len(found)} sections[/bold] in {source.name}")
         for section in found:
             indent = "  " * (section.depth - 1)
             _show(f"  [dim]{section.line:>6}[/dim]  {indent}{section.number}  {section.title}")
-        _show("[dim]Take one with --take <number> --into <file>.[/dim]")
+        _show("[dim]Order them by a question with --about, or take one with --take.[/dim]")
         return
 
     wanted = section_of(text, take)

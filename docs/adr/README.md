@@ -1,6 +1,6 @@
 # Decision records
 
-Seventy-eight records, in the order they were decided. The number is the identity: it is how
+Seventy-nine records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -495,3 +495,10 @@ A bar with what is on disk on the left and what the configuration may reach on t
 [`ADR-078-what-a-digest-is-for.md`](ADR-078-what-a-digest-is-for.md)
 
 Written in answer to a good question - if the launchers carry SHA-256 sums, should the skills and the code? - and most of the answer is **no**. The launchers are a special case in two ways: they run outside Git, and outside the audit trail. Neither is true of anything else. Git already hashes the whole tree and says when it changed; the trail already records `prompt_sha256`, `completion_sha256` and the digest of every file read and written, in a chain `lacc verify` walks. A `SHA256SUMS` of the Python would restate that less well and be one more file to go out of step. **But one gap was real**: `prompt_sha256` covers the template and the document together, so changing a skill's wording and reading a different file were indistinguishable. `template_sha256` is recorded beside it now, which is what lets the trail answer *did the instruction change between these runs*. And a third-party answer is bounded at two megabytes, because a timeout stops a slow answer and not an endless one.
+
+
+### 079 - opening a document at the right part
+
+[`ADR-079-opening-a-document-at-the-right-part.md`](ADR-079-opening-a-document-at-the-right-part.md)
+
+Nothing new was built: `sections` found 154 parts of a guideline and `Retriever` has ranked passages against a question since ADR-061, so they were pointed at each other. The part that makes it work is that **a section is represented by its title *and* the opening of its body** - ranking titles alone would be ranking fragments like `Imag` and `N-st`, and would fail exactly on the documents that need it most, because the worst extraction is in the largest files. A summary stops at the next section so a short one cannot borrow its neighbour's words. Every section is returned in order, not the best few: which to read is the reader's decision. Measured on the real guideline, the section that answers *nodal staging* comes fourth of 154 and a related one second - which is "154 down to a handful", not "it finds the section", and the record says the weaker thing.
