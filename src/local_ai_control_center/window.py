@@ -97,7 +97,11 @@ class Window(ctk.CTk):
         self._panel()
         self._bar()
         self.right.bind("<Configure>", self._reflow)
-        self.right.bind("<MouseWheel>", self._wheel)
+        # Bound on the whole window, not on the panel and its children. Tk delivers the
+        # wheel to the widget under the pointer, and a label neither handles it nor passes
+        # it on - so binding per widget left gaps, and a panel scrolled only after being
+        # clicked. `bind_all` sees it wherever it lands (ADR-084).
+        self.bind_all("<MouseWheel>", self._wheel)
         self._go(SECTIONS[0])
 
     # --- what a section is handed ----------------------------------------------------------
@@ -323,7 +327,6 @@ class Window(ctk.CTk):
             for child in getattr(widget, "winfo_children", list)():
                 if isinstance(child, ctk.CTkLabel):
                     child.configure(wraplength=width)
-                child.bind("<MouseWheel>", self._wheel)
                 walk(child)
 
         walk(self.right)

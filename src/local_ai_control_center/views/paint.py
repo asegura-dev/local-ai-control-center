@@ -45,13 +45,21 @@ def text(
     return label
 
 
-def fixed(parent: ctk.CTkFrame, words: str, colour: str, size: int = 11) -> ctk.CTkLabel:
-    """Monospaced text: code, a command, a table row - anything whose columns matter."""
+def fixed(
+    parent: ctk.CTkFrame, words: str, colour: str, size: int = 11, wrap: int = 720
+) -> ctk.CTkLabel:
+    """Monospaced text: code, a command, a table row - anything whose columns matter.
+
+    Wrapped like everything else, and re-wrapped with everything else. It was the one
+    painter with no `wraplength`, so a wide table or a long line of code ran off the right
+    edge with nothing to scroll sideways with (ADR-084).
+    """
     label = ctk.CTkLabel(
         parent,
         text=words,
         anchor="w",
         justify="left",
+        wraplength=wrap,
         text_color=colour,
         font=ctk.CTkFont(family="Consolas", size=size),
     )

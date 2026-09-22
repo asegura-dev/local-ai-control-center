@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The environment belongs outside the checkout, and the launcher was putting it back**
+  (ADR-084). `uv sync` failed four times in one day with `Access is denied`, once leaving two
+  empty `dist-info` directories behind. The project had already solved this: `run.ps1` sets
+  the environment outside the folder and its own documentation describes the failure exactly.
+  A 111 MB `.venv` existed inside the synchronised checkout because commands were run as `uv`
+  rather than through the wrapper - and `scripts/lacc-window.bat` called `uv` directly too, so
+  the launcher written to make this easy would have rebuilt the problem on the first
+  double-click.
+
+  Measurable result: **the suite went from 726 passed with 1 skipped to 727 passed**, because
+  the window's section test had been skipping for a toolkit installed into the wrong
+  environment.
+
+- **The document panel scrolled only after being clicked** (ADR-084). The wheel was bound on
+  each child as it was drawn, which left gaps: a widget created after the last re-wrap had no
+  binding at all. It is bound on the window now, which sees the event wherever it lands.
+
+- **Monospaced text ran off the right edge** (ADR-084). `paint.fixed` was the one painter
+  without a `wraplength`, so a wide table or a long line of code had nothing to wrap it and
+  nothing to scroll sideways with.
+
+### Fixed
 - **`lacc status` invented pending work** (ADR-082). It reported a guideline as having no
   quotation while **seven sections taken out of it** were collected, and reported the
   workspace's own `context_file` as a document nobody had quoted from. A status report that

@@ -1,6 +1,6 @@
 # Decision records
 
-Eighty-three records, in the order they were decided. The number is the identity: it is how
+Eighty-four records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -531,3 +531,10 @@ The sixth time a defect of this project has been reported as the model's dishone
 [`ADR-083-the-registry-decides-the-cut.md`](ADR-083-the-registry-decides-the-cut.md)
 
 Forty DOIs resolved to nothing and none was a work that does not exist: three were the DOI printed twice, eight carried the next entry's number and author, nine a word run on, and twenty were genuinely truncated. Where there is **evidence of contamination** a cut is offered and the registry decides - nothing guesses what the DOI is, it asks. A merely truncated DOI offers no cuts, because cutting one further can only produce a different work, and **a wrong DOI in a bibliography is worse than a missing one**. Recovered 16, taking 172 of 212 to 188; the estimate beforehand was "up to 20", and being under it is the side to be wrong on.
+
+
+### 084 - the environment belongs outside
+
+[`ADR-084-the-environment-belongs-outside.md`](ADR-084-the-environment-belongs-outside.md)
+
+`uv sync` failed four times in one day with `Access is denied`, once leaving the environment broken with two empty `dist-info` directories. **The project had already solved this**: `run.ps1` puts the environment outside the checkout and its own documentation describes the failure exactly. A 111 MB `.venv` existed inside a synchronised folder because commands were run as `uv` rather than through the wrapper - and `scripts/lacc-window.bat` called `uv` directly too, so the launcher written to make this easy would have rebuilt the problem on the first double-click. Measurable result: the suite went from 726 passed and 1 skipped to **727 passed**, because the window's test had been skipping for a toolkit that was in the wrong environment. Two defects found by using the window are fixed alongside: the panel scrolled only after a click, and monospaced text ran off the right edge.
