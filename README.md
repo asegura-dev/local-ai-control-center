@@ -5,6 +5,10 @@
 A local-first framework for private, reproducible, auditable AI-assisted
 workflows.
 
+**New here, or returning after a while?** [docs/ORIENTATION.md](docs/ORIENTATION.md) is one
+page: how to run it without breaking the environment, where everything lives, and the four
+rules that are not style preferences.
+
 ## What LACC is
 
 LACC is designed to run AI-assisted workflows entirely on your own machine,

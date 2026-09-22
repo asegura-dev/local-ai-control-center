@@ -3,6 +3,12 @@
 The reference for finding the right doc **without opening it**. One line per file:
 what it contains. For the reading order and status, see [README.md](README.md).
 
+## Start here
+
+| File | What's in it |
+|---|---|
+| [ORIENTATION](ORIENTATION.md) | One page, read first: run it through `run.ps1` and never bare `uv` - and why, measured; the four-command gate; where to look for what the work stands at, what the project is like now, and why anything is the way it is; the shape of the code and the layer rule; the four rules that are not preferences; and what this will not do. |
+
 ## Chapters - the book (`docs/NN-*.md`)
 
 | # | File | What's in it |

@@ -43,11 +43,19 @@ WIDTH, HEIGHT = 1280, 820
 RAIL, SIDE = 214, 330
 
 MARGIN = 96
-"""Room a wrapped label leaves for the padding around it.
+"""Room a wrapped label leaves for the padding around it, when nothing better is known.
 
 Wrapping was a fixed number first, so text ran past the edge of a narrow window and stopped
-short of a wide one.
+short of a wide one. It is now only the fallback: a label inside a card sits behind two more
+layers of padding, and a single figure for the whole panel let that text run out of its card
+(ADR-084).
 """
+
+INSET = 28
+"""Padding between a label and the edge of whatever holds it."""
+
+LINES_PER_NOTCH = 3
+"""How far one notch of the wheel scrolls, which is what the rest of the system does."""
 
 SECTIONS: tuple[Section, ...] = (*workspace.SECTIONS, *program.SECTIONS, *records.SECTIONS)
 """Every section, in the order they appear. The frame knows nothing else about them."""
@@ -321,22 +329,31 @@ class Window(ctk.CTk):
         the pointer was over the gaps between its cards.
         """
         self._pending = None
-        width = max(self.right.winfo_width() - MARGIN, 280)
+        panel = max(self.right.winfo_width() - MARGIN, 280)
 
         def walk(widget: object) -> None:
             for child in getattr(widget, "winfo_children", list)():
                 if isinstance(child, ctk.CTkLabel):
-                    child.configure(wraplength=width)
+                    # The width of what actually holds it, not of the panel: a label inside
+                    # a card has two more layers of padding in front of it, and wrapping to
+                    # the panel let it run out of the card (ADR-084).
+                    holder = getattr(child, "master", None)
+                    room = getattr(holder, "winfo_width", lambda: 0)()
+                    child.configure(wraplength=max(room - INSET, 200) if room > 60 else panel)
                 walk(child)
 
         walk(self.right)
 
     def _wheel(self, event: object) -> str:
-        """Scroll from anywhere in the panel, and stop the event travelling further."""
+        """Scroll from anywhere in the window, and stop the event travelling further.
+
+        Windows sends 120 per notch, and a notch is three lines everywhere else on the
+        system. Moving one unit per notch made a long record feel stuck (ADR-084).
+        """
         turned = getattr(event, "delta", 0)
         canvas = getattr(self.right, "_parent_canvas", None)
         if canvas is not None and turned:
-            canvas.yview_scroll(-1 if turned > 0 else 1, "units")
+            canvas.yview_scroll(-int(turned / 120) * LINES_PER_NOTCH, "units")
         return "break"
 
     def _clear(self) -> None:

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **[`docs/ORIENTATION.md`](docs/ORIENTATION.md): one page, read first.** How to run it
+  through `run.ps1` and never bare `uv` - with the measured reason - the four-command gate,
+  where to look for what the work stands at and why anything is the way it is, the shape of
+  the code, and the four rules that are not style preferences.
+
+  It exists because the guidance it carries was already written down in several places and was
+  still bypassed four times in one day. A rule spread across a changelog, a guide and a
+  docstring is a rule somebody will miss.
+
+### Fixed
+- **Wrapping to the panel was not wrapping to the card** (ADR-084). Giving `paint.fixed` a
+  `wraplength` stopped monospaced text running off the panel, but every label was wrapped to
+  the width of the *panel* while a label inside a card sits behind two further layers of
+  padding - so text still ran out of its card, just later. Each label now wraps to the width
+  of whatever actually holds it.
+
+- **The wheel moved one line per notch** (ADR-084). Windows sends 120 per notch and a notch is
+  three lines everywhere else on the system, so a long record felt stuck even after it
+  scrolled at all.
+
 ### Fixed
 - **The environment belongs outside the checkout, and the launcher was putting it back**
   (ADR-084). `uv sync` failed four times in one day with `Access is denied`, once leaving two

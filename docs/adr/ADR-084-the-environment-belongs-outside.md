@@ -58,6 +58,14 @@ on the window with `bind_all`, which sees the event wherever it lands.
 `wraplength`, so a wide table or a long line of code had nothing to wrap and nothing to
 scroll sideways with.
 
+**And giving it one was not enough.** Every label was wrapped to the width of the *panel*,
+while a label inside a card sits behind two further layers of padding - so text still ran out
+of its card, just later. Each label is wrapped to the width of **whatever actually holds it**
+now, with the panel figure kept only as the fallback for a widget not yet laid out.
+
+**The wheel moved one line per notch.** Windows sends 120 per notch and a notch is three lines
+everywhere else on the system, so a long record felt stuck even once it scrolled at all.
+
 ## Trade-off
 
 **`bind_all` is global.** Every mouse wheel in the window now scrolls the reading panel,
