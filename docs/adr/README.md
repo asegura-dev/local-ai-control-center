@@ -1,6 +1,6 @@
 # Decision records
 
-Seventy-nine records, in the order they were decided. The number is the identity: it is how
+Eighty records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about
@@ -502,3 +502,10 @@ Written in answer to a good question - if the launchers carry SHA-256 sums, shou
 [`ADR-079-opening-a-document-at-the-right-part.md`](ADR-079-opening-a-document-at-the-right-part.md)
 
 Nothing new was built: `sections` found 154 parts of a guideline and `Retriever` has ranked passages against a question since ADR-061, so they were pointed at each other. The part that makes it work is that **a section is represented by its title *and* the opening of its body** - ranking titles alone would be ranking fragments like `Imag` and `N-st`, and would fail exactly on the documents that need it most, because the worst extraction is in the largest files. A summary stops at the next section so a short one cannot borrow its neighbour's words. Every section is returned in order, not the best few: which to read is the reader's decision. Measured on the real guideline, the section that answers *nodal staging* comes fourth of 154 and a related one second - which is "154 down to a handful", not "it finds the section", and the record says the weaker thing.
+
+
+### 080 - where the work stands
+
+[`ADR-080-where-the-work-stands.md`](ADR-080-where-the-work-stands.md)
+
+`tools/measure.py` reports the project; nothing reported the **work**. `lacc status` does: six stages, each with what it produced **and what it has not**, counted from the files every time. "832 quotations" reads like success; "832 quotations, 3 documents with none" is the same fact with the part still needing doing attached. The record of getting it wrong three times is most of what is worth reading: **236 works resolved** counted the two failure lists as successes and the real figure was 172; **six documents with no quotation** counted three extracted sections, the user's notes and a test fixture; and the extracted sections were still miscounted because one opens `5.2.4` with nothing after it and the pattern wanted a space. A stage with no material is no longer settled - with an empty workspace, References read "0 of 0 parse" and called itself done.

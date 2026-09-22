@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`lacc status`: where the work stands, stage by stage** (ADR-080). `tools/measure.py`
+  reports the project - layers, tests, records. Nothing reported the **work**: how far a
+  bibliography has got through converting, collecting, assembling, resolving and reviewing.
+  That was answered by remembering, which is how a true figure survived for days after it
+  stopped being true.
+
+  Six stages, each with what it produced **and what it has not**. *"832 quotations"* reads
+  like success; *"832 quotations, 3 documents with none"* is the same fact with the part that
+  still needs doing attached.
+
+  Counted from the files every time: nothing stored, no model called, nothing sent.
+
+  **The record of getting it wrong three times is most of what is worth reading.** First,
+  *236 works resolved* when `resolve` had said 172 - it was counting every bullet, including
+  the two lists of what had **failed**. Second, *six documents with no quotation*, of which
+  three were sections LACC itself had extracted, one was the user's own notes and one a test
+  fixture. Third, those sections were still miscounted, because one opens `5.2.4` with nothing
+  after it and the pattern required a space.
+
+  And a stage with no material no longer calls itself done: with an empty workspace,
+  References read *"0 of 0 parse"* and settled - a stage reporting success for having no work.
+  Found by the test that asserted an empty workspace settles nothing.
+
+### Added
 - **`lacc sections --about "<question>"`: open a document at the part that answers it**
   (ADR-079). Nothing new was built. `sections` already found 154 parts of the EAU guideline
   and `Retriever` has ranked passages against a question since ADR-061; they were pointed at

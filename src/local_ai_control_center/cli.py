@@ -121,6 +121,7 @@ from local_ai_control_center.features.review import (
     paragraphs_in,
     report,
 )
+from local_ai_control_center.features.stages import stages_in
 from local_ai_control_center.features.status import EngineSeen, status_of
 from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.embedder import EmbeddingError
@@ -2369,6 +2370,43 @@ def sections(
         f"[green]Section {take}[/green] -> {into}   "
         f"[dim]{estimate_tokens(wanted):,} tokens of {estimate_tokens(text):,}[/dim]"
     )
+
+
+@app.command()
+def status(
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Where the work stands, stage by stage, and what each stage is missing.
+
+    **Counted from the files, now.** No model is called, nothing is written and nothing
+    leaves. Every figure here can be re-taken in seconds, which is why none of it is stored:
+    a number written down is one that will be true for a while and then quietly stop being.
+
+    A stage reports what is **missing** as well as what is done. "832 quotations" reads like
+    success; "832 quotations, 2 documents with none" is the same fact with the part that
+    still needs doing attached (ADR-080).
+    """
+    _, workspace = _load(config_path)
+    work = stages_in(workspace.root)
+    if not work.stages:
+        _show(f"[red]{workspace.root} is not a folder.[/red]")
+        raise typer.Exit(code=1)
+
+    _show(f"[dim]{work.workspace}[/dim]")
+    for stage in work.stages:
+        mark = "[green]done[/green]" if stage.settled else "[yellow]open[/yellow]"
+        _show("")
+        _show(f"  {mark}  [bold]{stage.name}[/bold]")
+        if stage.done:
+            _show(f"        {stage.done}")
+        if stage.missing:
+            _show(f"        [yellow]{stage.missing}[/yellow]")
+        if not stage.done:
+            _show(f"        [dim]{stage.command}[/dim]")
+    _show("")
+    _show(f"[dim]{work.settled} of {len(work.stages)} stages have nothing outstanding.[/dim]")
 
 
 @app.command()
