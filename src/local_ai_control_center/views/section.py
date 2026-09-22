@@ -62,6 +62,21 @@ class State:
     prompts: tuple[Prompt, ...] = ()
 
 
+WIDEST_ROW = 44
+"""Characters a sidebar row shows before it is cut.
+
+The tree has one column and no horizontal scrolling, so a longer title was simply severed
+mid-word with nothing to say it had been - `Chapter 2 - Roadmap: where LACC is and where it
+is headi`. Cut deliberately, with an ellipsis, it at least says so (ADR-084).
+"""
+
+
+def shortened(title: str, widest: int = WIDEST_ROW) -> str:
+    """A row's text, cut where it will not fit, with a mark that it was."""
+    tidy = " ".join(title.split())
+    return tidy if len(tidy) <= widest else tidy[: widest - 1].rstrip() + "…"
+
+
 Listing = Callable[["Sidebar", "Panel", "State"], None]
 """What fills the sidebar for a section and writes its heading."""
 

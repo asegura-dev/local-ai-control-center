@@ -58,13 +58,25 @@ on the window with `bind_all`, which sees the event wherever it lands.
 `wraplength`, so a wide table or a long line of code had nothing to wrap and nothing to
 scroll sideways with.
 
-**And giving it one was not enough.** Every label was wrapped to the width of the *panel*,
-while a label inside a card sits behind two further layers of padding - so text still ran out
-of its card, just later. Each label is wrapped to the width of **whatever actually holds it**
-now, with the panel figure kept only as the fallback for a widget not yet laid out.
+**And giving it one was not enough - twice.** First every label was wrapped to the width of
+the *panel*, while a label inside a card sits behind two further layers of padding, so text
+ran out of its card. Wrapping to the holder's own width did not fix it either, and a
+screenshot showed why: **inside a scrollable frame a child can be wider than what is on
+screen**, so both the panel and the holder measure something the reader cannot see.
+
+It is measured against the **viewport** now - the canvas the scrollable frame draws into -
+minus one inset per frame between it and the text. That is the only width on screen.
 
 **The wheel moved one line per notch.** Windows sends 120 per notch and a notch is three lines
 everywhere else on the system, so a long record felt stuck even once it scrolled at all.
+
+**The status bar overlapped itself**, reading `881 quotationsked`. The left half was packed
+first with no room given up, so a long one pushed the right half off the end. The right is
+packed first now and the left takes what is over.
+
+**And a sidebar title was severed mid-word** - `Chapter 2 - Roadmap: where LACC is and where
+it is headi` - because the tree has one column and no horizontal scrolling. Cut deliberately
+now, with an ellipsis, so it at least says it was cut.
 
 ## Trade-off
 

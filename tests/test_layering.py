@@ -356,3 +356,13 @@ def _runtime_imports_of(path: pathlib.Path) -> set[str]:
         and node.module.startswith(PACKAGE)
         and id(node) not in typing_only
     }
+
+
+def test_a_sidebar_row_says_when_it_was_cut() -> None:
+    """The tree has one column and no horizontal scrolling (ADR-084)."""
+    from local_ai_control_center.views.section import shortened
+
+    assert shortened("short one") == "short one"
+    long_one = "Chapter 2 - Roadmap: where LACC is and where it is heading next"
+    assert shortened(long_one).endswith("\u2026")
+    assert len(shortened(long_one)) <= 44

@@ -37,7 +37,7 @@ from local_ai_control_center.features.overview import configurations_in
 from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.status import EngineSeen, Status
 from local_ai_control_center.views import paint, program, records, workspace
-from local_ai_control_center.views.section import Section, State
+from local_ai_control_center.views.section import Section, State, shortened
 
 WIDTH, HEIGHT = 1280, 820
 RAIL, SIDE = 214, 330
@@ -127,7 +127,7 @@ class Window(ctk.CTk):
 
     def row(self, key: str, shown: str, under: str = "") -> str:
         """Add a row to the sidebar, optionally under a group."""
-        self.tree.insert(under, "end", iid=key, text=f"  {shown}")
+        self.tree.insert(under, "end", iid=key, text=f"  {shortened(shown)}")
         self._rows.add(key)
         return key
 
@@ -276,14 +276,20 @@ class Window(ctk.CTk):
 
         shown = self.seen
         left = shown.material if shown else "no workspace read"
-        ctk.CTkLabel(
-            bar, text=f"  {left}", anchor="w", text_color=skin.dim, font=ctk.CTkFont(size=11)
-        ).pack(side="left", padx=(8, 0))
-
+        # The right half is packed first and the left is given what is over. Packed the
+        # other way round, a long left half pushed the right one off and the two overlapped
+        # into `881 quotationsked` (ADR-084).
         self.engine_said = ctk.CTkLabel(
             bar, text="", anchor="e", text_color=skin.dim, font=ctk.CTkFont(size=11)
         )
         self.engine_said.pack(side="right", padx=(0, 10))
+        ctk.CTkLabel(
+            bar,
+            text=f"  {left}",
+            anchor="w",
+            text_color=skin.dim,
+            font=ctk.CTkFont(size=11),
+        ).pack(side="left", padx=(8, 0), fill="x", expand=True)
         if self.check_engine is not None:
             ctk.CTkButton(
                 bar,
@@ -329,20 +335,22 @@ class Window(ctk.CTk):
         the pointer was over the gaps between its cards.
         """
         self._pending = None
-        panel = max(self.right.winfo_width() - MARGIN, 280)
+        # The **viewport**, not the panel frame and not the holder. Inside a scrollable
+        # frame a child can be wider than what is on screen, so both of those measure
+        # something the reader cannot see - which is why the text still ran off the right
+        # edge after being wrapped to its card (ADR-084).
+        canvas = getattr(self.right, "_parent_canvas", None)
+        seen = getattr(canvas, "winfo_width", lambda: 0)() or self.right.winfo_width()
+        room = max(seen - MARGIN, 260)
 
-        def walk(widget: object) -> None:
+        def walk(widget: object, inset: int) -> None:
             for child in getattr(widget, "winfo_children", list)():
                 if isinstance(child, ctk.CTkLabel):
-                    # The width of what actually holds it, not of the panel: a label inside
-                    # a card has two more layers of padding in front of it, and wrapping to
-                    # the panel let it run out of the card (ADR-084).
-                    holder = getattr(child, "master", None)
-                    room = getattr(holder, "winfo_width", lambda: 0)()
-                    child.configure(wraplength=max(room - INSET, 200) if room > 60 else panel)
-                walk(child)
+                    child.configure(wraplength=max(room - inset, 200))
+                # Each frame between the viewport and the text costs its own padding.
+                walk(child, inset + (INSET if isinstance(child, ctk.CTkFrame) else 0))
 
-        walk(self.right)
+        walk(self.right, 0)
 
     def _wheel(self, event: object) -> str:
         """Scroll from anywhere in the window, and stop the event travelling further.

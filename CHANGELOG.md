@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Text still ran off the right edge, and a screenshot showed why** (ADR-084). Wrapping to
+  the panel was wrong, and wrapping to the label's own holder was wrong too: **inside a
+  scrollable frame a child can be wider than what is on screen**, so both measure something
+  the reader cannot see. It is measured against the viewport now - the canvas the scrollable
+  frame draws into - minus one inset per frame between it and the text.
+
+- **The status bar overlapped itself**, reading `881 quotationsked`. The left half was packed
+  first with no room given up, so a long one pushed the right half off the end.
+
+- **A sidebar title was severed mid-word.** The tree has one column and no horizontal
+  scrolling, so a long title simply stopped. It is cut deliberately now, with an ellipsis, so
+  it says that it was.
+
 ### Added
 - **[`docs/ORIENTATION.md`](docs/ORIENTATION.md): one page, read first.** How to run it
   through `run.ps1` and never bare `uv` - with the measured reason - the four-command gate,
