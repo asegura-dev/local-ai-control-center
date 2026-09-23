@@ -16,13 +16,17 @@ from local_ai_control_center.core.budget import answer_reserve, estimate_tokens
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.corpus import parse_corpus
 from local_ai_control_center.core.grounding import CheckedClaim
-from local_ai_control_center.ports.retriever import Passage, Retriever, Selection
+from local_ai_control_center.ports.retriever import Passage, Retriever
 
 
-def as_material(selection: Selection) -> str:
-    """Render the chosen passages as the text that goes into the prompt."""
+def rendered(passages: tuple[Passage, ...]) -> str:
+    """Render passages as the text that goes into a prompt.
+
+    One renderer, because a thread sends passages a selection did not choose and rendering
+    them a second way would be a second thing to keep true (ADR-091).
+    """
     blocks = []
-    for passage in selection.chosen:
+    for passage in passages:
         where = f"{passage.source}, p. {passage.page}" if passage.page else passage.source
         blocks.append(f"[{where}]{chr(10)}{passage.text}")
     return (chr(10) * 2).join(blocks)
@@ -88,6 +92,14 @@ class Prepared(BaseModel):
 
     selected: int = 0
     considered: int = 0
+
+    established: int = 0
+    """How many of the selected passages a thread had already established (ADR-091).
+
+    Zero for a question asked on its own. Shown, because an answer resting mostly on what
+    earlier turns established is an answer about the thread rather than about the corpus.
+    """
+
     set_aside: int = 0
     how: str = ""
     """Which ranking chose them, in the retriever's own words."""
@@ -165,6 +177,7 @@ def prepare(
     text: str,
     config: Config,
     retriever: Retriever,
+    carried: tuple[Passage, ...] = (),
 ) -> Prepared:
     """Read a corpus, rank it against a question, and report what would be sent.
 
@@ -209,7 +222,12 @@ def prepare(
         # an exception raised on a worker thread, which a window reports by not repainting.
         return Prepared(question=asked, corpus=corpus, refusal=str(error))
 
-    material = as_material(selection)
+    # What a thread already established goes in front of what the ranking chose for this
+    # question, and the budget runs out on the new material rather than on what a previous
+    # turn already stood on. Empty for a question asked on its own (ADR-091).
+    kept = {passage.text.strip() for passage in carried}
+    chosen = (*carried, *(p for p in selection.chosen if p.text.strip() not in kept))
+    material = rendered(chosen)
     reaches = config.engine_host if config.network_access else "this machine only"
     if not selection.chosen:
         return Prepared(
@@ -229,8 +247,9 @@ def prepare(
         question=asked,
         corpus=corpus,
         material=material,
-        chosen=selection.chosen,
-        selected=len(selection.chosen),
+        chosen=chosen,
+        selected=len(chosen),
+        established=len(carried),
         considered=selection.considered,
         set_aside=selection.set_aside,
         how=selection.how,

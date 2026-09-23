@@ -22,7 +22,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Ninety records front to back is a history. These are the threads through them, for
+Ninety-one records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -172,6 +172,7 @@ not to reach for an approximate algorithm to find them.
 | 088 | [how-far-the-nearest-quotation-is](adr/ADR-088-how-far-the-nearest-quotation-is.md) | Fase 4, answered - and not by clustering. Two instruments measured and refused: a top-N ranking returns N whatever you ask, and shared words invent gaps in a corpus that speaks in other words. Distance by meaning survived. A control topic outside your field is **required** as the floor, nothing is called a gap, and the closest quotation is shown so the number can be checked. |
 | 089 | [a-prompt-asks-once](adr/ADR-089-a-prompt-asks-once.md) | Passes were for documents that do not fit; nobody checked what they do for one that does. Six documents that **fit the window**: 59 verified quotations read whole, **352 read in passes**. The count is a property of the prompt, not the document. Costs stated: passes invent more (0 vs 16 of 119), and `--pages-per-pass` must be chosen by tokens, not pages. No code changed - the guidance was wrong. |
 | 090 | [one-reader-for-what-a-file-is](adr/ADR-090-one-reader-for-what-a-file-is.md) | Two implementations of "what is this file" - one for `status`, one for the window - had drifted: **38 documents against 29**, the window offering its own coverage reports as papers to cite. `core/kinds.py` is the one answer. Grouping belongs to the view, the standing context to whoever read the configuration. The layering rule could not catch it, because both copies were in the right layer. |
+| 091 | [a-thread-of-questions](adr/ADR-091-a-thread-of-questions.md) | What was asked for was a chat; a chat puts the previous **answer** in the next prompt, and an invented quotation then verifies instead of being caught. A thread carries the passages whose quotations were **found** and never the prose. Questions carry for a person to read and go in no prompt. A follow-up must be a whole question, because nothing guesses. |
 
 ## Guides (`docs/guides/`)
 

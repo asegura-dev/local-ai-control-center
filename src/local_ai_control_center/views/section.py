@@ -20,6 +20,7 @@ from local_ai_control_center.features.appearance import Palette
 from local_ai_control_center.features.ask import Asked, Prepared
 from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.prompts import Prompt
+from local_ai_control_center.ports.retriever import Passage
 
 
 class Sidebar(Protocol):
@@ -69,8 +70,12 @@ class State:
     which it is, the way `status` is, rather than a reader of text guessing (ADR-090).
     """
 
-    prepare_question: Callable[[str, str], Prepared] | None = None
-    """Rank a corpus against a question and report what would be sent. Sends no prompt."""
+    prepare_question: Callable[[str, str, tuple[Passage, ...]], Prepared] | None = None
+    """Rank a corpus against a question and report what would be sent. Sends no prompt.
+
+    The third argument is what a thread has already established - passages whose quotations
+    were checked in earlier turns. Empty for a question asked on its own (ADR-091).
+    """
 
     send_question: Callable[[Prepared], Asked] | None = None
     """Run a question that has already been previewed. Never raises (ADR-085).

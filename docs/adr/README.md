@@ -580,3 +580,10 @@ Coverage, deferred three times, and **two of the three instruments measured for 
 [`ADR-090-one-reader-for-what-a-file-is.md`](ADR-090-one-reader-for-what-a-file-is.md)
 
 The third time this project found two readers of one decision living apart, and the first time it was found before the drift cost anything. Telling a paper from a corpus from a report was implemented twice - once for `lacc status`, once for the window - and by the time anybody counted, the window offered **38** documents to quote from where `status` counted **29**: two coverage reports LACC had written itself, a topics file, six extracted sections, and the standing context. `core/kinds.py` holds the one answer now; grouping and configuration stay with whoever draws and whoever read the settings. The layering rule could not have caught it - both copies were in the right layer - so `tests/test_kinds.py` fails any function outside core that returns two kind names.
+
+
+### 091 - a thread of questions, not a conversation
+
+[`ADR-091-a-thread-of-questions.md`](ADR-091-a-thread-of-questions.md)
+
+Delivers what was asked for and refuses the mechanism that was asked for. A conversation puts turn N's **answer** into turn N+1's prompt - and an invented quotation then **verifies**, because it really is in what was sent; the check confirms it instead of catching it. Measured here, about one answer in five carries one. So a thread carries **the passages whose quotations were found** and never the prose; the questions carry for a person to read and go in no prompt either. A follow-up has to be a whole question, because nothing here guesses what *"and the specificity?"* meant. First real thread: 219 passages sent, 3 established; then 226 of which 3 came from the first turn, 2 more established, none of the model's prose among them.

@@ -83,7 +83,7 @@ class Window(ctk.CTk):
         prompts: tuple[Prompt, ...] = (),
         status: Status | None = None,
         check_engine: Callable[[], EngineSeen] | None = None,
-        prepare_question: Callable[[str, str], Prepared] | None = None,
+        prepare_question: Callable[..., Prepared] | None = None,
         send_question: Callable[[Prepared], Asked] | None = None,
         context_file: str = "",
     ) -> None:
@@ -435,7 +435,7 @@ def show(
     prompts: tuple[Prompt, ...] = (),
     status: Status | None = None,
     check_engine: Callable[[], EngineSeen] | None = None,
-    prepare_question: Callable[[str, str], Prepared] | None = None,
+    prepare_question: Callable[..., Prepared] | None = None,
     send_question: Callable[[Prepared], Asked] | None = None,
     context_file: str = "",
 ) -> None:

@@ -2283,7 +2283,7 @@ def _engine_seen(config: Config) -> EngineSeen:
 
 def _asking_for_the_window(
     config: Config, workspace: Workspace
-) -> tuple[Callable[[str, str], Prepared], Callable[[Prepared], Asked]]:
+) -> tuple[Callable[..., Prepared], Callable[[Prepared], Asked]]:
     """Compose the one action the window may run (ADR-085).
 
     Composition, which is the driving adapter's job (ADR-029), and why this sits in a view
@@ -2293,14 +2293,19 @@ def _asking_for_the_window(
     """
     skill = AskCorpusSkill()
 
-    def prepare_one(question: str, corpus: str) -> Prepared:
-        """Rank a corpus against a question. The prompt is not sent."""
+    def prepare_one(question: str, corpus: str, carried: tuple[Passage, ...] = ()) -> Prepared:
+        """Rank a corpus against a question. The prompt is not sent.
+
+        ``carried`` is what a thread has already established, and goes in front of what the
+        ranking chooses - never the model's own prose, which re-entering a prompt is how an
+        invention would come to verify (ADR-091).
+        """
         try:
             path = workspace.resolve_within(Path(corpus))
             text = path.read_text(encoding="utf-8", errors="replace")
         except (ValueError, OSError) as error:
             return Prepared(question=question.strip(), corpus=corpus, refusal=str(error))
-        return prepare(question, corpus, text, config, _retriever_for(config, path))
+        return prepare(question, corpus, text, config, _retriever_for(config, path), carried)
 
     def send_one(prepared: Prepared) -> Asked:
         """Send a question that was previewed. **This never raises**, by contract.

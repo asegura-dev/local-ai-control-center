@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-09-23
+
+### Added
+- **The window asks in a thread** (ADR-091). Ask again on the same corpus and what the
+  earlier answers established goes with the new question. The turns are drawn newest first,
+  under the box.
+
+  **It is not a conversation, and the difference is the point.** A conversation puts the
+  model's previous answer into the next prompt - and if one turn invented a quotation, the
+  next turn then *has* it, so the check **confirms** the invention instead of catching it.
+  Measured here, a 14B model puts an unfindable quotation into about one answer in five; a
+  conversation is a mechanism for laundering those.
+
+  So what carries is **the passages whose quotations were found**, never what the model
+  said. An answer's prose is kept to be read and is sent nowhere again. The questions carry
+  for a person to read and go in no prompt either: a question is not evidence.
+
+  A follow-up has to be a whole question. *"And the specificity?"* means nothing to a
+  retriever, and nothing here guesses what it meant - the thread saves re-reading, not
+  re-typing.
+
+  The first real thread, over the 1,129-quotation corpus: turn one sent 219 passages and
+  established 3; turn two sent 226 **of which 3 came from turn one**, and established 2
+  more. Four passages carried, each with a document and a page, and none of the model's
+  prose among them.
+
+  The thread lives while the window is open and is not saved. The record is the audit log,
+  which already holds every question, every prompt and every answer, hash-chained.
+
 ## [2.6.0] - 2026-09-23
 
 ### Added
