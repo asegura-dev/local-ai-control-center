@@ -22,7 +22,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Eighty-eight records front to back is a history. These are the threads through them, for
+Eighty-nine records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -170,6 +170,7 @@ not to reach for an approximate algorithm to find them.
 | 086 | [a-variable-is-not-a-call](adr/ADR-086-a-variable-is-not-a-call.md) | The view rule read every name a function writes down as a call, so a parameter named `corpus` made three functions look like the `corpus` command, which prints. They were invisible to the check - and one was a third copy of a decision the slice already held. Call sites only now; `ask`, `measure` and the window take one path; an exception nobody needs fails; and the measurement tool reads the vocabulary instead of a copy thirteen names behind. |
 | 087 | [the-doi-a-person-established](adr/ADR-087-the-doi-a-person-established.md) | Conversion loses a document's DOI: 11 PDFs carry one, 0 of the Markdown files made from them do. Nine of the silent twelve print one on the page - but a document prints what it cites too, and **no test separated them**: a cited DOI scored 100% against the registry's own title. The rule was refused rather than fudged with a threshold. `lacc identify` proposes, a person disposes, and the answer is kept beside the file. 11 of 23 own sources to 19 of 23. |
 | 088 | [how-far-the-nearest-quotation-is](adr/ADR-088-how-far-the-nearest-quotation-is.md) | Fase 4, answered - and not by clustering. Two instruments measured and refused: a top-N ranking returns N whatever you ask, and shared words invent gaps in a corpus that speaks in other words. Distance by meaning survived. A control topic outside your field is **required** as the floor, nothing is called a gap, and the closest quotation is shown so the number can be checked. |
+| 089 | [a-prompt-asks-once](adr/ADR-089-a-prompt-asks-once.md) | Passes were for documents that do not fit; nobody checked what they do for one that does. Six documents that **fit the window**: 59 verified quotations read whole, **352 read in passes**. The count is a property of the prompt, not the document. Costs stated: passes invent more (0 vs 16 of 119), and `--pages-per-pass` must be chosen by tokens, not pages. No code changed - the guidance was wrong. |
 
 ## Guides (`docs/guides/`)
 

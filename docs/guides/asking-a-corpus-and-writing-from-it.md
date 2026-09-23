@@ -29,6 +29,27 @@ when you ask, and nothing in the answer will say why:
 
     lacc run extract_claims big-guideline.md --in-passes --pages-per-pass 3
 
+**And use passes on documents that fit, when the document is worth it.** Six papers that fit
+the window gave **59 quotations read whole and 352 read in passes** - six times as many, from
+the same model and the same documents. The number of quotations is a property of the
+**prompt**, not of the document: asked once about nineteen thousand tokens a model answers
+with about twenty, and asked five times about four thousand tokens each it answers with about
+twenty each time.
+
+What comes back differs in kind, not only in number. Of 103 quotations from one guideline
+section, **26 were about the subject being researched against 4** from the single pass - a
+pass that sees four pages has no room to summarise and quotes what is in front of it.
+
+It is not free. Passes invent more: the one document measured both ways gave 0 unfound
+quotations read whole and 16 of 119 read in passes. The check catches them either way and
+marks them, and six per cent of 264 is still far more usable material than none of 59 - but
+quote the pair, never the first number alone (ADR-089).
+
+Choose `--pages-per-pass` by **tokens, not pages**. A journal page is about 1,300 tokens and a
+two-column preprint page about 320, so the same `3` means very different things. Three to four
+thousand tokens per pass is what these measurements used - twelve pages of one document, three
+of another.
+
 ## How to ask
 
 **Ask for the parts you want, not for the topic.** This is the difference between a useful

@@ -482,6 +482,56 @@ The control is the floor, the ordering is the one a person would give, and the t
 test called absent sits above the floor and below everything well covered. This one shipped -
 with no threshold, because a similarity is an ordering and not an interval (ADR-088).
 
+## A premise nobody had checked, and what checking it was worth
+
+`--in-passes` reads a document in several passes over its pages, and existed for documents
+too large for the window. A document that fits was read whole, on the reasoning that one
+request does what five requests do. Six documents that **fit**, collected both ways against
+the same model:
+
+| document | tokens | read whole | read in passes |
+|---|---|---|---|
+| a guideline section | 19,315 | 18 | **103** of 119 |
+| a head-to-head PSMA study | 17,796 | 9 | **58** of 61 |
+| a nodal segmentation paper | 18,150 | 11 | **53** of 55 |
+| a PSMA pitfalls review | 14,411 | 7 | **49** of 55 |
+| a PSMA validation study | 14,080 | 5 | **45** of 48 |
+| a PSMA bone-uptake study | 13,921 | 9 | **44** of 45 |
+| | | **59** | **352** |
+
+**Six times.** The number of quotations is a property of the prompt rather than of the
+document, and nothing in this project had noticed because the setting was named after the
+problem it was built for.
+
+And the difference is not only in number: of the 103 from the guideline section, **26 are
+about nodal disease against 4** from the single pass.
+
+**Its cost, stated.** The one document measured both ways produced **0** unfound quotations
+read whole and **16 of 119** in passes. Across all five re-read papers, 15 of 264 - about 6%.
+The check marks them either way; what a higher yield buys is more attempts, not more
+reliability (ADR-089).
+
+This took four minutes and moved the corpus from 880 citable quotations to 1,129.
+
+## What a coverage measurement was worth, once acted on
+
+The coverage report named two topics within 0.05 of its floor. Five papers were re-read in
+passes, two of them chosen because they speak to the thinner one. Re-measured:
+
+| topic | before | after |
+|---|---|---|
+| histopathology as the reference standard | 0.55 | **0.60** |
+| specificity and false positives | 0.64 | **0.68** |
+| sensitivity for pelvic nodes | 0.66 | 0.67 |
+| **prostate cancer in Mexico** | 0.54 | **0.54** |
+| the control, outside the subject | 0.50 | **0.50** |
+
+**The floor did not move and neither did the topic nothing was collected for**, which is what
+makes the rest readable as signal. Before, the nearest thing the corpus held to a
+histopathological reference standard was a study using *three readers* as its reference;
+after, it is *"Validating imaging-results with post-prostatectomy and lymph-node dissection
+histology"*.
+
 ## How to read a figure from this project
 
 **Ask what the check could not see.** Six of the twelve wrong figures in the table above were the check

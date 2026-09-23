@@ -111,3 +111,55 @@ def test_a_document_covered_through_its_extracts_is_covered(tmp_path: Path) -> N
     (tmp_path / "corpus.md").write_text(_corpus("part.md"), encoding="utf-8")
     by_name = {s.name: s for s in stages_in(tmp_path).stages}
     assert not by_name["Quotations"].missing, "the guideline is covered through its extract"
+
+
+# --- what `coverage` brought into the workspace, and what it reads (ADR-088) ---------------
+
+
+def test_a_coverage_report_is_not_a_document_nobody_quoted(tmp_path: Path) -> None:
+    """Written by LACC, like a bibliography and a review.
+
+    It was counted as a document the day `coverage` shipped, which invented three pending
+    items out of the tool's own output - the defect ADR-082 exists to prevent, arriving
+    again through a new writer nobody had taught this reader about.
+    """
+    (tmp_path / "paper.md").write_text("Some prose about a study.", encoding="utf-8")
+    (tmp_path / "corpus.md").write_text(_corpus("paper.md"), encoding="utf-8")
+    (tmp_path / "cobertura.md").write_text(
+        "# How far the nearest quotation is\n\n3 topics against corpus.md.\n", encoding="utf-8"
+    )
+    quotations = next(s for s in stages_in(tmp_path).stages if s.name == "Quotations")
+    assert "cobertura.md" not in quotations.missing
+    assert not quotations.missing
+
+
+def test_a_topics_file_is_not_a_document_to_quote_from(tmp_path: Path) -> None:
+    """It is the question, not a source. Recognised by the control marker `coverage` demands."""
+    (tmp_path / "paper.md").write_text("Some prose about a study.", encoding="utf-8")
+    (tmp_path / "corpus.md").write_text(_corpus("paper.md"), encoding="utf-8")
+    (tmp_path / "temas.md").write_text(
+        "# what this thesis has to hold up\n\nnodal staging\ndosimetry\n! bone sarcoma\n",
+        encoding="utf-8",
+    )
+    quotations = next(s for s in stages_in(tmp_path).stages if s.name == "Quotations")
+    assert not quotations.missing
+
+
+def test_the_control_marker_is_found_where_a_person_writes_it(tmp_path: Path) -> None:
+    """Last. It is the odd one out, and that is where an odd one out goes."""
+    (tmp_path / "paper.md").write_text("Some prose.", encoding="utf-8")
+    (tmp_path / "corpus.md").write_text(_corpus("paper.md"), encoding="utf-8")
+    lines = ["# a long preamble about what this file is for", ""]
+    lines += [f"topic number {n} of the thesis" for n in range(60)]
+    lines += ["! something well outside this field"]
+    (tmp_path / "temas.md").write_text("\n".join(lines), encoding="utf-8")
+    quotations = next(s for s in stages_in(tmp_path).stages if s.name == "Quotations")
+    assert not quotations.missing
+
+
+def test_a_list_with_no_control_marker_is_still_a_document(tmp_path: Path) -> None:
+    """`coverage` refuses such a file, so nothing else should treat it as one."""
+    (tmp_path / "corpus.md").write_text(_corpus("other.md"), encoding="utf-8")
+    (tmp_path / "notes.md").write_text("nodal staging\ndosimetry\n", encoding="utf-8")
+    quotations = next(s for s in stages_in(tmp_path).stages if s.name == "Quotations")
+    assert "notes.md" in quotations.missing

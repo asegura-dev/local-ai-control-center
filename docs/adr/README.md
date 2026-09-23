@@ -566,3 +566,10 @@ Eleven PDFs carry a DOI in their metadata; **none of the eleven Markdown files m
 [`ADR-088-how-far-the-nearest-quotation-is.md`](ADR-088-how-far-the-nearest-quotation-is.md)
 
 Coverage, deferred three times, and **two of the three instruments measured for it were refused**. Counting documents behind a top-N ranking gave 7-11 for every topic including a control outside the subject - it measures the retriever. Counting shared words called a topic absent that the corpus covers in other words, which is a false gap about somebody's own bibliography. Distance by meaning put the control at the floor and ordered the rest sensibly, so that shipped. **Nothing is called a gap**: a control topic is required as the floor, no threshold decides anything, and the quotation that came closest is printed so the number can be checked. Measured here: floor 0.50, and two topics within 0.05 of it - the histopathological reference standard and Mexican epidemiology.
+
+
+### 089 - a prompt asks once
+
+[`ADR-089-a-prompt-asks-once.md`](ADR-089-a-prompt-asks-once.md)
+
+`--in-passes` was built for documents too large for the window, and the premise that a document which fits should be read whole was never checked. Checking it took four minutes: six documents that **fit**, collected both ways, gave **59 verified quotations read whole and 352 read in passes**. The number of quotations is a property of the prompt, not of the document. What comes back differs in kind as well - 26 quotations about the subject against 4. Stated with its cost: passes invent more (0 unfound read whole, 16 of 119 in passes), and `--pages-per-pass` has to be chosen by tokens rather than pages, since a journal page is 1,300 tokens and a preprint page 320. No code changed; the guidance did.

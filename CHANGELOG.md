@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-09-23
+
 ### Changed
+- **`--in-passes` is not only for documents that do not fit** (ADR-089). It was built for a
+  document too large for the window, and everything else was read whole because one request
+  can do what five requests do. That premise was never checked. Six documents that **fit the
+  window**, collected both ways against the same model:
+
+  | | read whole | read in passes |
+  |---|---|---|
+  | verified quotations | **59** | **352** |
+
+  **Six times as many.** The number of quotations is a property of the **prompt**, not of the
+  document: asked once about nineteen thousand tokens a model returns about twenty, and asked
+  five times about four thousand each it returns about twenty each time. What comes back
+  differs in kind too - of 103 quotations from one guideline section, **26 were about nodal
+  disease against 4** from the single pass.
+
+  Stated with its cost: passes invent more. The one document measured both ways gave 0 unfound
+  quotations read whole and **16 of 119** read in passes. The check catches them either way.
+  Across all five re-read papers, 15 of 264 - about 6%. Quote the pair, never the first number.
+
+  No code changed. The command's help and the asking guide did: both described passes as the
+  remedy for a refusal.
+
 - **The server guide's claim about the context cache is now a measurement.** It said holding
   the KV cache at 8 bits is "the difference between fitting comfortably and fitting by a
   hair" on a 16 GB card. Asked what it was holding, a server running `qwen2.5:14b` at Q4_K_M
@@ -16,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing reports it: the engine answers, the answers are correct, it is just slower than it
   looks like it should be. `GET /api/ps` returns `size` and `size_vram`, and the two being
   different is the whole story.
+
+### Fixed
+- **`status` counted `coverage`'s own reports as documents nobody had quoted.** Three invented
+  pending items, the day after `coverage` shipped - the defect ADR-082 exists to prevent,
+  arriving again through a new writer that the reader had not been taught about. A coverage
+  report and a topics file are now recognised for what they are. The topics file is found by
+  the control marker `coverage` refuses to run without, looked for **anywhere** in the opening
+  rather than on the first line, because a person writes the control last.
 
 ## [2.3.0] - 2026-09-23
 

@@ -424,7 +424,10 @@ def run(
         bool,
         typer.Option(
             "--in-passes",
-            help="Read a document too large for the window in several passes over its pages.",
+            help="Read a document in several passes over its pages. Needed for one too "
+            "large for the window, and worth it for one that fits: measured at six "
+            "times the quotations, because a prompt asks once however much it is "
+            "shown (ADR-089).",
         ),
     ] = False,
     pages_per_pass: Annotated[
@@ -1624,7 +1627,10 @@ def collect(
         bool,
         typer.Option(
             "--in-passes",
-            help="Read documents too large for the window in several passes over their pages.",
+            help="Read documents in several passes over their pages. Needed for one too "
+            "large for the window, and worth it for one that fits: measured at six "
+            "times the quotations, because a prompt asks once however much it is "
+            "shown (ADR-089).",
         ),
     ] = False,
     pages_per_pass: Annotated[
