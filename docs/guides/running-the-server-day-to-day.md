@@ -168,6 +168,18 @@ Holding that cache at 8 bits roughly halves it, at no cost worth noticing:
 ```
 
 On a 16 GB card that is the difference between a 14B model at a full window fitting
-comfortably and fitting by a hair. See
+comfortably and fitting by a hair, and the hair has since been measured. Asked what it was
+holding, a server running `qwen2.5:14b` at Q4_K_M with a 32,768 window reported:
+
+| | |
+|---|---|
+| the model altogether | **15.75 GB** |
+| how much of that is on the card | **14.64 GB - 93%** |
+
+**The remaining 1.1 GB is in system memory**, and every token generated reads it across the
+bus. Nothing reports this as a problem: the engine answers, the answers are correct, and it
+is simply slower than it looks like it should be. The way to see it is to ask the engine what
+it holds - `GET /api/ps` returns `size` and `size_vram`, and the two being different is the
+whole story. See
 [choosing hardware](choosing-hardware-for-local-models.md#if-you-can-build-a-desktop-instead)
 for the sizing table.

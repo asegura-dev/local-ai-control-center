@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The server guide's claim about the context cache is now a measurement.** It said holding
+  the KV cache at 8 bits is "the difference between fitting comfortably and fitting by a
+  hair" on a 16 GB card. Asked what it was holding, a server running `qwen2.5:14b` at Q4_K_M
+  with a 32,768 window reported **15.75 GB of which 14.64 GB is on the card - 93%.** The
+  remaining 1.1 GB is in system memory and is read across the bus for every token, and
+  nothing reports it: the engine answers, the answers are correct, it is just slower than it
+  looks like it should be. `GET /api/ps` returns `size` and `size_vram`, and the two being
+  different is the whole story.
+
 ## [2.3.0] - 2026-09-23
 
 ### Added
