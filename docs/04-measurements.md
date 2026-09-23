@@ -415,6 +415,36 @@ Nothing was measured wrong. A true statement was carried forward past the work t
 false, which is a way of being wrong that no check here looks for: the number was right, the
 tense was not.
 
+## A rule proposed, measured and refused
+
+The plan was to read the DOI a document prints on its own front page, so that the nine
+documents whose PDF metadata is silent could be resolved. The objection is obvious: a document
+prints the DOIs of what it **cites** too. The proposed separator was to ask the registry what
+each candidate is and keep only the one whose title the document prints.
+
+| share of the registry's title found in the document | which DOI | what it actually is |
+|---|---|---|
+| **100%** | `10.3322/caac.21660` | **cited** |
+| **100%** | `10.1002/ijc.33588` | **cited** |
+| 100% | five others | own |
+
+A reference list prints the full title of what it cites, so a cited work scores as highly as
+an owned one. Narrowing to the title block did not rescue it:
+
+| window | best **cited** DOI | worst **own** DOI |
+|---|---|---|
+| 400 characters | **60%** | **0%** |
+| 800 characters | 60% | 29% |
+| 1500 characters | 60% | 42% |
+
+**At every window a cited DOI outranks an owned one.** There is no threshold, the rule was not
+built, and `lacc identify` shows the candidates and lets a person choose (ADR-087). The cost
+of finding this out was about twenty minutes; the cost of not finding it out would have been
+wrong DOIs in a thesis bibliography.
+
+Also measured on the way: **11 of 23 PDFs carry a DOI in their metadata, and 0 of the 11
+Markdown files made from them do.** Conversion loses it every time.
+
 ## How to read a figure from this project
 
 **Ask what the check could not see.** Six of the twelve wrong figures above were the check

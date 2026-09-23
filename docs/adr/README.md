@@ -552,3 +552,10 @@ Reverses the first sentence of ADR-069, which said the window reads and runs not
 [`ADR-086-a-variable-is-not-a-call.md`](ADR-086-a-variable-is-not-a-call.md)
 
 The converse rule (ADR-066) drew its call graph from every name a function writes down, so a parameter named `corpus` counted as a call to the `corpus` command - which prints. Three functions in `cli.py` inherited presentation from a variable name and were invisible to the check for as long as it has existed. Two are composition and are named; the third was a **third copy** of the decision the slice already held, which is the very shape ADR-065 cost a corpus to learn. Edges come from call sites now, `ask`/`measure`/the window take one path, an unneeded exception fails the test rather than sitting there, and `tools/measure.py` reads the vocabulary from the rule instead of a copy that had drifted thirteen names behind it.
+
+
+### 087 - the DOI a person established
+
+[`ADR-087-the-doi-a-person-established.md`](ADR-087-the-doi-a-person-established.md)
+
+Eleven PDFs carry a DOI in their metadata; **none of the eleven Markdown files made from them does**, so the corpus is built from files that cannot be resolved. Nine of the twelve silent PDFs print a DOI on the page - and reading it automatically was **measured and refused**: a document prints the DOIs of what it cites too, and a *cited* DOI scored 100% against the registry's own title, outranking owned ones at every window tried. No threshold separates them, so `lacc identify` proposes and a person disposes, and what they establish is written beside the file and never inside it. Took the bibliography of the user's own sources from 11 of 23 to 19 of 23. With it: three commands were presenting a correct refusal to overwrite as a traceback.

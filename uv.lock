@@ -182,7 +182,7 @@ wheels = [
 
 [[package]]
 name = "local-ai-control-center"
-version = "2.1.0"
+version = "2.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "psutil" },

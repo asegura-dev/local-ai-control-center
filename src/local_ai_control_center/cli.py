@@ -113,12 +113,18 @@ from local_ai_control_center.features.ask import (
     might_support,
     prepare,
 )
-from local_ai_control_center.features.bibliography import bibliography
+from local_ai_control_center.features.bibliography import as_entry, bibliography
 from local_ai_control_center.features.commands import commands_of
 from local_ai_control_center.features.corpus import (
     assembled,
     collected_markdown,
     recheck,
+)
+from local_ai_control_center.features.identity import (
+    establish,
+    established_for,
+    opening_of,
+    printed_dois,
 )
 from local_ai_control_center.features.measure import spread
 from local_ai_control_center.features.navigate import ranked
@@ -665,6 +671,21 @@ def _warn_no_context_ceiling() -> None:
     )
 
 
+def _write_or_exit(destination: Path, text: str) -> None:
+    """Write a file LACC produced, and translate the one refusal it can meet.
+
+    `write_new_file` refuses a path that already exists, which is the rule that keeps LACC
+    from replacing something of yours. Three commands called it without catching that, so
+    the refusal reached the terminal as a traceback - a deliberate, correct decision
+    presented as a crash. Found by running `resolve` twice (ADR-087).
+    """
+    try:
+        write_new_file(destination, text)
+    except ConversionError as error:
+        _show(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+
 def _build_provider(choice: ProviderChoice, config: Config, skill: str = "") -> Provider:
     """Construct the chosen provider, for this skill's model.
 
@@ -1041,8 +1062,13 @@ def resolve(
             _show(f"[red]{source} is not in the workspace.[/red]")
             raise typer.Exit(code=1)
         own = embedded_metadata(path).doi
+        stated = established_for(path)
         if own:
             wanted.setdefault(own.strip().lower(), source.name)
+        elif stated is not None:
+            # Established by a person and recorded beside the file, because no test tried
+            # separates a document's own printed DOI from one it cites (ADR-087).
+            wanted.setdefault(stated.doi.strip().lower(), f"{source.name} (established)")
         else:
             silent.append(source.name)
         if cited:
@@ -1121,7 +1147,7 @@ def resolve(
             unknown.append(doi)
     registry.write()
 
-    write_new_file(destination, bibliography(resolved, unknown, silent, config.registry_url))
+    _write_or_exit(destination, bibliography(resolved, unknown, silent, config.registry_url))
     _show(f"[green]{len(resolved)} of {len(wanted)} resolved[/green] -> {into}")
     if repaired:
         _show(
@@ -2206,7 +2232,7 @@ def review(
     written_report = report(findings, draft.name, against.name, 0)
     if into:
         destination = workspace.resolve_within(into)
-        write_new_file(destination, written_report)
+        _write_or_exit(destination, written_report)
         # The same findings as data, beside the report, so the window can paint them over
         # the draft without re-running an engine (ADR-069).
         reviewed = Reviewed(draft=draft.name, corpus=against.name, findings=tuple(findings))
@@ -2334,6 +2360,121 @@ def window(
 
 
 @app.command()
+def identify(
+    document: Annotated[Path, typer.Argument(help="A document inside the workspace.")],
+    doi: Annotated[
+        str | None,
+        typer.Option("--doi", help="The DOI this document is. Checked against the registry."),
+    ] = None,
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Say which work a document is, when nothing in it says so.
+
+    **Without `--doi` this chooses nothing.** It lists the DOIs the document prints near its
+    front and asks the registry what each one is, so you can see which is the document itself
+    and which are works it cites. That distinction is yours to make: measured over a real
+    bibliography, **no test separated them** - a cited DOI scored 100% against the registry's
+    own title, and at every narrower window a cited one outranked an owned one (ADR-087).
+
+    With `--doi`, the registry is asked, the work it names is shown, and on confirmation the
+    answer is written **beside** the document as `<document>.doi.json` - never into it, because
+    the corpus checks hundreds of quotations against these files as they are. `lacc resolve`
+    reads it afterwards for any document whose own metadata is silent.
+    """
+    config, workspace = _load(config_path)
+    if not config.registry_url or not config.network_access:
+        _show(
+            "[red]This asks a registry, so it needs both switches on.[/red] Write "
+            "`registry_url: https://api.crossref.org` and `network_access: true` in your "
+            "configuration. Both are off by default."
+        )
+        raise typer.Exit(code=1)
+    try:
+        path = workspace.resolve_within(document)
+    except ValueError as error:
+        _show(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+    if not path.exists():
+        _show(f"[red]{document} is not in the workspace.[/red]")
+        raise typer.Exit(code=1)
+
+    registry = RememberedRegistry(
+        CrossrefRegistry(config.registry_url, config.registry_mailto),
+        workspace.resolve_within(Path("identified.registry.json")),
+    )
+    already = established_for(path)
+    if already is not None:
+        _show(f"[dim]Already established as {already.doi} on {already.established}.[/dim]")
+
+    if doi is None:
+        _propose(path, registry, config)
+        return
+
+    wanted = doi.strip()
+    _show(f"[yellow]1 DOI would be sent to {config.registry_url}.[/yellow]")
+    if not typer.confirm("Ask the registry?", default=False):
+        _show("Nothing was sent.")
+        raise typer.Exit(code=1)
+    try:
+        work = registry.about(wanted)
+    except RegistryError as error:
+        _show(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+    registry.write()
+    if work is None:
+        _show(f"[red]The registry holds nothing for {wanted}.[/red] Nothing was written.")
+        raise typer.Exit(code=1)
+
+    _show(f"[bold]{work.title}[/bold]")
+    _show(f"[dim]{as_entry(work)}[/dim]")
+    said = opening_of(path.read_text(encoding="utf-8", errors="replace"))
+    _show(f"[dim]The document opens: {said}[/dim]")
+    if not typer.confirm("Is that what this document is?", default=False):
+        _show("[yellow]Nothing was written.[/yellow] A wrong DOI is worse than a missing one.")
+        raise typer.Exit(code=1)
+    written = establish(path, wanted, work.title)
+    _show(f"[green]Established[/green] -> {written.name}")
+
+
+def _propose(path: Path, registry: RememberedRegistry, config: Config) -> None:
+    """List the DOIs a document prints, with what the registry says each one is."""
+    candidates = printed_dois(path.read_text(encoding="utf-8", errors="replace"))
+    if not candidates:
+        _show(
+            f"[yellow]{path.name} prints no DOI in its front matter.[/yellow] Nothing to "
+            "propose - two of the four documents this was measured on are arXiv preprints, "
+            "which carry none."
+        )
+        return
+    fresh = [one for one in candidates if not registry.holds(one)]
+    _show(f"[bold]{len(candidates)} DOIs[/bold] printed near the front of {path.name}.")
+    if fresh:
+        _show(f"[yellow]{len(fresh)} would be sent to {config.registry_url}.[/yellow]")
+        if not typer.confirm("Ask the registry what they are?", default=False):
+            _show("Nothing was sent.")
+            return
+    for one in candidates:
+        try:
+            work = registry.about(one)
+        except RegistryError as error:
+            _show(f"  [red]{one}[/red]  {error}")
+            continue
+        if work is None:
+            _show(f"  [dim]{one}[/dim]  the registry holds nothing for it")
+            continue
+        _show(f"  [bold]{one}[/bold]  {work.title}")
+    registry.write()
+    said = opening_of(path.read_text(encoding="utf-8", errors="replace"))
+    _show(f"[dim]The document opens: {said}[/dim]")
+    _show(
+        "[dim]Nothing was chosen. A document prints its own DOI and the DOIs it cites, and "
+        "no test separates them - which is why this asks you. Name one with --doi.[/dim]"
+    )
+
+
+@app.command()
 def sections(
     source: Annotated[Path, typer.Argument(help="A document inside the workspace.")],
     about: Annotated[
@@ -2406,7 +2547,7 @@ def sections(
         _show("[red]Name where to write it with --into.[/red]")
         raise typer.Exit(code=1)
     destination = workspace.resolve_within(into)
-    write_new_file(destination, wanted)
+    _write_or_exit(destination, wanted)
     # Which document this came out of, beside the file rather than inside it. Nothing is
     # written into an extract: the quotations checked against these files stay checked
     # (ADR-076), and this is a fact about the file (ADR-082).

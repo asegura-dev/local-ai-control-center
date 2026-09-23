@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-23
+
+### Added
+- **`lacc identify`: the DOI a person established, recorded beside the file** (ADR-087).
+  Measured over a real bibliography of 23 papers: **11 PDFs carry a DOI in their metadata and
+  none of the 11 Markdown files made from them does** - conversion loses it entirely - while
+  **9 of the 12 silent PDFs print a DOI on their own front pages.**
+
+  Reading the printed one automatically was proposed, measured and **refused**. A document
+  also prints the DOIs of what it cites, and no test separated them: over the whole front
+  matter a *cited* DOI scored **100%** against the registry's own title, and at 400, 800 and
+  1500 characters a cited DOI still outranked an owned one. Picking a threshold anyway would
+  have been this project's MinHash again.
+
+  So `lacc identify <document>` lists what the document prints and asks the registry what each
+  one is, and **chooses nothing**. With `--doi` it shows the work the registry names beside
+  the document's own opening line, and on confirmation writes `<document>.doi.json` - beside
+  the file, never inside it, because hundreds of quotations are checked against these
+  documents as they are. `resolve` reads it for any document whose metadata is silent.
+
+  Applied: the bibliography of the user's own sources went from **11 of 23 to 19 of 23**.
+
+### Fixed
+- **Three commands presented a correct refusal as a crash** (ADR-087). `write_new_file`
+  refuses a path that already exists - the rule that stops LACC replacing something of yours -
+  and `resolve`, `review --into` and `sections --take` called it without catching that, so the
+  refusal reached the terminal as a traceback. Found by running `resolve` twice.
+
 ## [2.1.0] - 2026-09-22
 
 ### Added
