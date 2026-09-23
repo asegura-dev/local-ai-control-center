@@ -59,7 +59,7 @@ class DenseRetriever(Retriever):
 
     def _ranked(self, question: str, passages: tuple[Passage, ...]) -> list[int]:
         """Passage indices, closest first."""
-        vectors = self._vectors_for(passages)
+        vectors = self.vectors_for(passages)
         asked = _unit(self._embedder.embed((question,))[0])
         scored = [
             (sum(a * b for a, b in zip(asked, vectors[index], strict=False)), index)
@@ -68,8 +68,14 @@ class DenseRetriever(Retriever):
         scored.sort(key=lambda pair: (-pair[0], pair[1]))
         return [index for _, index in scored]
 
-    def _vectors_for(self, passages: tuple[Passage, ...]) -> list[tuple[float, ...]]:
-        """The unit vector of every passage, embedding only what is not already known."""
+    def vectors_for(self, passages: tuple[Passage, ...]) -> list[tuple[float, ...]]:
+        """The unit vector of every passage, embedding only what is not already known.
+
+        Public because a second caller needs exactly this and would otherwise write it
+        again: `lacc coverage` compares topics against the same vectors this ranks with, and
+        a second copy of "compute what is missing, reuse the rest, rewrite the whole cache"
+        is a second thing to keep true (ADR-088).
+        """
         known = remembered(self._cache, self._embedder.name) if self._cache else {}
         keys = [key_for(passage.text) for passage in passages]
         missing = tuple(

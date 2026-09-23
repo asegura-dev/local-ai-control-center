@@ -569,6 +569,7 @@ What the version actually holds:
 | `lacc sections` | a document's own numbering, and one part taken out of it (ADR-076) |
 | `lacc window` | a second view: eight sections, and it reads (ADR-069 to ADR-075, ADR-077) |
 | and in v2.1.0 | a ninth that asks, behind a preview, on a thread (ADR-085) |
+| and in v2.3.0 | `lacc coverage` - the deferred fase 4, answered by distance rather than by clustering (ADR-088) |
 | `scripts/` | launchers whose digests the gate enforces (ADR-071) |
 | the method | measured, written down, and followable without being explained |
 

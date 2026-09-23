@@ -120,6 +120,15 @@ from local_ai_control_center.features.corpus import (
     collected_markdown,
     recheck,
 )
+from local_ai_control_center.features.coverage import (
+    CONTROL_MARK,
+    missing_control,
+    reach_of,
+    topics_in,
+)
+from local_ai_control_center.features.coverage import (
+    report as coverage_report,
+)
 from local_ai_control_center.features.identity import (
     establish,
     established_for,
@@ -140,6 +149,7 @@ from local_ai_control_center.features.review import (
 from local_ai_control_center.features.stages import TAKEN_FROM, stages_in
 from local_ai_control_center.features.status import EngineSeen, status_of
 from local_ai_control_center.ports.converter import ConversionError, Converter
+from local_ai_control_center.ports.embedder import EmbeddingError
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
 from local_ai_control_center.ports.provider import Provider, ProviderError
 from local_ai_control_center.ports.registry import RegistryError, Work
@@ -2357,6 +2367,103 @@ def window(
         lambda: _engine_seen(config),
         *_asking_for_the_window(config, workspace),
     )
+
+
+@app.command()
+def coverage(
+    topics_file: Annotated[
+        Path, typer.Argument(help="One topic per line. Mark the control with `!`.")
+    ],
+    against: Annotated[
+        Path, typer.Option("--against", help="A corpus written by lacc collect or lacc corpus.")
+    ],
+    into: Annotated[Path | None, typer.Option("--into", help="Where to write the report.")] = None,
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """How far the nearest quotation is from each topic you name.
+
+    **It says what is thin. It cannot say what is missing** - LACC knows nothing of your field
+    beyond the documents you brought, and naming an absent subject would be a model's memory
+    rather than your sources.
+
+    **Nothing is called a gap.** A similarity has no meaning on its own, so one line of your
+    topics file must be marked with `!` as a subject deliberately *outside* your field. That
+    is the floor the rest are read against, and without it the numbers are unanchored
+    (ADR-088).
+
+    Needs `embedding_model`. Shared words were measured for this and produce a report that
+    looks the same and is wrong: they called a topic absent that the corpus speaks to in other
+    words, which is a false gap about your own bibliography.
+    """
+    config, workspace = _load(config_path)
+    if not config.embedding_model:
+        _show(
+            "[red]This needs an embedding model.[/red] Set `embedding_model: bge-m3` in your "
+            "configuration. Word overlap was measured for this job and reported a topic as "
+            "absent that the corpus covers in other words - a false gap is the one thing a "
+            "coverage report must not produce (ADR-088)."
+        )
+        raise typer.Exit(code=1)
+    try:
+        topics_path = workspace.resolve_within(topics_file)
+        corpus_path = workspace.resolve_within(against)
+        topics = topics_in(topics_path.read_text(encoding="utf-8", errors="replace"))
+        text = corpus_path.read_text(encoding="utf-8", errors="replace")
+    except (ValueError, OSError) as error:
+        _show(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    if not topics:
+        _show(f"[red]{topics_file} names no topics.[/red] One per line.")
+        raise typer.Exit(code=1)
+    if missing_control(topics):
+        _show(
+            f"[red]No control topic.[/red] Mark one line with `{CONTROL_MARK}` - a subject "
+            "deliberately outside your field. Without a floor these numbers have no meaning, "
+            "and a reader supplies one from somewhere."
+        )
+        raise typer.Exit(code=1)
+
+    collected = [c for c in parse_corpus(text) if "NOT IN THE DOCUMENT" not in c.recorded_verdict]
+    if not collected:
+        _show(f"[yellow]{against} holds no quotation that was found in its document.[/yellow]")
+        raise typer.Exit(code=1)
+    passages = tuple(
+        Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
+    )
+
+    host = resolve_engine_host(config.engine_host, config.network_access)
+    embedder = OllamaEmbedder(config.embedding_model, host)
+    cache = corpus_path.with_suffix(corpus_path.suffix + VECTOR_SUFFIX)
+    _show(
+        f"[bold]{len(topics)} topics[/bold] against {len(passages)} quotations, by meaning. "
+        f"[dim]{config.embedding_model} on {host}[/dim]"
+    )
+    try:
+        vectors = tuple(DenseRetriever(embedder, cache).vectors_for(passages))
+        found = reach_of(topics, passages, vectors, embedder)
+    except (EmbeddingError, ValueError) as error:
+        _show(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    floor = next((one.nearest for one in found if one.topic.control), 0.0)
+    for one in found:
+        name = f"{one.topic.said}  (control)" if one.topic.control else one.topic.said
+        colour = "dim" if one.nearest <= floor else "white"
+        _show(f"  [{colour}]{one.nearest:.2f}[/{colour}]  {name}")
+    _show(
+        f"[dim]The floor is {floor:.2f}. Nothing here is called a gap: a similarity is an "
+        "ordering, not an interval.[/dim]"
+    )
+
+    if into is not None:
+        written = coverage_report(
+            found, against.name, config.embedding_model, datetime.now(UTC).date().isoformat()
+        )
+        _write_or_exit(workspace.resolve_within(into), written)
+        _show(f"[green]Written[/green] -> {into}")
 
 
 @app.command()

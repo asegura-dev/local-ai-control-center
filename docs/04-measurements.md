@@ -445,9 +445,46 @@ wrong DOIs in a thesis bibliography.
 Also measured on the way: **11 of 23 PDFs carry a DOI in their metadata, and 0 of the 11
 Markdown files made from them do.** Conversion loses it every time.
 
+## Two more instruments proposed, measured and refused
+
+Coverage was deferred three times on one condition - *a gap measured over an incomplete
+corpus is a false gap* - and when the corpus was complete enough, two of the three ways of
+measuring it turned out to be that same false gap wearing different clothes.
+
+**Documents behind a top-N ranking.** Twelve real questions plus one deliberately outside the
+subject, top twenty passages each:
+
+| documents drawn on | question |
+|---|---|
+| 8 | **paediatric bone sarcoma chemotherapy** *(the control)* |
+| 7 to 11 | every other question asked |
+
+A top-N ranking fills N whatever it is given, so the number is a property of the retriever.
+**Refused.**
+
+**Quotations sharing three significant words.** This differentiates, and the control correctly
+comes out zero - but so does *inter-reader variability among nuclear medicine physicians*, in
+a corpus holding *"the corresponding sensitivity for the human readers was 77% on average"*.
+A tool reporting a gap in somebody's own bibliography where none exists is worse than no tool.
+**Refused.**
+
+**Distance by meaning**, over the vectors already cached:
+
+| nearest | topic |
+|---|---|
+| **0.50** | paediatric bone sarcoma *(the control, and the floor)* |
+| 0.54 | prostate cancer incidence and mortality in Mexico |
+| 0.55 | histopathology as the reference standard |
+| 0.60 | inter-reader variability |
+| 0.74 | deep learning segmentation of PSMA PET lesions |
+
+The control is the floor, the ordering is the one a person would give, and the topic the word
+test called absent sits above the floor and below everything well covered. This one shipped -
+with no threshold, because a similarity is an ordering and not an interval (ADR-088).
+
 ## How to read a figure from this project
 
-**Ask what the check could not see.** Six of the twelve wrong figures above were the check
+**Ask what the check could not see.** Six of the twelve wrong figures in the table above were the check
 reporting its own blind spot. The question that found every one of them was not "what is the
 rate" but "what did it reject, and was it right to".
 

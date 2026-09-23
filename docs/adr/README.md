@@ -559,3 +559,10 @@ The converse rule (ADR-066) drew its call graph from every name a function write
 [`ADR-087-the-doi-a-person-established.md`](ADR-087-the-doi-a-person-established.md)
 
 Eleven PDFs carry a DOI in their metadata; **none of the eleven Markdown files made from them does**, so the corpus is built from files that cannot be resolved. Nine of the twelve silent PDFs print a DOI on the page - and reading it automatically was **measured and refused**: a document prints the DOIs of what it cites too, and a *cited* DOI scored 100% against the registry's own title, outranking owned ones at every window tried. No threshold separates them, so `lacc identify` proposes and a person disposes, and what they establish is written beside the file and never inside it. Took the bibliography of the user's own sources from 11 of 23 to 19 of 23. With it: three commands were presenting a correct refusal to overwrite as a traceback.
+
+
+### 088 - how far the nearest quotation is
+
+[`ADR-088-how-far-the-nearest-quotation-is.md`](ADR-088-how-far-the-nearest-quotation-is.md)
+
+Coverage, deferred three times, and **two of the three instruments measured for it were refused**. Counting documents behind a top-N ranking gave 7-11 for every topic including a control outside the subject - it measures the retriever. Counting shared words called a topic absent that the corpus covers in other words, which is a false gap about somebody's own bibliography. Distance by meaning put the control at the floor and ordered the rest sensibly, so that shipped. **Nothing is called a gap**: a control topic is required as the floor, no threshold decides anything, and the quotation that came closest is printed so the number can be checked. Measured here: floor 0.50, and two topics within 0.05 of it - the histopathological reference standard and Mexican epidemiology.

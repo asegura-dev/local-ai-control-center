@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-23
+
+### Added
+- **`lacc coverage`: how far the nearest quotation is from each topic you name** (ADR-088).
+  Coverage has been on this roadmap since v1 and deferred three times. Two of the three
+  instruments measured before building it were **refused**:
+
+  - Counting the documents behind a top-N ranking returned **7 to 11 documents for every
+    topic, including one deliberately outside the subject.** A top-N ranking fills N; the
+    number measures the retriever, not the corpus.
+  - Counting shared words called a topic absent **that the corpus speaks to in other words** -
+    a false gap, reported about the user's own bibliography.
+
+  Distance by meaning put the control at the floor and ordered the rest the way a person
+  would, so that is what shipped. **Nothing is called a gap:** a similarity is an ordering,
+  not an interval, so one line of the topics file must be marked `!` as a subject outside
+  your field, and that is the floor the rest are read against. The report shows the quotation
+  that came closest, so a number can be checked rather than believed. It refuses to run
+  without an embedding model, with the measurement as the reason.
+
+  Measured on this bibliography: floor **0.50**, best covered **0.74** (deep learning
+  segmentation), and two topics within 0.05 of the floor - **histopathology as the reference
+  standard (0.55)** and **Mexican epidemiology (0.54)**. For the first of those the nearest
+  quotation in the whole corpus uses *three readers* as the reference standard, not pathology.
+
+- `DenseRetriever.vectors_for` is public, because coverage compares topics against the same
+  vectors the ranking uses and a second copy of "compute what is missing, reuse the rest"
+  would be a second thing to keep true.
+
 ## [2.2.0] - 2026-09-23
 
 ### Added
