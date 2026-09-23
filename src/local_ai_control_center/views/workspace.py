@@ -10,6 +10,7 @@ from pathlib import Path
 
 import customtkinter as ctk
 
+from local_ai_control_center.core.kinds import WRITTEN_BY_LACC
 from local_ai_control_center.features.overview import corpus_seen, documents_in
 from local_ai_control_center.features.reading import blocks_in, opening
 from local_ai_control_center.features.review import reviewed_from, reviews_in
@@ -87,12 +88,17 @@ def _show_review(key: str, panel: Panel, state: State) -> None:
 # --- files of a kind ------------------------------------------------------------------------
 
 
-def _files_of(kind: str, title: str, said: str) -> Listing:
-    """A listing for one kind of file. Three sections differ only by these words."""
+def _files_of(kinds: frozenset[str], title: str, said: str) -> Listing:
+    """A listing for one group of kinds. Three sections differ only by these words.
+
+    A *group* rather than one kind, because "written by LACC" is a grouping this view makes
+    of three things core distinguishes - and the grouping lives here, where the drawing is,
+    while what each file *is* lives in `core.kinds` (ADR-090).
+    """
 
     def listing(side: Sidebar, panel: Panel, state: State) -> None:
-        for seen in documents_in(state.workspace):
-            if seen.kind == kind:
+        for seen in documents_in(state.workspace, state.context_file):
+            if seen.kind in kinds:
                 side.row(str(seen.path), seen.name)
         panel.said(title, said)
 
@@ -105,7 +111,7 @@ def _show_written(key: str, panel: Panel, state: State) -> None:
 
 def _show_document(key: str, panel: Panel, state: State) -> None:
     path = Path(key)
-    for seen in documents_in(state.workspace):
+    for seen in documents_in(state.workspace, state.context_file):
         if seen.path != path:
             continue
         size = f"{seen.bytes_on_disk / 1024:,.0f} KB"
@@ -144,17 +150,28 @@ SECTIONS = (
     Section("Reviews", _list_reviews, _show_review),
     Section(
         "Written",
-        _files_of("written", "Written by LACC", "Bibliographies and review reports."),
+        _files_of(
+            WRITTEN_BY_LACC,
+            "Written by LACC",
+            "Bibliographies, review reports and coverage reports.",
+        ),
         _show_written,
     ),
     Section(
         "Corpora",
-        _files_of("corpus", "Corpora", "Choose one to count what it holds and read it."),
+        _files_of(
+            frozenset({"corpus"}), "Corpora", "Choose one to count what it holds and read it."
+        ),
         _show_corpus,
     ),
     Section(
         "Documents",
-        _files_of("document", "Documents", "Everything else in the workspace."),
+        _files_of(
+            frozenset({"document", "extract", "topics"}),
+            "Documents",
+            "The papers you brought, the sections taken out of them, and the topics you "
+            "wrote. Not the standing context, which every run carries anyway.",
+        ),
         _show_document,
     ),
 )

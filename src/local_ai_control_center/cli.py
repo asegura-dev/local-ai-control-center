@@ -2372,6 +2372,7 @@ def window(
         status_of(workspace.root, config),
         lambda: _engine_seen(config),
         *_asking_for_the_window(config, workspace),
+        config.context_file or "",
     )
 
 

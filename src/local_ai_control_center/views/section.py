@@ -62,6 +62,13 @@ class State:
     commands: tuple[Command, ...] = ()
     prompts: tuple[Prompt, ...] = ()
 
+    context_file: str = ""
+    """The standing context a configuration names.
+
+    A document, and what makes it not one to quote from is a setting - so the window is told
+    which it is, the way `status` is, rather than a reader of text guessing (ADR-090).
+    """
+
     prepare_question: Callable[[str, str], Prepared] | None = None
     """Rank a corpus against a question and report what would be sent. Sends no prompt."""
 

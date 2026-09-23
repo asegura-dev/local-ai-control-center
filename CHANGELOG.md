@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-09-23
+
+### Fixed
+- **The window and `status` decided separately what each file is, and had drifted**
+  (ADR-090). One decision, two implementations - `features/stages.py` for `lacc status` and
+  `features/overview.py` for the window - neither aware of the other. Counted over a real
+  workspace:
+
+  | | the window | `status` |
+  |---|---|---|
+  | documents to quote from | **38** | **29** |
+
+  The nine the window offered as papers to cite: two **coverage reports it had written
+  itself**, one topics file, and six sections taken out of the guideline. Plus the standing
+  context file, which `status` excludes because the configuration names it and the window
+  had never been told.
+
+  Nothing had broken. That is luck - ADR-065 is the same shape left alone, and there the two
+  writers of the corpus format drifted and silently stripped the meaning from a whole corpus.
+
+  `core/kinds.py` now holds the one answer and both slices ask it. "Written by LACC" is a
+  grouping the *view* makes of three kinds core distinguishes, and the standing context is
+  excluded by whoever read the configuration - a reader of text has no business knowing
+  about settings.
+
+  **The layering rule could not have caught this**: it checks that logic has not leaked into
+  a view, and both copies were in `features/` where they belong. `tests/test_kinds.py` adds
+  the missing check - any function outside `core/kinds.py` that returns two or more kind
+  names fails it.
+
 ## [2.4.0] - 2026-09-23
 
 ### Changed

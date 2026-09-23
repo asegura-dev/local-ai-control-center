@@ -573,3 +573,10 @@ Coverage, deferred three times, and **two of the three instruments measured for 
 [`ADR-089-a-prompt-asks-once.md`](ADR-089-a-prompt-asks-once.md)
 
 `--in-passes` was built for documents too large for the window, and the premise that a document which fits should be read whole was never checked. Checking it took four minutes: six documents that **fit**, collected both ways, gave **59 verified quotations read whole and 352 read in passes**. The number of quotations is a property of the prompt, not of the document. What comes back differs in kind as well - 26 quotations about the subject against 4. Stated with its cost: passes invent more (0 unfound read whole, 16 of 119 in passes), and `--pages-per-pass` has to be chosen by tokens rather than pages, since a journal page is 1,300 tokens and a preprint page 320. No code changed; the guidance did.
+
+
+### 090 - one reader for what a file is
+
+[`ADR-090-one-reader-for-what-a-file-is.md`](ADR-090-one-reader-for-what-a-file-is.md)
+
+The third time this project found two readers of one decision living apart, and the first time it was found before the drift cost anything. Telling a paper from a corpus from a report was implemented twice - once for `lacc status`, once for the window - and by the time anybody counted, the window offered **38** documents to quote from where `status` counted **29**: two coverage reports LACC had written itself, a topics file, six extracted sections, and the standing context. `core/kinds.py` holds the one answer now; grouping and configuration stay with whoever draws and whoever read the settings. The layering rule could not have caught it - both copies were in the right layer - so `tests/test_kinds.py` fails any function outside core that returns two kind names.

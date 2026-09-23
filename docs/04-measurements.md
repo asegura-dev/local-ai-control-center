@@ -532,6 +532,26 @@ histopathological reference standard was a study using *three readers* as its re
 after, it is *"Validating imaging-results with post-prostatectomy and lymph-node dissection
 histology"*.
 
+## One decision, two implementations, three times
+
+Telling a paper from a corpus from a report is one decision. It was implemented twice - for
+`lacc status` and for the window - and the copies drifted:
+
+| | the window | `status` |
+|---|---|---|
+| documents to quote from | **38** | **29** |
+
+The window was offering **its own coverage reports** as papers to cite, along with a topics
+file, six extracted sections, and the standing context that `status` excludes by
+configuration. Nothing had broken yet, which is luck rather than design.
+
+That is the third time this shape has appeared here: two writers of the corpus format
+(ADR-065), a vocabulary copied into the measurement tool that fell thirteen names behind
+(ADR-086), and now this. **Every one was in the right layer.** The rule that guards layers
+checks where code lives, not whether the same decision is made twice in the right place -
+which is why the check added this time counts *functions that return kind names* rather than
+where they sit (ADR-090).
+
 ## How to read a figure from this project
 
 **Ask what the check could not see.** Six of the twelve wrong figures in the table above were the check

@@ -84,6 +84,7 @@ class Window(ctk.CTk):
         check_engine: Callable[[], EngineSeen] | None = None,
         prepare_question: Callable[[str, str], Prepared] | None = None,
         send_question: Callable[[Prepared], Asked] | None = None,
+        context_file: str = "",
     ) -> None:
         super().__init__()
         self._pending: str | None = None
@@ -98,6 +99,7 @@ class Window(ctk.CTk):
         self.check_engine = check_engine
         self.prepare_question = prepare_question
         self.send_question = send_question
+        self.context_file = context_file
         self.engine = EngineSeen()
         self.preferences = preferences
         self.saved = saved
@@ -156,6 +158,7 @@ class Window(ctk.CTk):
             prompts=self.prompts,
             prepare_question=self.prepare_question,
             send_question=self.send_question,
+            context_file=self.context_file,
         )
 
     # --- the three columns -----------------------------------------------------------------
@@ -433,6 +436,7 @@ def show(
     check_engine: Callable[[], EngineSeen] | None = None,
     prepare_question: Callable[[str, str], Prepared] | None = None,
     send_question: Callable[[Prepared], Asked] | None = None,
+    context_file: str = "",
 ) -> None:
     """Open the window and hand control to Tk until it closes.
 
@@ -451,4 +455,5 @@ def show(
         check_engine,
         prepare_question,
         send_question,
+        context_file,
     ).mainloop()

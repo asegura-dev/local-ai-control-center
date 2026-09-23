@@ -18,20 +18,11 @@ from pydantic import BaseModel, ConfigDict
 from local_ai_control_center.core.budget import estimate_tokens
 from local_ai_control_center.core.config import Config, load_config
 from local_ai_control_center.core.corpus import parse_corpus
+from local_ai_control_center.core.kinds import kind_of
 
-CORPUS_MARK = "# Collected quotations"
-COLLECTED_MARK = "# Claims collected by"
-BIBLIOGRAPHY_MARK = "# Bibliography"
-REVIEW_MARK = "# Review of"
-"""How a file says it is a corpus: by the heading its writer put at the top.
-
-Recognised by content rather than by filename, because a corpus is whatever `collect` or
-`corpus` wrote and a person may call it anything. The two writers agree on this line, which
-is what ADR-065 made true.
-"""
-
-_SAMPLE = 400
-"""Bytes read to decide what a file is. A heading is in the first line or it is not there."""
+FINDINGS = ".findings.json"
+"""What a review leaves beside its report. Recognised by name because it is not Markdown,
+and `core.kinds` reads text rather than filenames (ADR-090)."""
 
 
 class DocumentSeen(BaseModel):
@@ -121,41 +112,33 @@ def settings_of(path: Path) -> tuple[Setting, ...]:
         return (Setting(label="Unreadable", value=str(error).split(chr(10))[0]),)
 
 
-def _kind_of(path: Path) -> str:
-    """What a file announces itself to be, from its opening line."""
-    if path.suffix == ".json" and path.name.endswith(".findings.json"):
-        return "review"
-    if path.suffix != ".md":
-        return "other"
-    try:
-        with path.open(encoding="utf-8", errors="replace") as handle:
-            opening = handle.read(_SAMPLE)
-    except OSError:
-        return "other"
-    if opening.startswith((CORPUS_MARK, COLLECTED_MARK)):
-        return "corpus"
-    if opening.startswith((BIBLIOGRAPHY_MARK, REVIEW_MARK)):
-        # Written by LACC, read by a person: grouped with what LACC produced rather than
-        # with the papers, because they answer different questions about the workspace.
-        return "written"
-    return "document"
-
-
-def documents_in(workspace: Path) -> tuple[DocumentSeen, ...]:
+def documents_in(workspace: Path, context_file: str = "") -> tuple[DocumentSeen, ...]:
     """Everything in the workspace worth listing, largest first.
 
     Token counts are the same estimate the rest of the project budgets with, so a number
     here and a number in a refusal mean the same thing.
+
+    What each file *is* comes from `core.kinds`, which is the one place that decides it. This
+    module used to decide it again, and the two had drifted nine files apart by the time
+    anybody counted them (ADR-090).
+
+    ``context_file`` is the standing context a configuration names. It is a document, and
+    what makes it not one to quote from is a setting - so it is excluded here, by the caller
+    who read that setting, rather than by a reader of text (ADR-082).
     """
     seen: list[DocumentSeen] = []
     for path in sorted(workspace.glob("*")):
         if not path.is_file() or path.name.startswith("."):
             continue
+        if context_file and path.name == context_file:
+            continue
         try:
             size = path.stat().st_size
         except OSError:
             continue
-        kind = _kind_of(path)
+        # A review's findings sit beside its report as JSON, which is not text this reader
+        # looks at - so it is recognised here, by name, where the listing is assembled.
+        kind = "review" if path.name.endswith(FINDINGS) else kind_of(path)
         tokens = 0
         if path.suffix == ".md":
             # The estimate, not a tokeniser: the same arithmetic the window budget uses.

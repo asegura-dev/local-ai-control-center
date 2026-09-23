@@ -191,12 +191,14 @@ def test_the_cache_round_trips_through_json(tmp_path: Path) -> None:
     assert RememberedRegistry(_Counting({}), cache).about("10.1000/x") == work
 
 
-def test_a_bibliography_is_recognised_as_something_lacc_wrote() -> None:
-    """The window groups what LACC produced apart from the papers (ADR-073)."""
-    from local_ai_control_center.features.overview import BIBLIOGRAPHY_MARK
+def test_a_bibliography_is_recognised_as_something_lacc_wrote(tmp_path: Path) -> None:
+    """The writer and the reader have to agree, and now there is one reader (ADR-090)."""
+    from local_ai_control_center.core.kinds import WRITTEN_BY_LACC, kind_of
 
-    written = bibliography([], [], [], "https://api.crossref.org")
-    assert written.startswith(BIBLIOGRAPHY_MARK)
+    path = tmp_path / "bibliografia.md"
+    path.write_text(bibliography([], [], [], "https://api.crossref.org"), encoding="utf-8")
+    assert kind_of(path) == "bibliography"
+    assert kind_of(path) in WRITTEN_BY_LACC
 
 
 def test_markup_a_publisher_deposited_does_not_reach_the_page() -> None:

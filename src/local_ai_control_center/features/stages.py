@@ -18,37 +18,23 @@ doing still attached. This project has measured what the first kind of sentence 
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
 from local_ai_control_center.core.corpus import parse_corpus
+from local_ai_control_center.core.kinds import kind_of
 from local_ai_control_center.core.references import references_in, without_truncations
 
-CORPUS_MARKS = ("# Collected quotations", "# Claims collected by")
-BIBLIOGRAPHY_MARK = "# Bibliography"
-REVIEW_MARK = "# Review of"
-COVERAGE_MARK = "# How far the nearest quotation is"
-"""How a coverage report opens (ADR-088).
-
-Added the day after `coverage` shipped, because `status` counted its own reports as
-documents nobody had quoted - three invented pending items. **Every new writer of a file in
-the workspace has to be taught to this reader**, and there is no way to notice except by
-running `status` after adding one (ADR-082).
-"""
-
-_A_CONTROL_TOPIC = re.compile(r"(?m)^!\s*\S")
-"""How a topics file is recognised: a line marked as the control.
-
-Not a heading, because a topics file has none worth requiring - it is a list somebody wrote.
-The control marker is the one thing `coverage` *refuses to run without*, so every usable
-topics file carries it, and a line opening with `!` is not markdown for anything else.
-
-It is looked for anywhere in the opening rather than on the first line, because a person
-writes the control **last** - it is the odd one out, and that is where an odd one out goes.
-"""
 RESOLVED_MARK = "## Resolved"
+"""The heading a bibliography puts its resolved works under.
+
+Not a file kind: it is how this stage counts *inside* a bibliography, which is its own
+business. Only the entries under it count - the first reading of this counted every bullet
+in the file, including the two failure lists, and reported 236 resolved where `resolve` had
+said 172 (ADR-080).
+"""
+
 TAKEN_FROM = ".from.json"
 """Where a section written by `--take` records the document it came from.
 
@@ -59,24 +45,6 @@ part of it.
 
 Without it, `status` called a guideline "with no quotation" while seven sections taken out of
 it were collected - a pending item that was not pending (ADR-082).
-"""
-
-_SAMPLE = 200
-
-_ENOUGH_FOR_A_LIST = 8_000
-"""How much is read when the cheap checks have all missed.
-
-Only reached by a file that is not a corpus, a bibliography, a review, a coverage report or
-an extract - so it is read once, to look for a control marker that a person writes at the
-end of a short list. A file with nothing of the sort past this is a document.
-"""
-
-_SECTION_OPENING = re.compile(r"^\s{0,3}\d{1,2}(?:\.\d{1,2}){0,2}\.?(?:\s|$)")
-"""How a file written by `sections --take` opens: with the number of the section it is.
-
-Counted apart from the documents somebody brought, because it is neither - it came out of
-one of them. The first reading of this counted six documents "with no quotation" of which
-three were extracted sections and one was a page of the user's own notes (ADR-080).
 """
 
 
@@ -112,29 +80,6 @@ class Work(BaseModel):
         return sum(1 for stage in self.stages if stage.settled)
 
 
-def _kind(path: Path) -> str:
-    """What a file announces itself to be, from its first line."""
-    try:
-        with path.open(encoding="utf-8", errors="replace") as handle:
-            more = handle.read(_ENOUGH_FOR_A_LIST)
-    except OSError:
-        return "other"
-    opening = more[:_SAMPLE]
-    if opening.startswith(CORPUS_MARKS):
-        return "corpus"
-    if opening.startswith(BIBLIOGRAPHY_MARK):
-        return "bibliography"
-    if opening.startswith(REVIEW_MARK):
-        return "review"
-    if opening.startswith(COVERAGE_MARK):
-        return "coverage"
-    if _A_CONTROL_TOPIC.search(more):
-        return "topics"
-    if _SECTION_OPENING.match(opening.splitlines()[0] if opening.splitlines() else ""):
-        return "extract"
-    return "document"
-
-
 def stages_in(workspace: Path, context_file: str = "") -> Work:
     """Read the workspace and say where each stage of the work stands.
 
@@ -162,7 +107,7 @@ def stages_in(workspace: Path, context_file: str = "") -> Work:
             continue
         if context_file and path.name == context_file:
             continue
-        by_kind[_kind(path)].append(path)
+        by_kind[kind_of(path)].append(path)
 
     documents = by_kind["document"]
     corpora = by_kind["corpus"]

@@ -58,7 +58,9 @@ def _alive(widget: object) -> bool:
 
 
 def _list_corpora(side: Sidebar, panel: Panel, state: State) -> None:
-    found = [seen for seen in documents_in(state.workspace) if seen.kind == "corpus"]
+    found = [
+        seen for seen in documents_in(state.workspace, state.context_file) if seen.kind == "corpus"
+    ]
     for seen in found:
         side.row(str(seen.path), seen.name)
     if state.prepare_question is None or state.send_question is None:

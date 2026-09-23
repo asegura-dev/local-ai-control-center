@@ -46,7 +46,7 @@ imports. It is now visible:
 
 | Directory | What may live there |
 |---|---|
-| `core/` | The rules: configuration contracts, permissions, previews, plans, the fence, quotation checking, the workspace boundary. Depends on nothing outside itself. |
+| `core/` | The rules: configuration contracts, permissions, previews, plans, the fence, quotation checking, the workspace boundary, and what a file in a workspace *is*. Depends on nothing outside itself. |
 | `ports/` | An abstract class and the contracts that cross it. Nothing else. |
 | `adapters/` | Implementations of those ports: Ollama, a mock, PDF and Word, ntfy, word and dense retrieval, an asking judge, an embedder, and the vector cache beside a corpus. |
 | `features/` | One capability each, as a vertical slice: the corpus format, review, the sections of a document, what each skill will ask, where the work stands, asking. Whatever has to agree with something else lives beside it (ADR-066). |
