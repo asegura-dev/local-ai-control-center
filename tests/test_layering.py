@@ -355,7 +355,7 @@ def test_every_section_can_list_and_is_named() -> None:
     pytest.importorskip("customtkinter", reason="the window is an optional install")
     from local_ai_control_center.window import SECTIONS
 
-    assert len(SECTIONS) >= 9
+    assert len(SECTIONS) >= 11
     names = [section.name for section in SECTIONS]
     assert len(names) == len(set(names)), f"two sections share a name: {names}"
     for section in SECTIONS:

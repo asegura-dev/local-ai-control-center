@@ -19,6 +19,7 @@ quotation is shown so the number can be checked in three seconds rather than bel
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
@@ -35,6 +36,14 @@ supplies one, usually the number the corpus would need for everything to be fine
 
 NEAREST_SHOWN = 240
 """Characters of the closest quotation printed beside a topic's distance."""
+
+REACHES_SUFFIX = ".reaches.json"
+"""Where a coverage run leaves its numbers, beside the report it wrote.
+
+The same arrangement `review --into` uses for its findings, for the same reason: the window
+paints a measurement without re-running an engine, and it reads **data** rather than parsing
+the Markdown back. A reader of a file its own writer generated is how ADR-065 happened.
+"""
 
 
 class Topic(BaseModel):
@@ -150,6 +159,48 @@ def reach_of(
     # bottom is where the work is, which is why the control is printed with them rather than
     # cut off: it is usually there.
     return tuple(sorted(found, key=lambda one: -one.nearest))
+
+
+class Measured(BaseModel):
+    """One coverage run, as data: what was asked, of what, with which model, and when."""
+
+    model_config = ConfigDict(frozen=True)
+
+    corpus: str
+    model: str
+    taken: str
+    reaches: tuple[Reach, ...] = ()
+
+    @property
+    def floor(self) -> float:
+        """What the control reached, or zero when no control was given.
+
+        Zero is not a floor and is not pretended to be one: a reader with no floor is told
+        so rather than shown a number that happens to be small.
+        """
+        return next((one.nearest for one in self.reaches if one.topic.control), 0.0)
+
+
+def measurements_in(folder: Path) -> tuple[Path, ...]:
+    """Every coverage measurement left in ``folder``, newest first.
+
+    Here rather than in a view, because finding and ordering them is a decision (ADR-066).
+    """
+    found = sorted(folder.glob(f"*{REACHES_SUFFIX}"), key=lambda p: p.stat().st_mtime)
+    return tuple(reversed(found))
+
+
+def measured_from(path: Path) -> Measured | None:
+    """Read one measurement back, or nothing if the file is not one.
+
+    A damaged file is nothing rather than half a measurement: a coverage report missing its
+    control would be read as having no floor, which is the one thing it must never claim
+    falsely.
+    """
+    try:
+        return Measured.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def report(reaches: tuple[Reach, ...], corpus: str, model: str, taken: str) -> str:

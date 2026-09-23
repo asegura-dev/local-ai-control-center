@@ -39,7 +39,7 @@ from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.overview import configurations_in
 from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.status import EngineSeen, Status
-from local_ai_control_center.views import asking, paint, program, records, workspace
+from local_ai_control_center.views import asking, paint, program, records, work, workspace
 from local_ai_control_center.views.section import Section, State, shortened
 
 WIDTH, HEIGHT = 1280, 820
@@ -61,6 +61,7 @@ LINES_PER_NOTCH = 3
 """How far one notch of the wheel scrolls, which is what the rest of the system does."""
 
 SECTIONS: tuple[Section, ...] = (
+    *work.SECTIONS,
     *workspace.SECTIONS,
     *asking.SECTIONS,
     *program.SECTIONS,

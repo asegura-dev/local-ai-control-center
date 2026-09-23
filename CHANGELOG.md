@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-09-23
+
+### Added
+- **The window shows where the work stands**, which until now was a line along the bottom
+  with two counts on it. Six stages, each with what it produced **and what it is still
+  missing**, and the command that moves it forward. Counted from the files every time; no
+  model, no network, nothing written (ADR-080).
+
+- **And it shows a coverage measurement**, ordered, with the floor named and the quotation
+  that came closest under each topic. A topic within 0.06 of the control is drawn in the
+  colour of a contradiction - **which decides nothing**; the report still calls nothing a
+  gap, and the colour only puts a reader's eye where the work is (ADR-088).
+
+  `coverage --into` now leaves its numbers as `<report>.reaches.json` beside the report, the
+  way `review --into` leaves its findings. The window reads **data**, never the Markdown its
+  own writer produced - reading back a file you generated is how ADR-065 happened.
+
+- Eleven sections now, and `documents_in` takes the standing context file so the window
+  excludes it the way `status` does.
+
+### Measured
+- **The coverage number is reproducible.** Two runs over the same corpus, topics and model
+  moved **0 of 16** topics. That is what earns the second decimal place.
+- **And it answers to the corpus.** Between 880 and 1,129 citable quotations, 6 of 16 topics
+  moved, and the two largest are exactly the two papers that were re-read: dosimetry
+  **+0.12** and SUVmax thresholds **+0.13**. Ten did not move, including the floor and the
+  topic nothing was collected for.
+
 ## [2.5.0] - 2026-09-23
 
 ### Fixed

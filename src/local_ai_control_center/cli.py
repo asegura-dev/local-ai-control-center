@@ -122,6 +122,8 @@ from local_ai_control_center.features.corpus import (
 )
 from local_ai_control_center.features.coverage import (
     CONTROL_MARK,
+    REACHES_SUFFIX,
+    Measured,
     missing_control,
     reach_of,
     topics_in,
@@ -2466,10 +2468,19 @@ def coverage(
     )
 
     if into is not None:
-        written = coverage_report(
-            found, against.name, config.embedding_model, datetime.now(UTC).date().isoformat()
+        taken = datetime.now(UTC).date().isoformat()
+        destination = workspace.resolve_within(into)
+        _write_or_exit(
+            destination, coverage_report(found, against.name, config.embedding_model, taken)
         )
-        _write_or_exit(workspace.resolve_within(into), written)
+        # The numbers beside the report, the way findings sit beside a review: the window
+        # paints a measurement without re-running an engine, and reads data rather than
+        # parsing back the Markdown this just wrote (ADR-069).
+        measured = Measured(
+            corpus=against.name, model=config.embedding_model, taken=taken, reaches=found
+        )
+        beside = destination.with_suffix(REACHES_SUFFIX)
+        beside.write_text(measured.model_dump_json(indent=2) + chr(10), encoding="utf-8")
         _show(f"[green]Written[/green] -> {into}")
 
 

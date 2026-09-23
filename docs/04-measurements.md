@@ -518,19 +518,27 @@ This took four minutes and moved the corpus from 880 citable quotations to 1,129
 The coverage report named two topics within 0.05 of its floor. Five papers were re-read in
 passes, two of them chosen because they speak to the thinner one. Re-measured:
 
-| topic | before | after |
-|---|---|---|
-| histopathology as the reference standard | 0.55 | **0.60** |
-| specificity and false positives | 0.64 | **0.68** |
-| sensitivity for pelvic nodes | 0.66 | 0.67 |
-| **prostate cancer in Mexico** | 0.54 | **0.54** |
-| the control, outside the subject | 0.50 | **0.50** |
+| topic | before | after | | what was re-read |
+|---|---|---|---|---|
+| radiation dosimetry and biodistribution | 0.67 | **0.79** | **+0.12** | the dosimetry paper, 5 -> 45 quotations |
+| SUVmax thresholds for a positive node | 0.61 | **0.74** | **+0.13** | the nodal segmentation paper, 11 -> 53 |
+| histopathology as the reference standard | 0.55 | **0.60** | +0.05 | the head-to-head study, 9 -> 58 |
+| specificity and false positives | 0.64 | **0.68** | +0.04 | |
+| sensitivity for pelvic nodes | 0.66 | 0.67 | +0.01 | |
+| ten other topics | | | **0.00** | nothing |
+| **prostate cancer in Mexico** | 0.54 | **0.54** | 0.00 | nothing |
+| the control, outside the subject | 0.50 | **0.50** | 0.00 | nothing |
 
-**The floor did not move and neither did the topic nothing was collected for**, which is what
-makes the rest readable as signal. Before, the nearest thing the corpus held to a
-histopathological reference standard was a study using *three readers* as its reference;
-after, it is *"Validating imaging-results with post-prostatectomy and lymph-node dissection
-histology"*.
+**Six of sixteen moved, and the two largest are exactly the two papers re-read.** Ten did not
+move at all, including the floor and the topic nothing was collected for. That is what makes
+a change of 0.12 readable as signal rather than drift.
+
+**And the measure is reproducible.** Two runs over the same corpus, the same topics and the
+same model moved **0 of 16** topics, which is what earns the second decimal place.
+
+Before, the nearest thing the corpus held to a histopathological reference standard was a
+study using *three readers* as its reference; after, it is *"Validating imaging-results with
+post-prostatectomy and lymph-node dissection histology"*.
 
 ## One decision, two implementations, three times
 
