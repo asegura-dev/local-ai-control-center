@@ -594,3 +594,10 @@ Delivers what was asked for and refuses the mechanism that was asked for. A conv
 [`ADR-092-what-a-screenshot-showed-and-a-test-could-not.md`](ADR-092-what-a-screenshot-showed-and-a-test-could-not.md)
 
 Text running off the right edge, reported three times and fixed twice. Two causes, both measured at last. The bottom bar was **a column on the right** - `side="bottom"` only spans the window while the cavity is whole - taking 250 pixels of reading width and hiding half of itself. And `wraplength` is scaled *again* by the toolkit, so a room measured at 547 physical pixels became a wrap at 684 in a label 599 wide: **at 100% scaling the two are identical and nothing is wrong**, which is why it only ever appeared in somebody else's screenshots. A check replaces the eye - `reqwidth > width` asked of every label in every section, 0 of 656. With them: the bar counted 61 documents where the workspace held 28, a section with no rows hides the middle column (643 pixels of panel to 1,305), and the rail is grouped into three.
+
+
+### 093 - a workspace is chosen where you can see it
+
+[`ADR-093-a-workspace-is-chosen-where-you-can-see-it.md`](ADR-093-a-workspace-is-chosen-where-you-can-see-it.md)
+
+The most load-bearing fact about a session - which folder every file comes from and goes to - sat at the bottom of the rail under the theme, in the faintest colour in the palette, which is why somebody who had used the window all day asked for the ability to "create and navigate workspaces". It moves to the top, with the configuration that names it. The window may now write **one new configuration** and only a new one, behind the same check-produces-the-button grammar as a question (ADR-085). And the request came with *"one for OneDrive, so it synchronises" *: LACC cannot synchronise and should not, so what this adds is the consequence stated where the choice is made - a git working tree refused because that is a fact, a sync folder allowed because a folder name is a guess, and the one setting that removes most of the exposure named beside it rather than the warning simply frightening.

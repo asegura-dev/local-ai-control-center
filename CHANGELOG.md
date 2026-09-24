@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+- **The workspace is chosen where you can see it** (ADR-093). Which folder every file comes
+  from and goes to used to sit at the *bottom* of the rail, under the theme, in the faintest
+  colour in the palette. It is now the first thing on the screen, with the configuration that
+  names it and any warning about it. The theme stays at the bottom, where a theme belongs.
+
+- **A `Workspaces` section**: every configuration and the workspace it names, the one in
+  force marked, a configuration that cannot be read **named with the reason** rather than
+  quietly left out - and a form that makes another one.
+
+  **Check produces the button**, as `Prepare` does for a question. Pressing it writes nothing
+  and draws what would happen: the folder, whether it is already there, what the
+  configuration would be called, the exact YAML it would contain, and every warning that
+  applies. The control that creates is drawn by that drawing (ADR-085).
+
+  This is the second thing the window writes, after its own appearance, and only ever a
+  **new** configuration - exclusive creation, so an existing name is refused rather than
+  replaced. It never edits one of yours.
+
+- **A synchronising folder is warned about where the choice is made, and told what to do.**
+  `sync_folder_suspicion` has warned since ADR-022 and printed to a terminal that nobody
+  using the window reads. A git working tree is still **refused** - that one is a fact, not a
+  guess from a folder name - and a sync folder is allowed with the two things that are
+  genuinely private named beside it: the audit log under `audit_level: full`, which
+  `audit_level: standard` fixes in one line, and your standing context and drafts, which it
+  cannot.
+
+### Fixed
+- The advice first said to set `audit_level: metadata`, which is not one of the two levels
+  there are. A test now asserts that the setting it names exists.
+
 ## [2.8.0] - 2026-09-23
 
 ### Fixed

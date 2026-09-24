@@ -39,7 +39,16 @@ from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.overview import configurations_in
 from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.status import EngineSeen, Status
-from local_ai_control_center.views import asking, paint, program, records, work, workspace
+from local_ai_control_center.features.workspaces import risk_of
+from local_ai_control_center.views import (
+    asking,
+    making,
+    paint,
+    program,
+    records,
+    work,
+    workspace,
+)
 from local_ai_control_center.views.section import Section, State, in_groups, shortened
 
 WIDTH, HEIGHT = 1280, 820
@@ -62,7 +71,12 @@ LINES_PER_NOTCH = 3
 
 
 SECTIONS: tuple[Section, ...] = in_groups(
-    work.SECTIONS, asking.SECTIONS, workspace.SECTIONS, program.SECTIONS, records.SECTIONS
+    work.SECTIONS,
+    asking.SECTIONS,
+    workspace.SECTIONS,
+    making.SECTIONS,
+    program.SECTIONS,
+    records.SECTIONS,
 )
 """Every section, grouped. The frame knows their order and nothing else about them."""
 
@@ -175,9 +189,11 @@ class Window(ctk.CTk):
         self.rail = rail
 
         top = ctk.CTkFrame(rail, fg_color="transparent")
-        top.pack(fill="x", padx=18, pady=(20, 14))
+        top.pack(fill="x", padx=18, pady=(20, 8))
         paint.text(top, "LACC", skin.ink, 19, bold=True, wrap=180)
         paint.text(top, "reads what you wrote", skin.faint, 11, wrap=180)
+
+        self._where(rail, available)
 
         self.buttons: dict[str, ctk.CTkButton] = {}
         group = ""
@@ -218,9 +234,19 @@ class Window(ctk.CTk):
         themes.set(self.preferences.theme)
         themes.pack(fill="x", padx=12, pady=(2, 12))
 
-        paint.text(under, "  CONFIGURATION", skin.faint, 10, bold=True, wrap=180)
+    def _where(self, rail: ctk.CTkFrame, available: list[str]) -> None:
+        """Which workspace, which configuration names it, and what is risky about it.
+
+        At the top, because it is the most load-bearing fact about a session and it used to
+        sit under the theme in the faintest colour in the palette. The warning about a
+        synchronising folder went to a terminal nobody using this window reads (ADR-093).
+        """
+        skin = self.skin
+        here = ctk.CTkFrame(rail, fg_color="transparent")
+        here.pack(fill="x", pady=(2, 10))
+        paint.text(here, "  WORKSPACE", skin.faint, 10, bold=True, wrap=180)
         self.picker = ctk.CTkOptionMenu(
-            under,
+            here,
             values=available or ["none found"],
             height=30,
             corner_radius=8,
@@ -233,10 +259,23 @@ class Window(ctk.CTk):
         )
         self.picker.set(self.chosen or "none found")
         self.picker.pack(fill="x", padx=12, pady=2)
+        paint.text(here, f"  {self.folder}", skin.dim, 10, wrap=185)
+        if risk_of(self.folder).warned:
+            paint.text(
+                here,
+                "  this folder looks like it\n  synchronises - see New workspace",
+                skin.contradicted,
+                10,
+                wrap=185,
+            )
         paint.text(
-            under, "  changes which is read,\n  never what is in it", skin.faint, 10, wrap=185
+            here,
+            "  the configuration names it;\n  choosing one changes which\n  is read, never "
+            "what is in it",
+            skin.faint,
+            10,
+            wrap=185,
         )
-        paint.text(under, f"\n  WORKSPACE\n  {self.folder}", skin.faint, 10, wrap=185)
 
     def _middle(self) -> None:
         """The list for the current section."""

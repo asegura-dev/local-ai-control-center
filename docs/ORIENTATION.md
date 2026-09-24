@@ -31,7 +31,8 @@ The same applies to anything that launches LACC: `scripts/lacc-window.bat` goes 
 
 | | |
 |---|---|
-| **Where does the work stand?** | `.\run.ps1 run lacc status -c <config>` |
+| **Where does the work stand?** | `.\run.ps1 run lacc status -c <config>`, or the window's first section |
+| **What does my corpus barely cover?** | `.\run.ps1 run lacc coverage <topics> --against <corpus>` |
 | **What is the project like right now?** | `.\run.ps1 run python tools/measure.py` |
 | **Why is anything the way it is?** | [`docs/adr/README.md`](adr/README.md) - every record, annotated |
 | **What is in each file?** | [`docs/INDEX.md`](INDEX.md) |
@@ -70,6 +71,10 @@ of quotations are checked against them. Facts *about* a file go beside it -
 **Reaching anywhere is deliberate.** `network_access` is a ceiling, off by default. A
 destination is written in the configuration the user wrote, never an environment variable. The
 window makes no request until somebody presses a button.
+
+**A preview is what produces the button.** Anything in the window that runs or writes draws
+what it would do first, and the control that does it is created by that drawing - there is no
+path from typing to an effect that skips it (ADR-085, ADR-093).
 
 ## What it will not do, and that is the point
 

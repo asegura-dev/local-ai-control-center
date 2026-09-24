@@ -94,7 +94,7 @@ in [`docs/adr/`](docs/adr/) with its context, its trade-off and the alternative 
 
 ## Status
 
-v2.1.0, working end to end against a real local model and measured against a real
+v2.9.0, working end to end against a real local model and measured against a real
 bibliography rather than against documents written for the test.
 
 Every run takes the same shape: LACC plans the action, shows a preview, asks for
@@ -141,8 +141,21 @@ append-only, hash-chained audit log.
   window can be read one part at a time without cutting the file.
 - `lacc status` says where the work stands, stage by stage, with **what each stage is still
   missing** rather than only what it produced. Counted from the files every time.
-- `lacc window` opens a desktop window on all of it: eight sections that read, and one that
-  asks a question behind a preview you have to see before the button that sends it exists.
+- `lacc coverage <topics> --against <corpus>` says how far the nearest quotation in your
+  corpus is from each subject you name, ordered, against a **floor**: one line of the topics
+  file has to be a subject deliberately outside your field, and that is what the rest are
+  read against. **Nothing is called a gap** - a similarity is an ordering, not an interval -
+  and the quotation that came closest is printed under each topic so the number can be
+  checked rather than believed.
+- `lacc identify <document>` lists the DOIs a document prints and asks the registry what
+  each one is, and **chooses none of them**: a document prints the DOIs of what it cites
+  too, and no test separated the two. With `--doi` it records the one you established
+  beside the file, never inside it.
+- `lacc window` opens a desktop window on all of it: twelve sections in three groups, and
+  one of them asks. A question goes behind a preview you have to see before the button that
+  sends it exists, on a worker thread so the window never stops repainting, and asking again
+  carries **the passages whose quotations were found** - never what the model said, because
+  a conversation is how an invented quotation comes to verify one turn later.
 - `lacc preview` shows what would happen without doing it, `lacc profile` reports what
   the machine offers, `lacc verify` walks the audit chain, and `lacc notify test`
   checks notification settings before you rely on them.
@@ -179,10 +192,11 @@ ever contacted unless it is written down in your configuration, and no environme
 variable can widen that.
 
 v1.0 shipped, and v2.0 turned out not to be what its plan said: the roadmap keeps the wrong
-plan visible beside what actually arrived - `review`, `resolve`, `sections` and the window.
-What has **not** been built is coverage, and the reason is stated rather than rescheduled:
-a gap measured over an incomplete corpus is a false gap. See the
-[roadmap](docs/02-roadmap.md).
+plan visible beside what actually arrived. Coverage was deferred three times on one
+condition - *a gap measured over an incomplete corpus is a false gap* - and when the corpus
+was complete enough, **two of the three ways of measuring it were refused**: a top-N ranking
+returns N whatever you ask it, and shared words called a topic absent that the corpus speaks
+to in other words. The third held. See the [roadmap](docs/02-roadmap.md).
 
 ## Citing LACC
 

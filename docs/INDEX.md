@@ -22,7 +22,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Ninety-two records front to back is a history. These are the threads through them, for
+Ninety-three records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -174,6 +174,7 @@ not to reach for an approximate algorithm to find them.
 | 090 | [one-reader-for-what-a-file-is](adr/ADR-090-one-reader-for-what-a-file-is.md) | Two implementations of "what is this file" - one for `status`, one for the window - had drifted: **38 documents against 29**, the window offering its own coverage reports as papers to cite. `core/kinds.py` is the one answer. Grouping belongs to the view, the standing context to whoever read the configuration. The layering rule could not catch it, because both copies were in the right layer. |
 | 091 | [a-thread-of-questions](adr/ADR-091-a-thread-of-questions.md) | What was asked for was a chat; a chat puts the previous **answer** in the next prompt, and an invented quotation then verifies instead of being caught. A thread carries the passages whose quotations were **found** and never the prose. Questions carry for a person to read and go in no prompt. A follow-up must be a whole question, because nothing guesses. |
 | 092 | [what-a-screenshot-showed](adr/ADR-092-what-a-screenshot-showed-and-a-test-could-not.md) | The bottom bar was a **column on the right**, taking 250 pixels and hiding half of itself. And `wraplength` is scaled twice, so text wrapped 25% wider than its space - **identical at 100% scaling**, which is why two fixes missed it. `reqwidth > width` on a label is the defect, and can be asked of every label: 0 of 656. Also: 61 documents where there were 28, an empty column that ate a quarter of the window, and eleven names in a flat list. |
+| 093 | [a-workspace-is-chosen-where-you-can-see-it](adr/ADR-093-a-workspace-is-chosen-where-you-can-see-it.md) | Which folder everything comes from sat at the bottom of the rail under the theme, so somebody who had used the window all day asked for workspaces. It moves to the top, and the window may write **one new configuration** - never edit one. A git working tree is refused (a fact); a sync folder is allowed (a folder name is a guess) with the setting that removes most of the exposure named beside the warning. |
 
 ## Guides (`docs/guides/`)
 
