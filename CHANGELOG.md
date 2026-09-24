@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-09-23
+
+### Fixed
+- **The line along the bottom was a column on the right** (ADR-092). `side="bottom"` spans
+  the window only while the cavity is whole; packed after three `side="left"` siblings it
+  became a fourth column - taking **250 pixels of reading width** and hiding the half of the
+  bar that says what the workspace holds. `_bar`'s own docstring said it must be packed
+  first; `__init__` called it last.
+
+- **`wraplength` was scaled twice, so text ran off the right edge.** CustomTkinter multiplies
+  every dimension it is handed by the display scaling, and `winfo_width` already returns
+  physical pixels. A room measured at 547 became a wrap at **684** in a label **599** wide.
+  **At 100% scaling the two are the same and nothing is wrong**, which is why this survived
+  two fixes and only ever appeared in somebody else's screenshots.
+
+  A check replaces the eye: `reqwidth > width` on a label *is* "the text runs off". Asked of
+  every label in every section at this machine's scaling - **0 of 656**.
+
+- **The bar counted every Markdown file as a document**, saying **61** where the workspace
+  held 28: a corpus counted as a document, a backup as a document, a coverage report as a
+  document. ADR-090 named `features/status.py` as the classifier left out; it was invisible
+  while that half of the bar was off the screen and wrong the moment it appeared. It asks
+  `core.kinds` now. The test that asserted two documents for one paper and one corpus is
+  corrected.
+
+### Changed
+- **A section with nothing to choose from hides the middle column.** A quarter of the window
+  standing empty reads as something failing to load. The panel goes from 643 pixels to
+  **1,305** on those sections, and 893 on the rest.
+- **The rail is grouped into three**: what you are doing, what you are doing it with, and
+  what the program is. A section declares its own group; ordering them is
+  `views/section.py`'s job, because choosing an order is deciding something and a view does
+  not - which the layering rule said when the function was first written in the window.
+- "1 measurements" is "1 measurement".
+
 ## [2.7.0] - 2026-09-23
 
 ### Added

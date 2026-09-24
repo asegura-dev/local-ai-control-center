@@ -73,9 +73,9 @@ def _list_coverage(side: Sidebar, panel: Panel, state: State) -> None:
     if found:
         panel.said(
             "Coverage",
-            f"{len(found)} measurements. Choose one to see how far the nearest quotation is "
-            "from each topic you named.\nNothing here is called a gap: a similarity is an "
-            "ordering, not an interval.",
+            f"{len(found)} measurement{'' if len(found) == 1 else 's'}. Choose one to see "
+            "how far the nearest quotation is from each topic you named.\nNothing here is "
+            "called a gap: a similarity is an ordering, not an interval.",
         )
         return
     panel.said(
@@ -139,6 +139,6 @@ def _show_coverage(key: str, panel: Panel, state: State) -> None:
 
 
 SECTIONS = (
-    Section("Where it stands", _show_work),
-    Section("Coverage", _list_coverage, _show_coverage),
+    Section("Where it stands", _show_work, group="YOUR WORK"),
+    Section("Coverage", _list_coverage, _show_coverage, group="YOUR WORK"),
 )

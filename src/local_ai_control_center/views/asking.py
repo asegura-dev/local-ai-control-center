@@ -441,4 +441,4 @@ def _draw(answered: Asked, below: ctk.CTkFrame, panel: Panel) -> None:
     )
 
 
-SECTIONS = (Section("Ask", _list_corpora, _open_corpus),)
+SECTIONS = (Section("Ask", _list_corpora, _open_corpus, group="YOUR WORK"),)

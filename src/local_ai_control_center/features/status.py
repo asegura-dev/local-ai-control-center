@@ -20,9 +20,7 @@ from pydantic import BaseModel, ConfigDict
 
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.corpus import parse_corpus
-
-CORPUS_MARKS = ("# Collected quotations", "# Claims collected by")
-_SAMPLE = 200
+from local_ai_control_center.core.kinds import kind_of
 
 
 class EngineSeen(BaseModel):
@@ -90,20 +88,23 @@ class Status(BaseModel):
         return "   ".join(parts)
 
 
-def status_of(workspace: Path, config: Config) -> Status:
-    """Read the workspace and the configuration. No request is made to anything."""
+def status_of(workspace: Path, config: Config, context_file: str = "") -> Status:
+    """Read the workspace and the configuration. No request is made to anything.
+
+    What each file is comes from `core.kinds`, which is the one place that decides it. This
+    counted every Markdown file as a document and said **61** where the same workspace held
+    28 - invisible until the left half of this bar was drawn for the first time (ADR-090,
+    ADR-092).
+    """
     documents = corpora = quotations = 0
     if workspace.is_dir():
         for path in workspace.glob("*.md"):
-            if path.name.startswith("."):
+            if path.name.startswith(".") or (context_file and path.name == context_file):
                 continue
-            documents += 1
-            try:
-                with path.open(encoding="utf-8", errors="replace") as handle:
-                    opening = handle.read(_SAMPLE)
-            except OSError:
-                continue
-            if opening.startswith(CORPUS_MARKS):
+            kind = kind_of(path)
+            if kind == "document":
+                documents += 1
+            elif kind == "corpus":
                 corpora += 1
                 # The largest is the one being worked from; a backup beside it is smaller.
                 held = len(parse_corpus(path.read_text(encoding="utf-8", errors="replace")))

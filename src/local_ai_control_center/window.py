@@ -40,7 +40,7 @@ from local_ai_control_center.features.overview import configurations_in
 from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.status import EngineSeen, Status
 from local_ai_control_center.views import asking, paint, program, records, work, workspace
-from local_ai_control_center.views.section import Section, State, shortened
+from local_ai_control_center.views.section import Section, State, in_groups, shortened
 
 WIDTH, HEIGHT = 1280, 820
 RAIL, SIDE = 214, 330
@@ -60,14 +60,11 @@ INSET = 28
 LINES_PER_NOTCH = 3
 """How far one notch of the wheel scrolls, which is what the rest of the system does."""
 
-SECTIONS: tuple[Section, ...] = (
-    *work.SECTIONS,
-    *workspace.SECTIONS,
-    *asking.SECTIONS,
-    *program.SECTIONS,
-    *records.SECTIONS,
+
+SECTIONS: tuple[Section, ...] = in_groups(
+    work.SECTIONS, asking.SECTIONS, workspace.SECTIONS, program.SECTIONS, records.SECTIONS
 )
-"""Every section, in the order they appear. The frame knows nothing else about them."""
+"""Every section, grouped. The frame knows their order and nothing else about them."""
 
 
 class Window(ctk.CTk):
@@ -115,10 +112,15 @@ class Window(ctk.CTk):
         ctk.set_appearance_mode(self.skin.mode)
         self.configure(fg_color=self.skin.surface)
 
+        # The bar first. `side="bottom"` only spans the window while the cavity is still
+        # whole: packed after three `side="left"` siblings it becomes a **fourth column**,
+        # 250 pixels wide against the right edge, and the left half of it - everything the
+        # workspace holds - is never drawn at all. Its own comment said this and the call
+        # sat in the wrong place anyway (ADR-092).
+        self._bar()
         self._rail(available)
         self._middle()
         self._panel()
-        self._bar()
         self.right.bind("<Configure>", self._reflow)
         # Bound on the whole window, not on the panel and its children. Tk delivers the
         # wheel to the widget under the pointer, and a label neither handles it nor passes
@@ -170,6 +172,7 @@ class Window(ctk.CTk):
         rail = ctk.CTkFrame(self, width=RAIL, corner_radius=0, fg_color=skin.rail)
         rail.pack(side="left", fill="y")
         rail.pack_propagate(False)
+        self.rail = rail
 
         top = ctk.CTkFrame(rail, fg_color="transparent")
         top.pack(fill="x", padx=18, pady=(20, 14))
@@ -177,7 +180,11 @@ class Window(ctk.CTk):
         paint.text(top, "reads what you wrote", skin.faint, 11, wrap=180)
 
         self.buttons: dict[str, ctk.CTkButton] = {}
+        group = ""
         for section in SECTIONS:
+            if section.group and section.group != group:
+                group = section.group
+                paint.text(rail, f"  {group}", skin.faint, 10, bold=True, wrap=180)
             button = ctk.CTkButton(
                 rail,
                 text=section.name,
@@ -237,6 +244,7 @@ class Window(ctk.CTk):
         side = ctk.CTkFrame(self, width=SIDE, corner_radius=0, fg_color=skin.side)
         side.pack(side="left", fill="y")
         side.pack_propagate(False)
+        self.side = side
         style = ttk.Style()
         style.theme_use("clam")
         style.configure(
@@ -284,8 +292,9 @@ class Window(ctk.CTk):
     def _bar(self) -> None:
         """The line along the bottom: what there is, and what may be reached.
 
-        Packed before the columns claim the rest of the window, which is what `side="bottom"`
-        on a sibling that comes later would not do.
+        **Packed before the columns**, because `side="bottom"` spans the window only while
+        the cavity is whole. After three `side="left"` siblings it is a column against the
+        right edge instead, and it took 250 pixels of reading width with it (ADR-092).
         """
         skin = self.skin
         bar = ctk.CTkFrame(self, height=30, corner_radius=0, fg_color=skin.rail)
@@ -361,10 +370,17 @@ class Window(ctk.CTk):
         seen = getattr(canvas, "winfo_width", lambda: 0)() or self.right.winfo_width()
         room = max(seen - MARGIN, 260)
 
+        # **`wraplength` is scaled again on the way in.** CustomTkinter multiplies every
+        # dimension it is handed by the display scaling, and `winfo_width` already returns
+        # physical pixels - so a room of 547 measured on a 125% display became a wrap at
+        # 684, and text ran off the right of a 599-pixel label. Invisible at 100%, which is
+        # why this survived two fixes (ADR-092).
+        scaling = ctk.ScalingTracker.get_widget_scaling(self) or 1.0
+
         def walk(widget: object, inset: int) -> None:
             for child in getattr(widget, "winfo_children", list)():
                 if isinstance(child, ctk.CTkLabel):
-                    child.configure(wraplength=max(room - inset, 200))
+                    child.configure(wraplength=max(room - inset, 200) / scaling)
                 # Each frame between the viewport and the text costs its own padding.
                 walk(child, inset + (INSET if isinstance(child, ctk.CTkFrame) else 0))
 
@@ -416,6 +432,16 @@ class Window(ctk.CTk):
         self._rows.clear()
         self._clear()
         section.listing(self, self, self._state())
+        # A section with nothing to choose from had a quarter of the window standing empty
+        # beside it, which reads as something failing to load rather than as a page with no
+        # list (ADR-092). `before` keeps the column between the rail and the panel.
+        if self.tree.get_children():
+            if not self.side.winfo_ismapped():
+                # `after` the rail rather than `before` the panel: a scrollable frame packs
+                # an inner widget, so naming it here asks Tk about something it never saw.
+                self.side.pack(side="left", fill="y", after=self.rail)
+        else:
+            self.side.pack_forget()
 
     def _chosen(self, _event: object) -> None:
         """Hand the selection to the section that made it."""

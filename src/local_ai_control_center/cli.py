@@ -2376,7 +2376,7 @@ def window(
         saved,
         commands_of(app),
         prompts_of(_known_skills(config_path), config),
-        status_of(workspace.root, config),
+        status_of(workspace.root, config, config.context_file or ""),
         lambda: _engine_seen(config),
         *_asking_for_the_window(config, workspace),
         config.context_file or "",

@@ -52,4 +52,4 @@ def _show_record(key: str, panel: Panel, state: State) -> None:
         paint.block(panel.body, panel.skin, piece)
 
 
-SECTIONS = (Section("Documentation", _list_records, _show_record),)
+SECTIONS = (Section("Documentation", _list_records, _show_record, group="THE PROGRAM"),)

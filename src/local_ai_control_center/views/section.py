@@ -119,7 +119,31 @@ class Section:
     show: Callable[[str, Panel, State], None] | None = None
     """Absent for a section whose listing is the whole of it."""
 
+    group: str = ""
+    """Which heading this sits under in the rail.
+
+    Declared here rather than decided by the frame, for the reason the rest of a section is:
+    adding one is adding a piece to a tuple, not editing the menu as well (ADR-075). Eleven
+    names in a flat list read as eleven unrelated things; three headings make it three
+    (ADR-092).
+    """
+
     def open(self, key: str, panel: Panel, state: State) -> None:
         """Show one row, if this section has anything to show."""
         if self.show is not None:
             self.show(key, panel, state)
+
+
+def in_groups(*where: tuple[Section, ...]) -> tuple[Section, ...]:
+    """Every section, with those sharing a group together and the groups in first order.
+
+    Here rather than in the window, because deciding an order is deciding something and a
+    view does not (ADR-066). A section declares which group it is in and nothing about where
+    that group sits; the order the groups are handed in is the order they appear.
+    """
+    found = [section for group in where for section in group]
+    order: list[str] = []
+    for section in found:
+        if section.group not in order:
+            order.append(section.group)
+    return tuple(sorted(found, key=lambda one: order.index(one.group)))

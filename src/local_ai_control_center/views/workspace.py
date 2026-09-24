@@ -147,7 +147,7 @@ def _show_corpus(key: str, panel: Panel, state: State) -> None:
 
 
 SECTIONS = (
-    Section("Reviews", _list_reviews, _show_review),
+    Section("Reviews", _list_reviews, _show_review, group="YOUR WORK"),
     Section(
         "Written",
         _files_of(
@@ -156,6 +156,7 @@ SECTIONS = (
             "Bibliographies, review reports and coverage reports.",
         ),
         _show_written,
+        group="YOUR MATERIAL",
     ),
     Section(
         "Corpora",
@@ -163,6 +164,7 @@ SECTIONS = (
             frozenset({"corpus"}), "Corpora", "Choose one to count what it holds and read it."
         ),
         _show_corpus,
+        group="YOUR MATERIAL",
     ),
     Section(
         "Documents",
@@ -173,5 +175,6 @@ SECTIONS = (
             "wrote. Not the standing context, which every run carries anyway.",
         ),
         _show_document,
+        group="YOUR MATERIAL",
     ),
 )

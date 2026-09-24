@@ -128,7 +128,7 @@ def _show_configuration(side: Sidebar, panel: Panel, state: State) -> None:
 
 
 SECTIONS = (
-    Section("Commands", _list_commands, _show_command),
-    Section("Prompts", _list_prompts, _show_prompt),
-    Section("Configuration", _show_configuration),
+    Section("Commands", _list_commands, _show_command, group="THE PROGRAM"),
+    Section("Prompts", _list_prompts, _show_prompt, group="THE PROGRAM"),
+    Section("Configuration", _show_configuration, group="THE PROGRAM"),
 )

@@ -587,3 +587,10 @@ The third time this project found two readers of one decision living apart, and 
 [`ADR-091-a-thread-of-questions.md`](ADR-091-a-thread-of-questions.md)
 
 Delivers what was asked for and refuses the mechanism that was asked for. A conversation puts turn N's **answer** into turn N+1's prompt - and an invented quotation then **verifies**, because it really is in what was sent; the check confirms it instead of catching it. Measured here, about one answer in five carries one. So a thread carries **the passages whose quotations were found** and never the prose; the questions carry for a person to read and go in no prompt either. A follow-up has to be a whole question, because nothing here guesses what *"and the specificity?"* meant. First real thread: 219 passages sent, 3 established; then 226 of which 3 came from the first turn, 2 more established, none of the model's prose among them.
+
+
+### 092 - what a screenshot showed, and what a check now says instead
+
+[`ADR-092-what-a-screenshot-showed-and-a-test-could-not.md`](ADR-092-what-a-screenshot-showed-and-a-test-could-not.md)
+
+Text running off the right edge, reported three times and fixed twice. Two causes, both measured at last. The bottom bar was **a column on the right** - `side="bottom"` only spans the window while the cavity is whole - taking 250 pixels of reading width and hiding half of itself. And `wraplength` is scaled *again* by the toolkit, so a room measured at 547 physical pixels became a wrap at 684 in a label 599 wide: **at 100% scaling the two are identical and nothing is wrong**, which is why it only ever appeared in somebody else's screenshots. A check replaces the eye - `reqwidth > width` asked of every label in every section, 0 of 656. With them: the bar counted 61 documents where the workspace held 28, a section with no rows hides the middle column (643 pixels of panel to 1,305), and the rail is grouped into three.
