@@ -36,16 +36,16 @@ import customtkinter as ctk
 from local_ai_control_center.features.appearance import Palette, Preferences, remember
 from local_ai_control_center.features.ask import Asked, Prepared
 from local_ai_control_center.features.commands import Command
-from local_ai_control_center.features.overview import configurations_in
 from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.status import EngineSeen, Status
-from local_ai_control_center.features.workspaces import risk_of
+from local_ai_control_center.features.workspaces import points_of, risk_of
 from local_ai_control_center.views import (
     asking,
     making,
     paint,
     program,
     records,
+    settings,
     work,
     workspace,
 )
@@ -76,6 +76,7 @@ SECTIONS: tuple[Section, ...] = in_groups(
     workspace.SECTIONS,
     making.SECTIONS,
     program.SECTIONS,
+    settings.SECTIONS,
     records.SECTIONS,
 )
 """Every section, grouped. The frame knows their order and nothing else about them."""
@@ -94,6 +95,7 @@ class Window(ctk.CTk):
         prompts: tuple[Prompt, ...] = (),
         status: Status | None = None,
         check_engine: Callable[[], EngineSeen] | None = None,
+        ask_engine: Callable[[str], EngineSeen] | None = None,
         prepare_question: Callable[..., Prepared] | None = None,
         send_question: Callable[[Prepared], Asked] | None = None,
         context_file: str = "",
@@ -109,6 +111,7 @@ class Window(ctk.CTk):
         # one by that name, so the assignment went somewhere else and the read failed.
         self.seen = status
         self.check_engine = check_engine
+        self.ask_engine = ask_engine
         self.prepare_question = prepare_question
         self.send_question = send_question
         self.context_file = context_file
@@ -117,7 +120,10 @@ class Window(ctk.CTk):
         self.saved = saved
         self.skin: Palette = preferences.palette()
 
-        available = [p.name for p in configurations_in(configs)]
+        # `points_of` rather than a second lister: it says what each configuration
+        # names, which is what the Workspaces section draws, and one lister cannot
+        # drift from the other (ADR-090).
+        available = [one.name for one in points_of(configs)]
         self.chosen = preferences.configuration or (available[0] if available else "")
         self.section = SECTIONS[0]
 
@@ -176,6 +182,7 @@ class Window(ctk.CTk):
             prepare_question=self.prepare_question,
             send_question=self.send_question,
             context_file=self.context_file,
+            ask_engine=self.ask_engine,
         )
 
     # --- the three columns -----------------------------------------------------------------
@@ -270,8 +277,7 @@ class Window(ctk.CTk):
             )
         paint.text(
             here,
-            "  the configuration names it;\n  choosing one changes which\n  is read, never "
-            "what is in it",
+            "  choosing one changes which\n  is read. Workspaces changes\n  what is in it.",
             skin.faint,
             10,
             wrap=185,
@@ -500,6 +506,7 @@ def show(
     prompts: tuple[Prompt, ...] = (),
     status: Status | None = None,
     check_engine: Callable[[], EngineSeen] | None = None,
+    ask_engine: Callable[[str], EngineSeen] | None = None,
     prepare_question: Callable[..., Prepared] | None = None,
     send_question: Callable[[Prepared], Asked] | None = None,
     context_file: str = "",
@@ -519,6 +526,7 @@ def show(
         prompts,
         status,
         check_engine,
+        ask_engine,
         prepare_question,
         send_question,
         context_file,

@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-23
+
+### Added
+- **The configuration is changed from the window** (ADR-094). Nine settings in a form, with
+  what each one decides written under it. *Check* writes nothing and draws every line that
+  would change; the button that saves is produced by that drawing.
+
+  **The window may change what LACC does. It may not change what LACC is allowed to do.**
+  `network_access` and `workspace_in_repository` are shown and not edited - they are not
+  settings but **refusals being lifted**, and the whole weight of them is that somebody wrote
+  them down deliberately. `engine_host` is editable because with the ceiling down it is
+  inert; `audit_level` is, because it decides what is *recorded* rather than what is reached,
+  and lowering it is how a workspace that synchronises stops carrying your prose.
+
+- **An `Engines` section**: the host the configuration names and this machine, each asked on
+  a button, each saying whether it answered, how long it took and **which models it holds**
+  with the configured one marked. `check_engine` has returned the names since ADR-077 and the
+  window threw them away to keep a count.
+
+### Fixed
+- **The rail said WORKSPACE above a picker of configurations.** Every configuration in that
+  folder names the same workspace, so the control labelled with the folder changed the model
+  and left the folder alone. A label that names the wrong thing is believed.
+- **The window was using two configurations at once.** Its workspace and engine came from
+  `-c`; `chosen_configuration` came from the remembered preference. Launched with `denso.yaml`
+  against a preference holding `config.yaml`, the Engines section said it wanted one model
+  while marking another. The one you launched with is now the one in force.
+- **A form nobody touched proposed rewriting three lines**, because the boxes were filled from
+  the parsed contract rather than the file - `~/lacc-workspace` came back with backslashes and
+  every unmentioned setting came back as today's default.
+- **Saving rewrote the whole file**, destroying every comment and freezing the current
+  defaults into it. A configuration is edited line by line now: changing one setting produces
+  a diff of one setting.
+
 ## [2.9.0] - 2026-09-23
 
 ### Added

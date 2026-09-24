@@ -20,6 +20,7 @@ from local_ai_control_center.features.appearance import Palette
 from local_ai_control_center.features.ask import Asked, Prepared
 from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.prompts import Prompt
+from local_ai_control_center.features.status import EngineSeen
 from local_ai_control_center.ports.retriever import Passage
 
 
@@ -75,6 +76,13 @@ class State:
 
     The third argument is what a thread has already established - passages whose quotations
     were checked in earlier turns. Empty for a question asked on its own (ADR-091).
+    """
+
+    ask_engine: Callable[[str], EngineSeen] | None = None
+    """Ask one host what it holds and whether it answers. Reaches the network when called.
+
+    Called only from a button, which is the rule the line along the bottom has kept since it
+    was written (ADR-077, ADR-094).
     """
 
     send_question: Callable[[Prepared], Asked] | None = None

@@ -12,7 +12,6 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from local_ai_control_center.features.appearance import Palette
-from local_ai_control_center.features.overview import Setting
 from local_ai_control_center.features.reading import Block
 from local_ai_control_center.features.review import Finding
 
@@ -77,35 +76,6 @@ def card(parent: ctk.CTkFrame, skin: Palette, stripe: str = "") -> ctk.CTkFrame:
     body = ctk.CTkFrame(shell, fg_color="transparent")
     body.pack(side="left", fill="both", expand=True, padx=(0 if stripe else 14, 14), pady=13)
     return body
-
-
-def row(parent: ctk.CTkFrame, skin: Palette, setting: Setting) -> None:
-    """A label, its value, and the note that says why the value matters."""
-    line = ctk.CTkFrame(parent, fg_color="transparent")
-    line.pack(fill="x", pady=3)
-    ctk.CTkLabel(
-        line,
-        text=setting.label,
-        width=150,
-        anchor="w",
-        text_color=skin.dim,
-        font=ctk.CTkFont(size=12),
-    ).pack(side="left")
-    ctk.CTkLabel(
-        line,
-        text=setting.value,
-        anchor="w",
-        text_color=skin.ink,
-        font=ctk.CTkFont(size=12, weight="bold"),
-    ).pack(side="left")
-    if setting.note:
-        ctk.CTkLabel(
-            line,
-            text=f"   {setting.note}",
-            anchor="w",
-            text_color=skin.faint,
-            font=ctk.CTkFont(size=11),
-        ).pack(side="left")
 
 
 def block(parent: ctk.CTkFrame, skin: Palette, piece: Block) -> None:

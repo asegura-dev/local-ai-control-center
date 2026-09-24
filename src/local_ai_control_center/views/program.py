@@ -7,11 +7,8 @@ derived from the application, and a configuration is read (ADR-072, ADR-074).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import customtkinter as ctk
 
-from local_ai_control_center.features.overview import settings_of
 from local_ai_control_center.features.reading import blocks_in
 from local_ai_control_center.views import paint
 from local_ai_control_center.views.section import Panel, Section, Sidebar, State
@@ -113,22 +110,7 @@ def _show_prompt(key: str, panel: Panel, state: State) -> None:
         return
 
 
-def _show_configuration(side: Sidebar, panel: Panel, state: State) -> None:
-    """The configuration in force. Its listing is the whole of the section."""
-    if not state.chosen_configuration:
-        panel.said("No configuration found", f"Nothing ending in .yaml under {state.configs}.")
-        return
-    panel.said(
-        state.chosen_configuration,
-        "What this configuration declares. Reading only - nothing here is written.",
-    )
-    body = paint.card(panel.body, panel.skin)
-    for setting in settings_of(Path(state.configs) / state.chosen_configuration):
-        paint.row(body, panel.skin, setting)
-
-
 SECTIONS = (
     Section("Commands", _list_commands, _show_command, group="THE PROGRAM"),
     Section("Prompts", _list_prompts, _show_prompt, group="THE PROGRAM"),
-    Section("Configuration", _show_configuration, group="THE PROGRAM"),
 )

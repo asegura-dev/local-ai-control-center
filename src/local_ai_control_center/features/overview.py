@@ -16,7 +16,6 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from local_ai_control_center.core.budget import estimate_tokens
-from local_ai_control_center.core.config import Config, load_config
 from local_ai_control_center.core.corpus import parse_corpus
 from local_ai_control_center.core.kinds import kind_of
 
@@ -49,67 +48,6 @@ class CorpusSeen(BaseModel):
     refused: int = 0
     documents: tuple[tuple[str, int], ...] = ()
     """Each source document and how many quotations came from it, most first."""
-
-
-class Setting(BaseModel):
-    """One line of a configuration, as a person should read it."""
-
-    model_config = ConfigDict(frozen=True)
-
-    label: str
-    value: str
-    note: str = ""
-
-
-def configurations_in(folder: Path) -> tuple[Path, ...]:
-    """Every configuration file in ``folder``, by name."""
-    if not folder.is_dir():
-        return ()
-    return tuple(sorted(p for p in folder.glob("*.yaml") if p.is_file()))
-
-
-def settings_shown(config: Config) -> tuple[Setting, ...]:
-    """What a configuration declares, in the order somebody choosing one would ask.
-
-    The model first, because that is the question. The two switches that let anything leave
-    the machine last, because they are the ones worth noticing.
-    """
-    window = f"{config.context_tokens:,} tokens" if config.context_tokens else "not declared"
-    return (
-        Setting(label="Model", value=config.model or "the mock provider"),
-        Setting(
-            label="Embeddings",
-            value=config.embedding_model or "off",
-            note="" if config.embedding_model else "ranking falls back to shared words",
-        ),
-        Setting(label="Engine", value=config.engine_host or "this machine"),
-        Setting(label="Context window", value=window),
-        Setting(label="Workspace", value=str(config.workspace_root)),
-        Setting(label="Answers in", value=config.output_language),
-        Setting(label="Audit", value=config.audit_level),
-        Setting(
-            label="Network",
-            value="allowed" if config.network_access else "off",
-            note="the ceiling: with this off, nothing reaches anywhere",
-        ),
-        Setting(
-            label="Registry",
-            value=config.registry_url or "none",
-            note="" if config.registry_url else "no DOI is ever resolved",
-        ),
-    )
-
-
-def settings_of(path: Path) -> tuple[Setting, ...]:
-    """Read one configuration and describe it, or say it could not be read.
-
-    A configuration that fails validation is a thing a person needs to see named, not a
-    window that shows nothing.
-    """
-    try:
-        return settings_shown(load_config(path))
-    except (OSError, ValueError) as error:
-        return (Setting(label="Unreadable", value=str(error).split(chr(10))[0]),)
 
 
 def documents_in(workspace: Path, context_file: str = "") -> tuple[DocumentSeen, ...]:

@@ -601,3 +601,10 @@ Text running off the right edge, reported three times and fixed twice. Two cause
 [`ADR-093-a-workspace-is-chosen-where-you-can-see-it.md`](ADR-093-a-workspace-is-chosen-where-you-can-see-it.md)
 
 The most load-bearing fact about a session - which folder every file comes from and goes to - sat at the bottom of the rail under the theme, in the faintest colour in the palette, which is why somebody who had used the window all day asked for the ability to "create and navigate workspaces". It moves to the top, with the configuration that names it. The window may now write **one new configuration** and only a new one, behind the same check-produces-the-button grammar as a question (ADR-085). And the request came with *"one for OneDrive, so it synchronises" *: LACC cannot synchronise and should not, so what this adds is the consequence stated where the choice is made - a git working tree refused because that is a fact, a sync folder allowed because a folder name is a guess, and the one setting that removes most of the exposure named beside it rather than the warning simply frightening.
+
+
+### 094 - what it does, and what it may do
+
+[`ADR-094-what-it-does-and-what-it-may-do.md`](ADR-094-what-it-does-and-what-it-may-do.md)
+
+The configuration was the only thing left that you had to leave the window to change, and the setting you most want to change is the one you cannot check - which models are actually installed, here and on the machine the configuration names. Both are answered, behind one line: **the window may change what LACC does; it may not change what LACC is allowed to do.** `network_access` and `workspace_in_repository` are not settings but refusals being lifted, and a toggle is not a deliberate decision. A diff is the confirmation, with no extra ceremony for the riskier settings - a ritual on some changes teaches people to click through the ritual. Three defects came out of driving it: the window was using two configurations at once and contradicting itself on one screen, a form nobody touched proposed rewriting three lines, and saving destroyed every comment in the file.

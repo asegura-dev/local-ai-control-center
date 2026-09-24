@@ -38,8 +38,21 @@ class EngineSeen(BaseModel):
     reached: bool = False
     answered: bool = False
     models: int = 0
+    held: tuple[str, ...] = ()
+    """What the engine says it holds. The check has returned these since ADR-077 and this
+    contract kept only the count, so the window could say `4 models` and not which."""
+
+    host: str = ""
+    wanted: str = ""
+    """The model the configuration names, so a listing can say which of them it is."""
+
     seconds: float = 0.0
     detail: str = ""
+
+    @property
+    def has_it(self) -> bool:
+        """Whether the engine holds the model the configuration names."""
+        return bool(self.wanted) and self.wanted in self.held
 
     @property
     def said(self) -> str:

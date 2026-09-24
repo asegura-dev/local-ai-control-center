@@ -2261,21 +2261,25 @@ def review(
         _show(f"-> {into}")
 
 
-def _engine_seen(config: Config) -> EngineSeen:
-    """Ask the engine whether it answers, as the window's contract rather than the adapter's.
+def _engine_at(config: Config, host: str) -> EngineSeen:
+    """Ask one named host what it holds, as the window's contract (ADR-094).
 
-    Composition: the window is handed this to call, so a view never touches an adapter and
-    nothing is asked until somebody presses the button (ADR-077).
+    Composition, so a view never touches an adapter. The host is passed in because the
+    Engines section asks two of them - the one the configuration names and this machine -
+    and neither is asked until somebody presses a button.
     """
-    host = resolve_engine_host(config.engine_host, config.network_access)
     if not config.model:
-        return EngineSeen(asked=True, detail="No model is configured.")
-    found = check_engine(config.model, host, config.context_tokens)
+        return EngineSeen(asked=True, host=host, detail="No model is configured.")
+    reachable = resolve_engine_host(host, config.network_access)
+    found = check_engine(config.model, reachable, config.context_tokens)
     return EngineSeen(
         asked=True,
         reached=found.reached,
         answered=found.answered,
         models=len(found.models),
+        held=tuple(found.models),
+        host=reachable,
+        wanted=config.model,
         seconds=found.seconds or 0.0,
         detail=found.detail,
     )
@@ -2367,8 +2371,11 @@ def window(
     # and should not appear among them, and they are not configuration either (ADR-069).
     saved = workspace.root / WINDOW_PREFERENCES
     preferences = preferences_from(saved)
-    if not preferences.configuration:
-        preferences = preferences.model_copy(update={"configuration": config_path.name})
+    # The configuration you launched with is the one in force, not the one remembered from
+    # last time. Without this the window read `denso.yaml` for its workspace and engine while
+    # the Configuration section edited `config.yaml` - two configurations on one screen, and
+    # the Engines section said it wanted one model while marking another (ADR-094).
+    preferences = preferences.model_copy(update={"configuration": config_path.name})
     show(
         workspace.root,
         config_path.parent,
@@ -2377,7 +2384,8 @@ def window(
         commands_of(app),
         prompts_of(_known_skills(config_path), config),
         status_of(workspace.root, config, config.context_file or ""),
-        lambda: _engine_seen(config),
+        lambda: _engine_at(config, config.engine_host),
+        lambda host: _engine_at(config, host),
         *_asking_for_the_window(config, workspace),
         config.context_file or "",
     )

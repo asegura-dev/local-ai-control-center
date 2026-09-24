@@ -94,7 +94,7 @@ in [`docs/adr/`](docs/adr/) with its context, its trade-off and the alternative 
 
 ## Status
 
-v2.9.0, working end to end against a real local model and measured against a real
+v2.10.0, working end to end against a real local model and measured against a real
 bibliography rather than against documents written for the test.
 
 Every run takes the same shape: LACC plans the action, shows a preview, asks for
