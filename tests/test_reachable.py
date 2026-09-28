@@ -112,11 +112,13 @@ def test_the_check_would_have_caught_the_defect_it_exists_for() -> None:
     assert "enforce_shape" not in _names_the_source_sets(trees)
 
 
-CALLED_FROM_OUTSIDE = frozenset({"main"})
+CALLED_FROM_OUTSIDE = frozenset({"main", "filter"})
 """Definitions the program does not reference because something outside it does.
 
-`main` is the console entry point named in `pyproject.toml`. Each entry is a claim that
-something outside the source calls this, and it should be checkable by opening that thing.
+`main` is the console entry point named in `pyproject.toml`. `filter` is the method the
+standard library's `logging` calls on a `logging.Filter`; the one in `adapters/documents.py`
+counts pypdf's font warning (ADR-103). Each entry is a claim that something outside the
+source calls this, and it should be checkable by opening that thing.
 """
 
 

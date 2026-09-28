@@ -15,6 +15,7 @@ shape.
 from __future__ import annotations
 
 import inspect
+import typing
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -27,12 +28,26 @@ class Parameter(BaseModel):
 
     name: str
     required: bool
-    """True when it has no default, which is what makes it an argument rather than an option."""
+    """True when it has no default: the command does not run without it."""
+
+    flag: str = ""
+    """How an option is named on a command line, `--into`; empty for an argument.
+
+    Read from the declaration, because being required does not make a thing an argument.
+    `review` requires `--against`, and a usage line that printed it as `against` could be
+    copied and could not be run (ADR-103).
+    """
+
+    switch: bool = False
+    """An option that takes no value, like `--cited`."""
 
     @property
     def shown(self) -> str:
-        """How it is written on a command line."""
-        return self.name if self.required else f"--{self.name.replace('_', '-')}"
+        """How it is written on a command line, with the value it takes as a placeholder."""
+        value = f"<{self.name.replace('_', '-')}>"
+        if not self.flag:
+            return value
+        return self.flag if self.switch else f"{self.flag} {value}"
 
 
 class Command(BaseModel):
@@ -51,8 +66,13 @@ class Command(BaseModel):
 
     @property
     def usage(self) -> str:
-        """The line somebody would type."""
-        return " ".join(["lacc", self.name, *(p.shown for p in self.parameters)])
+        """The line somebody would type: what the command cannot run without.
+
+        What is optional is listed beside it rather than in it, so that a line copied from here
+        and filled in is a line that runs.
+        """
+        needed = (p.shown for p in self.parameters if p.required)
+        return " ".join(["lacc", self.name, *needed])
 
 
 _SKIP = {"config_path"}
@@ -70,21 +90,60 @@ def _described(documentation: str | None) -> tuple[str, str]:
     return summary, rest
 
 
-def _parameters_of(function: Any) -> tuple[Parameter, ...]:
-    """What a command takes, from its signature rather than from its decorators.
+def _declared(hint: Any) -> tuple[str, str, bool]:
+    """What an annotation declares - `argument`, `option` or nothing - its flag, and whether
+    it is a switch.
 
-    A required parameter is one with no default. That is what Typer uses to tell an argument
-    from an option too, so the two agree without this knowing anything about Typer.
+    Read by the names of the objects Typer leaves in the annotation, so this knows the shape
+    of a declaration without importing the library that makes it: presentation stays in the
+    CLI. Declared with `Annotated`, the first name sits in `default` and the rest in
+    `param_decls` - seen on the real application, not assumed.
+    """
+    if typing.get_origin(hint) is not typing.Annotated:
+        return "", "", False
+    base, *metadata = typing.get_args(hint)
+    for declaration in metadata:
+        kind = type(declaration).__name__
+        if kind == "ArgumentInfo":
+            return "argument", "", False
+        if kind == "OptionInfo":
+            first = getattr(declaration, "default", None)
+            rest = getattr(declaration, "param_decls", None) or ()
+            names = [n.split("/")[0] for n in (first, *rest) if isinstance(n, str)]
+            return "option", next((n for n in names if n.startswith("--")), ""), base is bool
+    return "", "", False
+
+
+def _parameters_of(function: Any) -> tuple[Parameter, ...]:
+    """What a command takes, from its signature and what its annotations declare.
+
+    An annotation that declares an option or an argument says which it is. Without one, a
+    parameter with no default is an argument and the rest are options, which is the rule
+    Typer applies itself.
     """
     try:
         signature = inspect.signature(function)
     except (TypeError, ValueError):
         return ()
-    return tuple(
-        Parameter(name=name, required=parameter.default is inspect.Parameter.empty)
-        for name, parameter in signature.parameters.items()
-        if name not in _SKIP
-    )
+    try:
+        hints = typing.get_type_hints(function, include_extras=True)
+    except (NameError, TypeError, AttributeError):
+        hints = {}
+    found = []
+    for name, parameter in signature.parameters.items():
+        if name in _SKIP:
+            continue
+        required = parameter.default is inspect.Parameter.empty
+        kind, flag, switch = _declared(hints.get(name))
+        if not kind:
+            kind = "argument" if required else "option"
+            switch = isinstance(parameter.default, bool)
+        if kind == "argument":
+            found.append(Parameter(name=name, required=required))
+            continue
+        flag = flag or f"--{name.replace('_', '-')}"
+        found.append(Parameter(name=name, required=required, flag=flag, switch=switch))
+    return tuple(found)
 
 
 def commands_of(application: Any) -> tuple[Command, ...]:

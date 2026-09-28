@@ -116,3 +116,22 @@ def test_a_note_holding_no_doi_is_nothing_rather_than_an_empty_answer(tmp_path: 
     document.write_text("anything", encoding="utf-8")
     beside(document).write_text('{"title": "something"}', encoding="utf-8")
     assert established_for(document) is None
+
+
+def test_a_doi_established_on_either_file_of_a_work_answers_for_both(tmp_path: Path) -> None:
+    """Eight of the sixteen documents `resolve` called silent had a DOI established on their
+    Markdown, and `resolve` had been run on their PDFs (ADR-103)."""
+    establish(tmp_path / "paper.md", "10.1000/md", "From the Markdown")
+    found = established_for(tmp_path / "paper.pdf")
+    assert found is not None and found.doi == "10.1000/md"
+    establish(tmp_path / "other.pdf", "10.1000/pdf", "From the PDF")
+    found = established_for(tmp_path / "other.md")
+    assert found is not None and found.doi == "10.1000/pdf"
+
+
+def test_a_document_s_own_note_comes_before_its_counterpart_s(tmp_path: Path) -> None:
+    establish(tmp_path / "paper.md", "10.1000/md")
+    establish(tmp_path / "paper.pdf", "10.1000/pdf")
+    for suffix, expected in ((".pdf", "10.1000/pdf"), (".md", "10.1000/md")):
+        found = established_for(tmp_path / f"paper{suffix}")
+        assert found is not None and found.doi == expected

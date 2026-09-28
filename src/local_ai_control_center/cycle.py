@@ -341,8 +341,8 @@ def write_new_file(path: Path, text: str) -> None:
             handle.write(text)
     except FileExistsError as error:
         raise ConversionError(
-            f"{path.name} already exists, and ingestion never overwrites. Move or rename "
-            "it, or name a different destination."
+            f"{path.name} already exists, and LACC writes its results only to new files. "
+            "Move or rename it, or name a different destination."
         ) from error
     except FileNotFoundError as error:
         raise ConversionError(
@@ -793,6 +793,8 @@ def run_conversion(
             # recorded. An extraction that dropped an implausible amount should be visible
             # afterwards, not only at the time (ADR-036).
             "furniture_dropped": getattr(converter, "furniture_dropped", 0),
+            # Kept off the screen and counted instead; the record keeps the count (ADR-103).
+            "fonts_read_in_part": getattr(converter, "fonts_read_in_part", 0),
         },
     )
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})

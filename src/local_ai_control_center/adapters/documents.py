@@ -13,8 +13,11 @@ correct, rather than a parse hidden inside a read.
 
 from __future__ import annotations
 
+import contextlib
+import logging
 import re
 from collections import Counter
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -204,6 +207,42 @@ def hidden_text_in(reader: PdfReader) -> tuple[tuple[HiddenText, ...], int]:
     return tuple(found), seen
 
 
+_FONT_WARNING = "fontTools is required"
+"""How pypdf says it read a font's encoding only in part, for want of an optional library."""
+
+
+class _FontWarnings(logging.Filter):
+    """Counts pypdf's one warning about font encodings, and keeps it off the screen.
+
+    Seven papers raised it 594 times in one ingest and buried everything else it said. Measured
+    before deciding: with the library it asks for, five of those papers came out with **16
+    spaces different in 407,000 characters, and no word** (ADR-103). Every other warning pypdf
+    raises still reaches the screen.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.count = 0
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.getMessage().startswith(_FONT_WARNING):
+            self.count += 1
+            return False
+        return True
+
+
+@contextlib.contextmanager
+def _font_warnings_counted() -> Iterator[_FontWarnings]:
+    """Count the font warning while a document is being read, and only then."""
+    counted = _FontWarnings()
+    logger = logging.getLogger("pypdf._cmap")
+    logger.addFilter(counted)
+    try:
+        yield counted
+    finally:
+        logger.removeFilter(counted)
+
+
 class PdfConverter(Converter):
     """Extracts text from a PDF, one page at a time, marking page boundaries.
 
@@ -217,6 +256,7 @@ class PdfConverter(Converter):
         self._dropped = 0
         self._hidden: tuple[HiddenText, ...] = ()
         self._fragments = 0
+        self._fonts_in_part = 0
 
     @property
     def name(self) -> str:
@@ -239,6 +279,14 @@ class PdfConverter(Converter):
         return self._fragments
 
     @property
+    def fonts_read_in_part(self) -> int:
+        """How often, in the last document, pypdf read a font's encoding only in part.
+
+        Counted rather than printed, and measured to change spacing and not words (ADR-103).
+        """
+        return self._fonts_in_part
+
+    @property
     def hidden(self) -> tuple[HiddenText, ...]:
         """Text in the last document that a reader would not have seen (ADR-040)."""
         return self._hidden
@@ -251,9 +299,11 @@ class PdfConverter(Converter):
     def extract_text(self, path: Path) -> str:
         """Return the PDF's text with a marker at each page boundary."""
         try:
-            reader = PdfReader(path)
-            pages = [page.extract_text(extraction_mode="plain") for page in reader.pages]
-            self._hidden, self._fragments = hidden_text_in(reader)
+            with _font_warnings_counted() as fonts:
+                reader = PdfReader(path)
+                pages = [page.extract_text(extraction_mode="plain") for page in reader.pages]
+                self._hidden, self._fragments = hidden_text_in(reader)
+            self._fonts_in_part = fonts.count
         except PyPdfError as error:
             raise ConversionError(f"Cannot read {path.name} as a PDF: {error}") from error
         except OSError as error:

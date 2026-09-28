@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+from typing import Annotated
+
+import typer
+import typer.main
+
 from local_ai_control_center.features.commands import Command, Parameter, commands_of
 
 
@@ -48,13 +55,52 @@ def test_the_first_sentence_and_the_rest_are_kept_apart() -> None:
     assert command.detail.startswith("And then the reason")
 
 
-def test_a_required_parameter_is_an_argument_and_the_rest_are_options() -> None:
+def test_without_a_declaration_typer_s_own_rule_decides() -> None:
+    """No default makes an argument and a default makes an option - Typer's rule, and this one."""
     command = commands_of(_App(_Entry(example)))[0]
     assert command.parameters == (
         Parameter(name="source", required=True),
-        Parameter(name="into", required=False),
+        Parameter(name="into", required=False, flag="--into"),
     )
-    assert command.usage == "lacc example source --into"
+    assert command.usage == "lacc example <source>"
+
+
+def review(
+    draft: Annotated[Path, typer.Argument(help="Yours.")],
+    against: Annotated[Path, typer.Option("--against", help="Theirs.")],
+    into: Annotated[Path | None, typer.Option("--into", help="Where.")] = None,
+    cited: Annotated[bool, typer.Option("--cited", help="Also these.")] = False,
+) -> None:
+    """Read a draft against a corpus."""
+
+
+def test_a_required_option_keeps_its_flag_and_shows_what_it_takes() -> None:
+    """Found using the window: `lacc review draft against --into` was copied and did not run.
+
+    Being required does not make a thing an argument. `--against` is required and an option,
+    and the line printed it as a bare word, with no mark anywhere of what to fill in.
+    """
+    command = commands_of(_App(_Entry(review)))[0]
+    assert command.usage == "lacc review <draft> --against <against>"
+    optional = [p.shown for p in command.parameters if not p.required]
+    assert optional == ["--into <into>", "--cited"]
+
+
+def test_every_line_the_window_offers_to_copy_parses_once_filled_in() -> None:
+    """The copy button's promise, held against the CLI's own parser.
+
+    Each usage line has its placeholders filled and is handed to the parser of the command it
+    names - which parses and converts and runs nothing, so a command that opens a window is as
+    safe to check as one that reads a file. The line printed before this record fails here:
+    `Option '--into' requires an argument`.
+    """
+    from local_ai_control_center.cli import app
+
+    parsers = typer.main.get_command(app)
+    for command in commands_of(app):
+        filled = [re.sub(r"<[^>]+>", "x", word) for word in command.usage.split()[2:]]
+        parser = parsers.commands[command.name]  # type: ignore[attr-defined]
+        parser.make_context(command.name, filled)
 
 
 def test_the_configuration_option_is_left_out() -> None:

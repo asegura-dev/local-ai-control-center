@@ -229,6 +229,7 @@ def test_bib_never_replaces_a_file(tmp_path: Path) -> None:
     (tmp_path / "ws" / "r.bib").write_text("mine", encoding="utf-8")
     result = runner.invoke(app, ["bib", "b.registry.json", "--into", "r.bib", "-c", str(config)])
     assert result.exit_code == 1
+    assert "LACC writes its results only to new files" in _said(result.stdout)
     assert (tmp_path / "ws" / "r.bib").read_text(encoding="utf-8") == "mine"
 
 

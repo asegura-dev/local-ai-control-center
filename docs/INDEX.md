@@ -22,7 +22,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-A hundred and two records front to back is a history. These are the threads through them, for
+A hundred and three records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -184,6 +184,7 @@ not to reach for an approximate algorithm to find them.
 | 100 | [the-window-opens-where-it-can-be-seen](adr/ADR-100-the-window-opens-where-it-can-be-seen.md) | Left to Windows, each opening landed further down than the last - the second **156 pixels below the screen**, status bar and theme picker out of sight. The window asks the system for the work area, opens at its top, centred, and shrinks to fit a smaller screen. The arithmetic is a tested function of numbers; the call to the system lives with what the program reads about the machine. Where the system cannot say, it opens as before. |
 | 101 | [one-rule-for-what-a-converted-file-says-about-itself](adr/ADR-101-one-rule-for-what-a-converted-file-says-about-itself.md) | `resolve` on the Markdown the workspace works from reported **23 papers with no DOI of their own**; their PDFs held 14. `references` already read the PDF beside a converted file and `resolve` did not - ADR-090's shape again. One function now answers for all three commands, finding the PDF by `ingest`'s own naming and nothing else, and the metadata reader opens only PDFs, which ended dozens of `invalid pdf header` lines. |
 | 102 | [a-bibliography-latex-can-cite-from](adr/ADR-102-a-bibliography-latex-can-cite-from.md) | The thesis is previewed through pandoc and typeset with biber, both of which read BibTeX, and its `.bib` had been assembled by a script outside LACC. **`lacc bib`** writes one from the answers `resolve` already keeps, with no network: keys from family name and year, never handed out again against the file you name with `--adding-to`, every LaTeX special written as a character, capitals in names kept. Volume, issue and pages are now read; `None` means *not read*, and answers kept before say so. 189 new entries beside 18 cited, no key shared, **biber and pandoc read both with no warning**; rendering it is what found `3D u-Net` and the false "ahead of print" that unread pages cause. |
+| 103 | [six-things-the-program-said-that-were-not-so](adr/ADR-103-six-things-the-program-said-that-were-not-so.md) | Six sentences found by using it, none caught by a test. A usage line that could be copied and not run (`--against` printed as `against`) - now every line, filled in, is handed to the CLI's own parser. A hint under Ask contradicting the preview below it. A refusal naming "ingestion" for every command. **594 lines of one pypdf warning, counted instead: measured, the library it asks for changes 16 spaces in 407,000 characters and no word.** "3 of 3" hidden pieces in a paper with 1,594, its denominator never passed. And a DOI established on the Markdown, invisible from the PDF: 8 of 16 documents looked silent. |
 
 ## Guides (`docs/guides/`)
 

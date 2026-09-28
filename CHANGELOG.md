@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Six things the program said that were not so** (ADR-103), each found by using it. The
+  Commands section offered `lacc review draft against --into`, which did not run: a required
+  option lost its `--` and nothing marked what to fill in - every usage line now parses in
+  the CLI's own parser once filled in. Ask said the ranking does not cross languages with
+  an embedding model configured. A refused file was refused as "ingestion" by commands that
+  are not. pypdf's font warning, 594 lines over seven papers, is counted in one line -
+  measured, the library it asks for changes 16 spaces in 407,000 characters and no word.
+  Hidden text said "3 of 3" of a paper with 1,594 pieces: the denominator was never passed.
+  And a DOI established on a Markdown file is found from its PDF, which made 8 of 16
+  documents look silent to `resolve`.
 - **`resolve` said papers had no DOI that their PDFs held** (ADR-101). Run on the Markdown
   the workspace works from, it reported 23 documents without a DOI of their own - their PDFs
   held 14 - and filled the screen with `invalid pdf header`, because it opened each Markdown

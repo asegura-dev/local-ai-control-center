@@ -176,8 +176,8 @@ def _open_corpus(key: str, panel: Panel, state: State, draft: str = "") -> None:
         box.insert("1.0", draft)
     _BOXES[corpus] = box
     said = (
-        "The ranking is by the words you use. It does not cross languages unless an "
-        "embedding model is configured."
+        "Ranked by the words you use, and also by meaning - across languages - when an "
+        "embedding model is configured. The preview says which."
     )
     if carried:
         said += (

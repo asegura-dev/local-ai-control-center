@@ -13,6 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from conftest import pdf_with_streams
 from typer.testing import CliRunner
 
 from local_ai_control_center.cli import app
@@ -1480,3 +1481,19 @@ def test_nothing_is_offered_when_the_quoted_passage_is_all_there_was() -> None:
 
     only = Passage(text="the network outlined each lymph node", source="a.md")
     assert might_support("anything at all", only.text, (only,), WordRetriever()) == ()
+
+
+def test_ingest_says_how_much_is_hidden_out_of_how_much(tmp_path: Path) -> None:
+    """A paper with three hidden names among thousands of fragments said "3 of 3".
+
+    The denominator was measured from ADR-040 on, and never passed to the report (ADR-103).
+    """
+    config, workspace = _ingest_config(tmp_path)
+    (workspace / "paper.pdf").write_bytes(
+        pdf_with_streams(
+            ["BT /F1 12 Tf 20 200 Td (One) Tj 20 -30 Td (Two) Tj /F1 0.5 Tf 20 -30 Td (Hid) Tj ET"]
+        )
+    )
+    result = runner.invoke(app, ["ingest", "paper.pdf", "-c", str(config)], input="y\n")
+    assert result.exit_code == 0, result.stdout
+    assert "1 of 3 pieces of text" in " ".join(result.stdout.split())

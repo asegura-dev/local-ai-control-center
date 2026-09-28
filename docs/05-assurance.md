@@ -19,7 +19,7 @@ was written and needs re-checking like any other measurement.
 | Configuration removes, never grants | `grant_for(skill, config)` enables what the skill declares, then the ceiling subtracts | **held by test** |
 | Nothing outside the workspace is touched | The cycle's only read site resolves through `workspace.resolve_within` on the line above the open | **held** |
 | `..`, symlinks and absolute paths are refused | `resolve_within`, with Windows reserved device names covered (ADR-017) | **held by test** |
-| Ingestion never overwrites | `path.open("x")` - exclusive creation, so there is no check-then-write race | **held** |
+| Results go only to new files | Every file a command writes for you goes through `write_new_file`, which opens with `"x"` - exclusive creation, so there is no check-then-write race. What LACC rewrites is its own - the registry's answers, the vectors and the audit's anchor beside your files, the window's preferences - and the configuration, only from the settings section after showing the difference and asking (ADR-039, ADR-094, ADR-103) | **held** |
 | Only hosts the configuration names are reached | `ollama_host()` refuses any non-loopback host; a remote engine needs `network_access` **and** an address written in the YAML | **held by test** |
 | An environment variable can never widen reach | `OLLAMA_HOST` is honoured only when it resolves to loopback, and refused otherwise | **held** |
 | A `.env` cannot override a variable already set | The loader writes only where the name is absent from the environment | **held** |

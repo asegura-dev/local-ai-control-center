@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -9,7 +10,7 @@ from pathlib import Path
 import docx
 import pytest
 from conftest import pdf_with_streams
-from pypdf import PdfReader
+from pypdf import PageObject, PdfReader
 
 from local_ai_control_center.adapters.documents import (
     PAGE_MARKER,
@@ -307,3 +308,34 @@ def test_the_rendered_size_is_judged_not_the_declared_one(tmp_path: Path) -> Non
     )
     found, _ = hidden_text_in(PdfReader(path))
     assert found == ()
+
+
+def test_pypdf_reading_a_font_in_part_is_counted_rather_than_printed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Seven papers said it 594 times in one ingest, burying everything else (ADR-103).
+
+    Measured before it was silenced: installing what it asks for changed 16 spaces in 407,000
+    characters and no word. Only that warning is counted - any other still reaches the screen.
+    """
+    path = tmp_path / "paper.pdf"
+    path.write_bytes(pdf_with_streams(["BT /F1 12 Tf 20 200 Td (Some text) Tj ET"]))
+    original = PageObject.extract_text
+
+    def noisy(self: PageObject, *args: object, **kwargs: object) -> str:
+        cmap = logging.getLogger("pypdf._cmap")
+        cmap.warning("fontTools is required to fully parse the encoding of a CFF Type1 font")
+        cmap.warning("Something else pypdf wants said")
+        return original(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(PageObject, "extract_text", noisy)
+    converter = PdfConverter()
+    with caplog.at_level(logging.WARNING):
+        text = converter.extract_text(path)
+    assert "Some text" in text
+    assert converter.fonts_read_in_part >= 1
+    said = [record.getMessage() for record in caplog.records]
+    assert not any("fontTools" in line for line in said)
+    assert "Something else pypdf wants said" in said
+    logging.getLogger("pypdf._cmap").warning("fontTools is required, after the document")
+    assert "fontTools is required, after the document" in [r.getMessage() for r in caplog.records]

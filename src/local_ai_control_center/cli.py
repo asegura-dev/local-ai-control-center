@@ -1442,6 +1442,8 @@ def ingest(
                 target,
                 getattr(converter, "furniture_dropped", 0),
                 getattr(converter, "hidden", ()),
+                getattr(converter, "fragments", 0),
+                getattr(converter, "fonts_read_in_part", 0),
             )
 
     if len(jobs) > 1:
@@ -1492,12 +1494,16 @@ def _report_ingestion(
     furniture: int = 0,
     hidden: tuple[HiddenText, ...] = (),
     fragments: int = 0,
+    fonts_in_part: int = 0,
 ) -> None:
     """Print the outcome of an ingestion run, naming the file it produced.
 
     Says how many lines were dropped as page furniture. Ingestion edits rather than only
     transcribing now, and a heuristic that quietly deletes text from a document the user
     keeps is the wrong shape for this project (ADR-036).
+
+    The denominator of hidden text was measured from ADR-040 on and never passed here, so a
+    paper with three hidden names among thousands of fragments said "3 of 3" (ADR-103).
     """
     if result.outcome == "completed":
         console.print(Panel(f"Extracted text written to {destination}", title="Ingested"))
@@ -1505,6 +1511,11 @@ def _report_ingestion(
             console.print(
                 f"[dim]{furniture} lines were dropped as page furniture - running headers, "
                 "footers and page numbers repeated across pages.[/dim]"
+            )
+        if fonts_in_part:
+            console.print(
+                f"[dim]pypdf read a font's encoding only in part {fonts_in_part} times. "
+                "Measured, that changes spacing and not words (ADR-103).[/dim]"
             )
         _report_hidden_text(hidden, fragments)
     elif result.outcome == "refused":

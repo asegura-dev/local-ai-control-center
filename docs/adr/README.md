@@ -656,3 +656,9 @@ A document's own DOI is in its PDF's metadata; the workspace works from the Mark
 [`ADR-102-a-bibliography-latex-can-cite-from.md`](ADR-102-a-bibliography-latex-can-cite-from.md)
 
 The thesis is written in Markdown, previewed through pandoc and typeset with biber, and all three read BibTeX; its `.bib` had come from a script outside LACC. `lacc bib` writes one from the answers `resolve` keeps, with no network and no model. A key someone cites is never handed out again, which is only possible against a file that is named; every LaTeX special character is written as a character, because the fields are a third party's; and volume, issue and pages are now read, with *not read* kept distinct from *empty*. Using it found what the tests had not: pandoc printed `3D u-Net`, and says "ahead of print" of every article whose pages were never read.
+
+### 103 - six things the program said that were not so
+
+[`ADR-103-six-things-the-program-said-that-were-not-so.md`](ADR-103-six-things-the-program-said-that-were-not-so.md)
+
+Each a sentence a person would have acted on, and each found by using the program rather than by a test: a usage line that did not run, a hint contradicting the preview beneath it, a refusal naming the wrong command, 594 lines of one warning, "3 of 3" for three pieces in 1,594, and a DOI one command saw and the next did not. The warning was measured before it was silenced - the library it asks for changes spacing and no word - and the usage lines are now held by the CLI's own parser.

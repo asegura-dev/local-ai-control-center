@@ -92,13 +92,31 @@ def beside(document: Path) -> Path:
     return document.with_suffix(document.suffix + DOI_BESIDE)
 
 
+_COUNTERPART = {".pdf": ".md", ".md": ".pdf"}
+"""A PDF and the Markdown `ingest` made of it: one work under two names (ADR-101)."""
+
+
 def established_for(document: Path) -> Established | None:
-    """What was established for this document, or nothing.
+    """What was established for this document, or for the other file of the same work.
+
+    A DOI established on the Markdown was invisible to `resolve` run on the PDF: eight of the
+    sixteen documents it called silent had one (ADR-103). Either file answers for both, the
+    document's own note first.
 
     A file that cannot be read or does not hold a DOI is nothing rather than an error: an
     unreadable note about a document must not stop the document being used.
     """
-    path = beside(document)
+    other = _COUNTERPART.get(document.suffix.lower())
+    for candidate in (document, document.with_suffix(other) if other else None):
+        if candidate is not None:
+            found = _read_established(beside(candidate))
+            if found is not None:
+                return found
+    return None
+
+
+def _read_established(path: Path) -> Established | None:
+    """The note at ``path``, or nothing if there is none or it holds no DOI."""
     if not path.exists():
         return None
     try:
