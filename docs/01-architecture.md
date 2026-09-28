@@ -31,11 +31,11 @@ LACC is built core-first. Application logic is intended to live in the package,
 and interfaces consume it. The dependency direction is meant to be one-way:
 
 ```text
-core logic  ->  CLI / dashboard use it
+core logic  ->  the CLI and the window use it
 ```
 
 The reverse is not allowed: the core must not depend on the CLI or the
-dashboard. This is intended to keep the core testable in isolation and to let
+window. This is intended to keep the core testable in isolation and to let
 interfaces change without touching business logic.
 
 ## Seven directories that mean something
@@ -48,10 +48,10 @@ imports. It is now visible:
 |---|---|
 | `core/` | The rules: configuration contracts, permissions, previews, plans, the fence, quotation checking, the workspace boundary, and what a file in a workspace *is*. Depends on nothing outside itself. |
 | `ports/` | An abstract class and the contracts that cross it. Nothing else. |
-| `adapters/` | Implementations of those ports: Ollama, a mock, PDF and Word, ntfy, word and dense retrieval, an asking judge, an embedder, and the vector cache beside a corpus. |
-| `features/` | One capability each, as a vertical slice: the corpus format, review, the sections of a document, what each skill will ask, where the work stands, asking. Whatever has to agree with something else lives beside it (ADR-066). |
-| `views/` | The window's sections: one module each, a name and a list and what to draw for a selection. They draw; they decide nothing (ADR-075). |
-| `system/` | Machine-facing code that is not behind a port: the audit trail, the profiler. |
+| `adapters/` | Implementations of those ports: Ollama, a mock, PDF and Word, ntfy, word and dense retrieval, an asking judge, an embedder, the vector cache beside a corpus, and Crossref with a memory of every answer it gave. |
+| `features/` | One capability each, as a vertical slice: the corpus format, review, coverage, the sections of a document, what each skill will ask, where the work stands, asking, a bibliography, the audit read as runs. Whatever has to agree with something else lives beside it (ADR-066). |
+| `views/` | The window's fourteen sections, in eight modules - a module holds the sections that read the same thing - each a name, a list and what to draw for a selection. They draw; they decide nothing (ADR-075). |
+| `system/` | Machine-facing code that is not behind a port: the audit trail, the profiler. It imports from `core/`, `ports/` and `adapters/`, and no test bounds it yet. |
 | top level | `cycle.py`, the application service, and **two** driving adapters: `cli.py` and `window.py`. |
 
 **Seven ports, and each one had to earn the abstraction.** `Provider` turns a prompt into an
@@ -71,14 +71,23 @@ change to the port at all.
 
 **`adapters` and `system` are separate because a port is not free.** An abstraction earns
 its place when there are two real implementations: Provider has Ollama and a mock, Converter
-has PDF and Word, Notifier has ntfy and its test double, Retriever has words and meaning. An audit trail and a hardware
-profile have one each, so they stay concrete. Putting them under `adapters` would imply a
-port that does not exist and invite someone to add one for symmetry.
+has PDF and Word, Notifier has ntfy and its test double, Retriever has words and meaning. An
+audit trail and a hardware profile have one each, so they stay concrete. Putting them under
+`adapters` would imply a port that does not exist and invite someone to add one for symmetry.
 
-`core/workspace.py` calls `Path.resolve`, so it is not free of the filesystem. That is a
-deliberate exception: "nothing outside the workspace is touched" is a rule in PRINCIPLES
-rather than a service the core consumes, and resolving a path is how the rule is checked.
-Naming the exception is better than a layering that quietly launders it.
+**Three ports have one implementation, and are ports for a different reason.** The judge,
+the embedder and the registry each ask a different question of a different endpoint - is
+this reading supported, what is this text's vector, what is this DOI - and the port is what
+keeps that question from being asked any other way: a registry answer can only arrive as a
+bounded `Work`, never as text a model wrote (ADR-053, ADR-061, ADR-067). That is a weaker
+reason than two implementations, and it is the one they have.
+
+`core/` is not free of the filesystem, and says where. `workspace.py` resolves paths, because
+resolving is how the boundary is checked; `config.py` reads the configuration and the
+`.env` beside it, and sets the environment from the second; `declared.py` reads the
+`skills/` folder; `kinds.py` opens a file to say what it is. Each reads what the rules are
+*about* rather than doing work the rules describe. Naming the exceptions is better than a
+layering that quietly launders them.
 
 **The restructure fixed a real inversion, and needed two moves rather than one.** `run_skill`
 orchestrated from inside `core.skill`, so the module holding the pure planning logic dragged
@@ -88,9 +97,10 @@ document. The slot is part of a prompt's shape, so it moved to `core.fence`, and
 did `core` stop reaching downward. Measuring the import graph again after each move is what
 found the second one.
 
-The layering is enforced by a test rather than described in this chapter. Seven directories
-whose names carry meaning are five directories somebody will eventually break, and a layout
-in a document is a wish.
+The layering is enforced by a test rather than described in this chapter - for every layer
+but `system/`. Directories whose names carry meaning are directories somebody will
+eventually break, and a layout in a document is a wish. Every module, one line each, is in
+`src/README.md`, and a test keeps that list whole.
 
 ## Where a side effect lives: reading files
 
@@ -101,8 +111,13 @@ produces two things the cycle can act on: the files it wants, as the action's
 The plan therefore never holds file content - it holds the hole.
 
 The cycle does the reading, in its established order: preview, confirm, **read**,
-call the provider, record. Reading after confirmation means a declined action never
+call the provider, record. Reading after confirmation means a declined skill run never
 touches a file. Reading before the provider means the contents can reach the prompt.
+
+A question to a corpus is the exception, and it is an honest one only in part. Its preview
+*is* a ranking of the corpus - which passages would go - so the corpus is read to draw it;
+and with an embedding model, drawing it sends the question to the engine before the
+confirmation. The first is what the preview is; the second is an open gap (ADR-105).
 The cycle fills the template and sends the result; the filled prompt is the cycle's
 product, not the plan's.
 
@@ -135,7 +150,10 @@ user, but that does not make its text an instruction LACC should follow. The fen
 a mitigation and the documentation says so - a document containing the closing marker
 ends it early. What keeps the residual risk small is structural rather than textual:
 nothing in LACC acts on a model's answer. It is returned to a person who previewed and
-confirmed the run, and no skill chains from it.
+confirmed the run, and no skill chains from it. Two things come close and are bounded: a
+thread of questions carries forward the passages whose quotations were found, never the
+answer's prose (ADR-091); and `--judge` sends a reading the model wrote, beside its
+quotation, to be judged - a model judging a model, reported as that (ADR-053).
 
 ## A second kind of run, and the cost of admitting it
 
@@ -151,9 +169,9 @@ for eight releases; ingestion is what it was for. Skills keep meaning "work a mo
 does", and `lacc ingest` builds its action directly.
 
 What the cycle grew is a second entry point, not a second sequence. Preview, refuse or
-ask, record - the order ADR-008 fixed - lives in one function that both entry points
-open with; what differs is only the middle, where one reads and calls a provider and the
-other converts and writes. Two public functions each re-implementing the order would be
+ask, record - the order ADR-008 fixed - lives in one function that every entry point
+opens with, three of them now: a run, a run in passes, and a conversion. What differs is
+only the middle, where one reads and calls a provider and another converts and writes. Two public functions each re-implementing the order would be
 two places that know how a run proceeds, which is the thing that order exists to prevent.
 
 The general design is visible from here: an action carrying its own effects, and one
@@ -243,8 +261,9 @@ harder.
 The rest follows from refusing to pretend. Tokens are estimated, because LACC has no
 tokenizer, so the estimate errs toward refusing and is called an estimate everywhere.
 Nothing is trimmed to fit, because trimming is the behaviour being prevented. And when no
-window is configured, the run proceeds and says so, because an unset option should not
-quietly become an assumption in either direction.
+window is configured, a single run proceeds and says so, because an unset option should not
+quietly become an assumption in either direction. Reading in passes and asking a corpus
+refuse instead: both divide a budget, and there is none to divide.
 
 ## A check that can be checked
 
@@ -263,8 +282,10 @@ Two things follow from that, and the second is the interesting one.
 
 The first is that the port grew - a completion now carries what the engine reported about
 producing it. The line is that these are facts about a call that already happened, never
-inputs to the next one. Generation parameters stay deferred. A port that can ask a question
-but not hear the answer is minimal in the wrong place.
+inputs to the next one. A port that can ask a question but not hear the answer is minimal in
+the wrong place. Generation parameters came later, each when a measurement asked for it:
+the temperature the skill sets (ADR-033), a shape the engine is made to produce (ADR-052),
+and whether a model that reasons is asked to (ADR-098).
 
 The second is that LACC does not learn from what it measures. Closing the loop is the
 obvious next move and it is refused: a constant that adjusts itself makes the ceiling
@@ -500,7 +521,8 @@ first look at an actual rejected quotation said otherwise.
 
 The subpackage split this section used to anticipate has happened: `core/`, `ports/`,
 `adapters/`, `features/`, `views/` and `system/` are described above and enforced by
-`tests/test_layering.py`, in both directions (ADR-029, ADR-066).
+`tests/test_layering.py`, in both directions, for every layer but `system/` (ADR-029,
+ADR-066).
 
 **Two gaps this section used to name are closed**, and what replaced them is more useful than
 the plan was.
@@ -509,9 +531,11 @@ the plan was.
 window this runs against, and the largest documents were the ones refused. The selection step
 is the `Retriever` port with two implementations behind it - words, and words fused with
 meaning (ADR-050, ADR-061) - and the documents that did not fit enter either in passes
-(ADR-045) or as one numbered section taken out of them (ADR-076). The honest limit is the
-budget rather than the ranking: over a corpus of 777 checked quotations a 32k window admits
-about 214 of them, so roughly a quarter enters whatever the ranking says.
+(ADR-045) or as one numbered section taken out of them (ADR-076). Passes turned out to
+help documents that fit as well: six of them gave 59 verified quotations read whole and 352
+read in passes, because a prompt asks once however much it is shown (ADR-089). The limit
+is now the ranking as much as the budget: over 1,129 checked quotations a 32k window admits
+about 220, a fifth (ADR-091).
 
 *Factual metadata.* Asked for a journal, a model supplied one from memory and did not say
 that it had - twelve fabrications in twenty-four, with an explicit instruction not to. It now
@@ -520,6 +544,25 @@ two switches that both have to be on, with a preview that names how many and whe
 (ADR-067, ADR-083). `lacc bib` writes the answers kept as BibTeX, offline, escaped as a
 third party's text and with the keys a person already cites left alone (ADR-102).
 
-What the structure still does not have is coverage - which parts of a subject a bibliography
-speaks to and which it does not. Its precondition is unchanged and is why it has not been
-built: **a gap measured over an incomplete corpus is a false gap.**
+*Coverage* - which parts of a subject a bibliography speaks to - waited on one condition,
+**a gap measured over an incomplete corpus is a false gap**, and was built when the corpus
+was complete enough: the distance from each topic to its nearest quotation, read against a
+topic deliberately outside the field, and nothing ever called a gap (ADR-088).
+
+*What was done.* The trail was hash-chained from early on and could only be checked. It can
+now be read - every run by day, how it ended by its own records, each record with what was
+sent and said - in the window's Audit section, one workspace at a time, because the trail
+lives inside the workspace (ADR-104). Where the work stands is `lacc status` and the
+window's first section (ADR-080); which work a document is, when nothing in it says, is
+`lacc identify` and a note beside the file (ADR-087).
+
+*Skills a person writes.* A skill can be declared in a YAML file in `skills/` beside the
+configuration, and may only read; it cannot replace a built-in one (ADR-048). That is the
+discovery an earlier version of this section treated as a future registry.
+
+*The window acts, in four places, each shown first.* Ask sends a question once its preview
+is drawn (ADR-085); Engines asks a host what it holds when a button is pressed; Configuration
+rewrites settings after drawing every change, never a ceiling (ADR-094); Workspaces makes a
+new one after saying what it would cost (ADR-093). Running a skill that writes to the
+workspace is still the command line's, and is the next thing an interface that acts would
+have to earn.

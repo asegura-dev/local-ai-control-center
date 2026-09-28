@@ -5,7 +5,47 @@ described with more confidence; later ones are direction and are expected to cha
 as real code reveals what each one actually needs. This is not a schedule and
 carries no dates.
 
-## Done
+Most of it is history, kept on purpose: the plans that were overtaken stay beside what
+actually arrived. **Where LACC is now, and what comes next, is the first section.**
+
+## Where it stands - 27 September
+
+**v2.10.0**, released on 23 September. Since then, in the changelog under *Unreleased*: the
+window scrolls, opens where it can be seen, and keeps an answer that arrives while you are
+elsewhere (ADR-095, ADR-096, ADR-099, ADR-100); a model that reasons is told whether to
+(ADR-098); a converted file says what its PDF says (ADR-101); `lacc bib` (ADR-102); six
+sentences the program said that were not so (ADR-103); the Audit section (ADR-104); and three
+promises the code had stopped keeping (ADR-105).
+
+What exists, by what it is for:
+
+| For | What |
+|---|---|
+| reading a library | `ingest`, `sections` to take one part of a document, `references`, `metadata`, `identify`, `resolve`, `bib` |
+| checking what a model says | `run extract_claims`, `collect` and `corpus`, every quotation checked against its document; `--in-passes`; `ask` over a corpus, with `--judge` |
+| checking what you wrote | `review` - your draft against your sources |
+| seeing the whole | `status`, stage by stage with what each is missing; `coverage`, how far each topic is from its nearest quotation |
+| a window on all of it | fourteen sections in three groups; four act, only when asked and each shown first |
+| the record | a hash-chained trail per workspace, `verify`, and the Audit section to read it |
+
+**What is next** - direction, in the order the thesis this is used for needs it:
+
+1. **Close what ADR-105 named.** `review`, `resolve`, `identify` and `coverage` leave no
+   record; and preparing a question embeds it before the preview that asks whether to send.
+2. **Measure the newer models on the old question.** With a second graphics card, a 32B at
+   a full window - and extraction re-run with the newer models against the figure this
+   project is cited by, 48 quotations of 237 not in their document.
+3. **Projects over one library**, one per paper, and a window section for writing, whose
+   guardrails come from the blind rating of what the models changed in real paragraphs.
+4. **What fits the machine**: the models a pair of cards can hold, pulled from the window,
+   against a list the person keeps.
+5. **v3.0.0**, as written at the end of this chapter: discovery with a whitelist, and running
+   a skill that writes, from the window.
+
+## Done, through v0.30.0
+
+Later versions, one line each, are the changelog; the sections below record what they
+decided and why.
 
 - **v0.0.1 - Scaffold.** An installable package, the quality gate (lint, format,
   strict type checking, tests), the documentation system, and the MIT license.
@@ -135,7 +175,7 @@ surfaced the next gap in what the system could verify, and that gap justified th
 release. That loop has no natural end, since there is always something more to check.
 By v0.23.0 the test suite was larger than the code and twenty-four decision records
 described a system that could summarize a file, critique a file, and convert a
-document - two of the six steps this chapter lays out, with the second finished nine
+document - two of the six steps this chapter laid out then, with the second finished nine
 releases earlier.
 
 Not all of it was a detour. The context ceiling and truncation detection are
@@ -203,7 +243,7 @@ records is still the trade-off; what changed is the tense. It was read as a stat
 what is coming for longer than it was true, which is the failure chapter 4 names as **asking
 when a figure was taken** - and a roadmap is a figure too.
 
-The name is free again. What v2.0 means now is further down.
+The name was free again; what v2.0 turned out to be is further down.
 
 v2 is one thing, and the list it replaced was six phrases (ADR-045). **A document too large
 for the window is read in passes over its pages**, which is what a tool for writing from
@@ -256,7 +296,9 @@ built on something finished rather than becoming the place where behaviour is de
 > UI or a web application. The condition held: `views/` draws and decides nothing, and
 > `tests/test_layering.py` enforces that in both directions. It read and ran nothing for
 > eight sections; the ninth asks one question, behind a preview that has to be drawn before
-> the control that sends it exists (ADR-069 to ADR-077, ADR-085).
+> the control that sends it exists (ADR-069 to ADR-077, ADR-085). **It has fourteen now**,
+> and four act, each shown first: Ask, Engines, Configuration and Workspaces (ADR-093,
+> ADR-094). Audit reads what was done and cannot change it (ADR-104).
 
 Converting the finished Markdown to LaTeX is not on this list. Pandoc does that well
 already, and LACC has no reason to reimplement it.
@@ -448,8 +490,8 @@ real launch with the suite green.
 
 So the rule is in the suite rather than in anyone's memory: every field with a default, on
 every model the program builds in code rather than reads from a file, must be set somewhere
-in the source. Eighty-seven fields qualify; all pass now, and a third instance fails the build
-(ADR-055).
+in the source. Eighty-seven fields qualified then, every field added since is held by the
+same rule, and a third instance fails the build (ADR-055).
 
 **For a roadmap, the lesson is what "done" is allowed to mean.** This document and the
 changelog both listed a feature that existed as a type and not as a path. Neither was lying:
@@ -490,12 +532,13 @@ of sentences, not of tables: *has anyone looked?*
 
 ## Retrieval, built - and what using it found
 
-The wall named throughout this document: a corpus of this size - 654 quotations then, 777
-citable of 881 now - does not fit a window, and the largest
-documents had to be read in passes to enter it at all. Choosing by meaning is built (ADR-061), measured, and honest
-about its size: decisive across languages - eight relevant of the first eight against about
-three by words - better in English on one question, which is a story, and blunted at this
-corpus size because a 32k budget admits a third of the corpus whatever the ranking says.
+The wall named throughout this document: a corpus of this size - 654 quotations then, 1,129
+citable on 23 September - does not fit a window, and the largest documents had to be read in
+passes to enter it at all. Choosing by meaning is built (ADR-061), measured, and honest about
+its size: decisive across languages - eight relevant of the first eight against about three
+by words - better in English on one question, which is a story, and blunted then because a
+32k budget admitted a third of the corpus whatever the ranking said. At 1,129 it admits a
+fifth, and the ranking decides what gets in (ADR-091).
 
 **Then the tool was asked a question somebody actually wanted answered, and that found three
 defects 587 tests had not** (ADR-062). A declared skill's prompt never carried the question.
@@ -508,11 +551,12 @@ checks found six defects of one shape; one real use found three more of a shape 
 looks for, because a check asks whether the code does what it says and a use asks whether
 what it says is what somebody needed.
 
-The fourth defect is unfixed and is a choice rather than a bug: `draft` asks for prose of
-three to six sentences resting on one quotation, which cannot hold it, so every paragraph is
-under-cited by construction and the judge flags all of it. Every figure in those paragraphs is
-in the corpus - missing citation, not invention. How to resolve it changes how a person
-writes, so it waits for the person.
+The fourth defect was a choice rather than a bug: `draft` asks for prose of three to six
+sentences resting on one quotation, which cannot hold it, so every paragraph is under-cited
+by construction and the judge flags all of it. Every figure in those paragraphs is in the
+corpus - missing citation, not invention. How to resolve it changes how a person writes, so
+it waited for the person, who chose: write dense, let the judge mark what needs support, and
+read `draft`'s quotation as the passage a paragraph is anchored to (ADR-063).
 
 ## The route from here: v2.0 and v3.0
 
@@ -537,7 +581,8 @@ way round.
 written. What is left of v1.9.0 is not code: two documents that have no quotation in the
 corpus, which is a run rather than a release - **a version of the software does not depend on
 the state of somebody's corpus**, and putting it on the release checklist was a mistake of
-judgement corrected here.
+judgement corrected here. Both have entered since; the guideline, through the sections taken
+out of it (ADR-082).
 
 v3.0.0 keeps its meaning: what can happen without you typing.
 
@@ -581,10 +626,18 @@ command: it is a different answer to what this tool is for.
 asked to go, and each thing asked for turned out to matter more than clustering: a
 bibliography that can be handed in, a reviewer for your own prose, a guideline that can be
 read one section at a time, and an interface for somebody who is a researcher rather than an
-operator. Coverage is still the right idea and still carries its precondition - **a gap
-measured over an incomplete corpus is a false gap** - and it is still not built.
+operator. Coverage was still the right idea and still carried its precondition - **a gap
+measured over an incomplete corpus is a false gap** - and it was built in v2.3.0, once the
+corpus was complete enough, by distance rather than by clustering (ADR-088).
 
-### What this section planned, and still argues for
+### What this section planned, kept as the plan it was
+
+**Most of what follows has since happened, some of it in another form**, and the figures in
+it are the day it was written. The slices exist - twenty modules in `features/`. The converse
+rule is a test (ADR-066). `_collected_markdown` and `_assembled` left `cli.py`, which has
+grown anyway. The window arrived as v2.0.0 rather than v2.5.0, and acts in four places.
+Coverage is distance rather than clusters. What has not happened is at the end: discovery,
+and running a skill that writes, from the window.
 
 ### v2.0.0 - the core takes back what is its own, and coverage becomes a thing that exists
 
@@ -693,6 +746,9 @@ text until it is accepted into the workspace.
 **An interface that acts**, with preview and confirmation on screen. The delicate part is named
 in advance: a click must not become easier to give than the confirmation it replaces. That is
 where a principle erodes quietly, so it gets its own record rather than arriving as a button.
+Part of it has arrived that way, one record at a time: the window asks a corpus (ADR-085),
+rewrites a configuration and makes a workspace (ADR-093, ADR-094), each behind the drawing of
+what it would do. What has not: running a skill that writes to the workspace.
 
 ### Deliberately not on the critical path
 

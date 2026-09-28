@@ -85,8 +85,9 @@ The tenth is the ninth's twin and it cost more, because it had been written into
 premise rather than as a prediction. The plan's next piece was approximate deduplication, on
 the stated grounds that the corpus held near-duplicates between documents. Nobody had looked.
 **It held none** - all 654 quotations, all 26 documents at the time, zero pairs across a
-document boundary; the corpus has since grown to 881 collected and 777 citable across 31
-documents, and this has not been re-run over them - and the entire exact comparison it was to be an approximation of takes 133
+document boundary; the corpus has since grown to 1,129 citable quotations (ADR-091), and
+this has not been re-run over them - and the entire exact comparison it was to be an
+approximation of takes 133
 milliseconds. What it does hold is six repeats inside a document, of which equality was
 already catching three. A sentence stated as a fact in a planning document is a figure with no
 measurement behind it, and it is harder to notice than a wrong number because it never looked
@@ -171,6 +172,10 @@ those are not present in any form tried - not stitched from separate sentences, 
 reworded. The check catches them. Nothing in the fluency of the surrounding prose
 distinguishes the other four.
 
+That is the figure to cite, with its conditions: one controlled run, 24 papers, one model.
+Larger corpora built later under other conditions ran lower - 102 of 881 truly absent
+(ADR-081), 15 of 264 read in passes (ADR-089) - and are not the same measurement.
+
 **How much you show at once changes how much you get.** Three papers that fit the window
 comfortably were read twice - whole, and in passes of about three pages:
 
@@ -200,8 +205,11 @@ material did not contain. This is the same shape as the fence: the instruction w
 and the structural change worked.
 
 **A model that does not fit its card runs eleven times slower.** 29 tokens per second
-against 2.7, for a 32B model at 19.9 GB on a 15.9 GB card. This is the largest single factor
-measured in this project, and no architectural decision affects it.
+against 2.7, for a 32B model at 19.9 GB on a 15.9 GB card. It was the largest single factor
+measured in this project until 27-sep, and no architectural decision affects it. What
+overtook it is one line of configuration: a model that reasons before answering took 40
+seconds and about 5,000 characters of reasoning for one sentence, and half a second told
+not to - eighty times (ADR-098).
 
 **One run per configuration measures nothing.** The same 14B on the same paper four times
 gave 4, 5, 7 and 3 claims, of which 2, 4, 3 and 2 verified - between 43% and 80%. That
@@ -350,12 +358,12 @@ is building for a cost that is not there, which is the lesson ADR-054 already pa
 first result a sentence the word ranking missed entirely; about seven of eight on topic
 against about six. Four runs would be a measurement.
 
-**And the budget blunts much of it at this size.** With a 32k window the selection admits
-**214 of 777 citable passages** - re-taken 22 September; it was 218 of 654 when this was first
-written - so between a quarter and a third of the corpus enters whatever the ranking says, and
-retrieval decides order and discards rather than membership. The share falls as the corpus
-grows, which is the direction that makes retrieval decisive; saying it already is would be the
-thirteenth wrong figure.
+**And the budget decides more as the corpus grows.** With a 32k window the selection admits
+**about 220 of 1,129 citable passages** - 219 and 226 on two questions on 23 September
+(ADR-091); it was 214 of 777 on 22 September and 218 of 654 when this was first written.
+At a quarter to a third, retrieval decided order and discards more than membership; **at a
+fifth it decides membership too**, which is the direction this paragraph predicted and now
+the state it describes.
 
 **Fusion is not measured against either ranking alone.** It is built and tested for mechanism
 and no figure says it wins.
@@ -553,12 +561,36 @@ The window was offering **its own coverage reports** as papers to cite, along wi
 file, six extracted sections, and the standing context that `status` excludes by
 configuration. Nothing had broken yet, which is luck rather than design.
 
-That is the third time this shape has appeared here: two writers of the corpus format
+That was the third time this shape appeared here, and it has appeared twice more since:
+`resolve` reading a DOI one way and `references` another (ADR-101), and a DOI established on
+a Markdown file invisible from its PDF (ADR-103). The first three: two writers of the corpus format
 (ADR-065), a vocabulary copied into the measurement tool that fell thirteen names behind
 (ADR-086), and now this. **Every one was in the right layer.** The rule that guards layers
 checks where code lives, not whether the same decision is made twice in the right place -
 which is why the check added this time counts *functions that return kind names* rather than
 where they sit (ADR-090).
+
+## What 27 September measured
+
+One day of using the program on the thesis's own material, each figure with the record that
+holds it:
+
+| What | Before | After | Record |
+|---|---|---|---|
+| One notch of the wheel | 3 px | 57 px, three lines at 125% | ADR-096 |
+| A window's second opening | 156 px below a 1,140 px work area | at the top, both times | ADR-100 |
+| One sentence from a model that reasons | 40 s, ~5,000 characters of reasoning | 0.5 s with `thinking: false` | ADR-098 |
+| Papers `resolve` called silent, run on Markdown | 23 | 14 of 30 own DOIs found beside them | ADR-101 |
+| Registry answers kept, as BibTeX | - | 203 works from 290 DOIs; 189 new beside 18 cited, no key shared; biber and pandoc silent | ADR-102 |
+| pypdf's font warning over seven papers | 594 lines | one line each; with the library it asks for, 16 spaces differ in 407,000 characters and no word | ADR-103 |
+| Hidden text reported in Dou 2020 | "3 of 3" | 3 of 1,594 | ADR-103 |
+| Documents `resolve` called silent that had an established DOI | 8 of 16 | 0 | ADR-103 |
+| The thesis's audit trail | - | 1,723 records, 250 runs; walked in 1.0-1.8 s; 9 runs with no end recorded | ADR-104 |
+| Rows of the assurance chapter that read *held* | - | 5 false: three fixed, two open | ADR-105 |
+
+Two of these are the chapter's shape in miniature. `resolve` reported silence that was
+the tool's, not the papers' - the pattern of the list above. And the assurance rows were
+sentences true when written, still reading *held* long after the code beside them moved.
 
 ## How to read a figure from this project
 
@@ -566,10 +598,12 @@ where they sit (ADR-090).
 reporting its own blind spot. The question that found every one of them was not "what is the
 rate" but "what did it reject, and was it right to".
 
-**Ask whether the answer was known in advance.** Every rate published here was measured
+**Ask whether the answer was known in advance.** Most rates published here were measured
 against real papers where nobody knew the correct answer, which is the condition that
-produced the errors. A fixture corpus with seeded truth is decided and deliberately not yet
-built (ADR-044).
+produced the errors. A fixture corpus with seeded truth now exists - twelve quotations, six
+real and six planted, and a test that grades the check against them (ADR-044,
+`tests/fixtures/seeded/`) - and the judge was graded on pairs labelled in advance. Those are
+the figures whose answer was known.
 
 **Ask how many runs.** Two runs are a story, four are a measurement, and this project has
 published figures from one.
