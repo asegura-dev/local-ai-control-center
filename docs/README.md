@@ -48,9 +48,20 @@ The **numbered chapters (00-05)** above are the linear *book* and live flat in
   is usually also about grounding and about honesty - under one heading, hiding it from the
   others.
 
-As the project grows, other layers will be added when there is something real to
-put in them - operational guides, status logs of what each phase produced, and a
-teaching course. They are not created in advance; empty folders do not belong here.
+Around them, each made when there was something real to put in it - empty folders do not
+belong here:
+
+- [`ORIENTATION.md`](ORIENTATION.md) - one page, read first: how to run anything here, the
+  gate, and the rules that are not preferences.
+- [`guides/`](guides/) - step by step: running LACC the first time, asking a corpus and
+  writing from it, reading what was done, setting up and running the server machine, and the
+  working method itself. [INDEX.md](INDEX.md) lists every one.
+- [`stack/`](stack/) - what LACC is made of: each technology and why it is here, a run
+  followed function by function, and every file it writes.
+
+And beside the code, [`src/README.md`](../src/README.md) names every module and
+[`tests/README.md`](../tests/README.md) every test file, one line each - kept true by
+`tests/test_indexes.py`, so neither can age into a list of files that are gone.
 
 ## Decisions (ADRs)
 

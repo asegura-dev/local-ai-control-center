@@ -9,6 +9,16 @@ what it contains. For the reading order and status, see [README.md](README.md).
 |---|---|
 | [ORIENTATION](ORIENTATION.md) | One page, read first: run it through `run.ps1` and never bare `uv` - and why, measured; the four-command gate; where to look for what the work stands at, what the project is like now, and why anything is the way it is; the shape of the code and the layer rule; the four rules that are not preferences; and what this will not do. |
 
+## The stack and the code (`docs/stack/`, `src/`, `tests/`)
+
+| File | What's in it |
+|---|---|
+| [stack/README](stack/README.md) | What LACC is made of: every library with its version, what it does here, where it is used and which record chose it; what it reaches outside the machine and how; the tools of the gate; and what the thesis side uses that LACC writes for. |
+| [stack/a-run-end-to-end](stack/a-run-end-to-end.md) | `lacc run extract_claims paper.md`, function by function: the plan, the preview, the cycle - authorise, read, measure, send, check - every audit event on the way, and what you are told after. |
+| [stack/files-on-disk](stack/files-on-disk.md) | Every file LACC writes, and where: results only ever as new files, its own records rewritten beside yours, and the two things it writes outside the workspace, both from the window. |
+| [src/README](../src/README.md) | Every module, one line each, by layer, with what each layer may import and the test that holds it; and where to start reading. Kept true by `tests/test_indexes.py`. |
+| [tests/README](../tests/README.md) | Every test file, one line each: the guards on the code's own shape first, then the rules, the cycle, the adapters, the features and the command line; and what is not tested, and why. Kept true by `tests/test_indexes.py`. |
+
 ## Chapters - the book (`docs/NN-*.md`)
 
 | # | File | What's in it |

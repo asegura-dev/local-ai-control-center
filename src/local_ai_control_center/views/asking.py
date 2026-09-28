@@ -1,8 +1,9 @@
-"""The one section that runs something, as a thread of questions (ADR-085, ADR-091).
+"""The section that asks an engine something, as a thread of questions (ADR-085, ADR-091).
 
-Every other section reads. This one types a question, shows what would be sent, and - on a
-second press - sends it. The reasons that kept the window read-only for eight sections are
-answered here rather than dismissed:
+It types a question, shows what would be sent, and - on a second press - sends it. It was the
+only section that acted until Workspaces and Configuration began to write (ADR-093, ADR-094).
+The reasons that kept the window read-only for eight sections are answered here rather than
+dismissed:
 
 **The preview is not a dialog, it is what produces the button.** `Prepare` draws what would
 go; the control that sends is created by that drawing, so there is no path from typing to an

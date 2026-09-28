@@ -59,6 +59,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counted stray carriage returns, and there it had become an ordinary line break.
 
 ### Added
+- **Where each thing lives, and what LACC is made of.** `src/README.md` names every module by
+  layer - what each layer may import and the test that holds it, and where to start reading -
+  and `tests/README.md` every test file, the guards on the code's own shape first. Both are
+  held by `tests/test_indexes.py`: a file added without its line, or a line left after its
+  file is gone, fails the suite. `docs/stack/` says what each technology is and why it is
+  here, follows `lacc run` function by function through every audit event, and lists every
+  file LACC writes - results only ever as new files, its own records rewritten, and the two
+  things it writes outside the workspace, both from the window.
 - **Audit: what was done, read in the window** (ADR-104). A fourteenth section lists the
   runs the workspace's trail holds - newest first, under their day, each with what ran and
   how its own records say it ended - and opens any of them record by record, with the

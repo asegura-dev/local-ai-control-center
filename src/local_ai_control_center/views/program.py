@@ -1,4 +1,4 @@
-"""The sections that read the program: its commands, its prompts, its configuration.
+"""The sections that read the program: its commands and its prompts.
 
 These answer *what can this do and what is it about to ask*, which is a different question
 from anything in the workspace. None of them runs anything: a plan is pure, a command list is
