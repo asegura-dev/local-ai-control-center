@@ -192,10 +192,13 @@ append-only, hash-chained audit log.
   answering not to: one sentence took 40 seconds on qwen3.5:9b with its reasoning, and half
   a second without.
 
-Why the checking matters, in one measured number: across 24 papers of a real bibliography,
-a 14B model produced 237 quotations and **48 of them are not in the document they cite** -
-about one in five, with 44 absent in any form tried. The check catches them. Nothing about
-the fluency of the surrounding prose distinguishes the other four.
+Why the checking matters, in one measured number: across the papers of a real bibliography,
+a 14B model produced 237 quotations and **42 of them are not in the document they cite** -
+about one in six, and re-run on 28 September it gave 38 of 216. The check catches them;
+nothing about the fluency of the surrounding prose distinguishes them. It was published as
+48 until the figure was re-taken with today's checker, which reads a line break a model
+writes as `\n`. Newer models invent far less on the same papers - qwen3.5:9b, 43 of 834 -
+and the check matters exactly as much, because the 43 read like the other 791.
 
 It is a check on quotations, not on claims: it can tell you the words are really there, and
 it cannot tell you the paper means what the model says it means. And it does not see text a

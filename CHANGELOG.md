@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Measured
+- **Three models on the same seventeen documents** (28-sep): `extract_claims` at 32k,
+  temperature zero, `thinking: false`, each model entirely on the card, every quotation
+  re-checked with today's checker. qwen2.5:14b, 216 quotations, **17.6% not in their
+  document**; qwen3.5:9b, **834 quotations, 5.2%** - 4.4 times the verified quotations at a
+  third of the invention rate, in twice the time; gemma4:12b, 702 and 7.7%. One run each.
+- **The figure this project was cited by, re-taken: 42 of 237, not 48.** Six were line
+  breaks a model wrote as `\n`, all in one document, which the checker has read since
+  ADR-081; the figure was repeated without being re-taken. The thirteenth wrong figure.
 - **The engine's cache at 8 bits, on the server this was built with** (28-sep, Ollama 0.34.0,
   32k window). qwen2.5:14b went from 15.74 GB, 93% on the card, to **12.18 GB, all of it on
   the card**; qwen3.5:9b and gemma4:12b barely changed, their architecture keeping little

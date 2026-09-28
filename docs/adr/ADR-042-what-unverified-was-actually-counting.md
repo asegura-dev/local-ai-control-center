@@ -114,3 +114,13 @@ direction that flattered the tool by making the model look worse. This ADR was t
 to that pattern, and it overshot in the opposite direction: it reported a model with no
 fabrications at all. A project that has learned it is biased one way is not thereby unbiased.
 
+## Second correction (28 September)
+
+**48 was right for the checker of v1.0.0 and is not for today's.** Re-run over the same 237
+quotations, the checker of v1.0.0 still finds 189 and misses 48; today's finds 195 and misses
+**42**. The six that changed are all in one document, the GLOBOCAN fact sheet for Mexico -
+rows of a table the model quoted with its line breaks written as `\n`, which the checker has
+read as line breaks since ADR-081. They were never inventions. The figure was repeated for two
+weeks after the checker changed, which is the thirteenth wrong figure in
+`docs/04-measurements.md`. The same model run again on the same seventeen documents gave
+38 of 216 (17.6%): the rate is one in six.

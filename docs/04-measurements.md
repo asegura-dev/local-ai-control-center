@@ -12,7 +12,7 @@ rejected can.**
 Everything below was measured against a real bibliography on real hardware. Where a figure
 was published and later corrected, both are shown, because the correction is the finding.
 
-## Twelve wrong figures, and which way each one leaned
+## Thirteen wrong figures, and which way each one leaned
 
 | Reported | What it actually was | Fixed in |
 |---|---|---|
@@ -27,6 +27,7 @@ was published and later corrected, both are shown, because the correction is the
 | The corpus has near-duplicate quotations between documents | It has none. Every repeat in it is inside one document, and there are six | ADR-054 |
 | A schema the engine enforces, shipped and documented | Nothing in the program could switch it on. Six tests passed by building the object the program never builds | ADR-055 |
 | Enforcing the shape gives 0 quotations against 19; do not use it | The parser refused a truncated document carrying 76 entries. It gives **32 verified against 15**, and the advice was backwards | ADR-056 |
+| **48 of 237 quotations are not in their document** - the figure this project was cited by | **42**. Six were line breaks the model wrote as `\n`, all in one document; the checker has read them as line breaks since ADR-081, and the figure went on being repeated without being re-taken | re-checked 28-sep |
 
 Six of these made the model look worse than it was. The seventh was the correction to that
 pattern, published in the same release that introduced it, and it overshot: it credited a
@@ -66,6 +67,14 @@ enforced answer was identical to the unconstrained one, word for word. Entry six
 caption repeated. Through entry thirty the fidelity genuinely holds at 93%; the sentence was
 right about what it looked at and wrong about what it claimed. **Checking the first item and
 concluding about the set.**
+
+**The thirteenth is the figure this project was cited by, and it aged rather than
+broke.** 48 of 237 was true with the checker of its release. The checker then learned to
+read a line break a model had written as an escape (ADR-081), and six of the 48 - all in
+one document, the rows of a statistics table - became found; the figure went on being
+repeated for two weeks without being re-taken. It leaned the old way: the model looked
+worse than it was. Re-taken on 28 September it is **42 of 237**, and the same model run
+again on the same seventeen documents gave **38 of 216 - 17.6%, one in six**.
 
 **The eleventh is not a figure about a model at all. It is a feature counted as delivered
 that did not exist.** ADR-052's schema was built, released, described in the changelog and
@@ -166,14 +175,17 @@ words are in a document, never whether what it says is true, and it measures the
 against the fabrications somebody thought to seed.
 
 
-**One quotation in five is invented.** On 24 papers of a real bibliography, a 14B model at
-temperature zero produced 237 quotations; 48 are not in the document they cite, and 44 of
-those are not present in any form tried - not stitched from separate sentences, not
-reworded. The check catches them. Nothing in the fluency of the surrounding prose
-distinguishes the other four.
+**One quotation in six is invented, by the 14B this was built with.** On 24 papers of a
+real bibliography - seventeen of which fit its window - a 14B model at temperature zero
+produced 237 quotations; **42 are not in the document they cite**, by today's checker. It
+was published as 48, and six of those were line breaks written as escapes: the thirteenth
+wrong figure, above. The check catches the rest, and nothing in the fluency of the
+surrounding prose distinguishes them.
 
-That is the figure to cite, with its conditions: one controlled run, 24 papers, one model.
-Larger corpora built later under other conditions ran lower - 102 of 881 truly absent
+That is the figure to cite for that model, with its conditions: one run, seventeen
+documents, a 14B at temperature zero. **Run again on 28 September it gave 38 of 216,
+17.6%**: it reproduces. Newer models invent far less on the same documents - 5.2% and 7.7%,
+below. Larger corpora built later under other conditions ran lower - 102 of 881 truly absent
 (ADR-081), 15 of 264 read in passes (ADR-089) - and are not the same measurement.
 
 **How much you show at once changes how much you get.** Three papers that fit the window
@@ -596,6 +608,36 @@ at 15.74 to the byte, because the engine reads its environment when it starts
 Two of these are the chapter's shape in miniature. `resolve` reported silence that was
 the tool's, not the papers' - the pattern of the list above. And the assurance rows were
 sentences true when written, still reading *held* long after the code beside them moved.
+
+## Three models on the same seventeen documents
+
+On 28 September, `lacc collect extract_claims` over the seventeen documents of `corpus.md`
+that fit a 32,768-token window whole - the ones the 14B's 237 quotations came from - once per
+model: temperature zero, the skill's own; `thinking: false`; the engine's cache at 8 bits;
+each model entirely on the card throughout, read from `/api/ps` every fifteen seconds. Every
+quotation re-checked with today's checker (`features.corpus.recheck`, what `lacc corpus`
+uses), the corpus of 11 September included, so all four are judged alike.
+
+| Model | Minutes | Quotations | In their document | Not | Share not | Answers cut at 8,192 tokens |
+|---|---|---|---|---|---|---|
+| qwen2.5:14b, 11 September | - | 237 | 195 | 42 | 17.7% | - |
+| qwen2.5:14b | 7.9 | 216 | 178 | 38 | **17.6%** | 0 of 17 |
+| **qwen3.5:9b** | 14.6 | **834** | **791** | 43 | **5.2%** | 4 of 17 |
+| gemma4:12b | 16.6 | 702 | 648 | 54 | 7.7% | 1 of 17 |
+
+**The 14B reproduces itself**: 17.6% against 17.7%, two weeks apart. **qwen3.5:9b gives 4.4
+times the verified quotations at under a third of the invention rate**, in twice the time
+and half the memory. The extra quotations are real ones - full sentences, a median of 24
+words against the 14B's 25, and almost no near-copies of one another. The 14B stops early:
+its answers have a median of 963 tokens against about 2,500 for the newer two, and none
+reached the ceiling. Four of qwen3.5's did, so it would have given more with more room.
+
+The invented quotations are about as many in each - 38, 43, 54 - spread over four times as
+many quotations. The check marks every one, so what differs for someone writing from the
+corpus is how much checked material each run leaves.
+
+**One run each.** Two runs are a story and four are a measurement, by this chapter's own
+rule. The difference is large and holds in most documents one by one, and it is one run.
 
 ## How to read a figure from this project
 
