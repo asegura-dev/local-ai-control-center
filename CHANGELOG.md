@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Measured
+- **The engine's cache at 8 bits, on the server this was built with** (28-sep, Ollama 0.34.0,
+  32k window). qwen2.5:14b went from 15.74 GB, 93% on the card, to **12.18 GB, all of it on
+  the card**; qwen3.5:9b and gemma4:12b barely changed, their architecture keeping little
+  cache; qwen3.8:27b is almost all weights - 19.01 to 18.55 GB, still 63% on the card - and
+  needs the second card. Every chat model installed accepts `think: false`; `think: true`
+  is refused by qwen2.5 with a 400. The server guide says so, and how to know the variables
+  took: the first restart left the engine exactly as it was.
+
 ### Fixed
 - **The guides and two messages said what the program no longer is.** The example configuration
   documented fourteen of eighteen settings while the first-time guide said it documented every

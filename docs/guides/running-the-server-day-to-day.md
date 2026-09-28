@@ -177,7 +177,8 @@ A model that reasons before answering holds the card for the whole of it: one se
 took 40 seconds on qwen3.5:9b with its reasoning and half a second without. `thinking:
 false` in LACC's configuration asks it not to (ADR-098).
 
-Holding that cache at 8 bits roughly halves it, at no cost worth noticing:
+Holding that cache at 8 bits roughly halves it. What it costs in the quality of answers was
+not measured here; what it saves was:
 
 ```powershell
 [Environment]::SetEnvironmentVariable("OLLAMA_FLASH_ATTENTION", "1", "Machine")
@@ -200,3 +201,37 @@ it holds - `GET /api/ps` returns `size` and `size_vram`, and the two being diffe
 whole story. See
 [choosing hardware](choosing-hardware-for-local-models.md#if-you-can-build-a-desktop-instead)
 for the sizing table.
+
+### Measured again with the cache at 8 bits
+
+On 28 September, same server, same Ollama 0.34.0, every model at a 32,768 window, read from
+`/api/ps` - before, and after the two variables above:
+
+| Model | Before | With the cache at 8 bits |
+|---|---|---|
+| qwen2.5:14b | 15.74 GB, 93% on the card | **12.18 GB, all of it on the card** |
+| qwen3.5:9b | 6.58 GB, all on the card | 6.15 GB |
+| gemma4:12b | 8.42 GB, all on the card | 8.11 GB |
+| qwen3.8:27b | 19.01 GB, 61% on the card | 18.55 GB, 63% |
+
+**The 14B stops reading across the bus** - the one that mattered, because it is the model the
+configurations name. The two newer small models barely change: their architecture keeps
+little cache to begin with. And the 27B is almost all weights, so no setting fits it on a
+16 GB card; a second card does.
+
+### The variables do nothing until the engine starts again
+
+`SetEnvironmentVariable` stores the value; a process reads it when it starts. Ollama started
+from the tray, or by a scheduled task that was already running, keeps the environment it was
+born with - and on 28 September the first restart left the server exactly as it was, the
+same 15.74 GB to the byte. The engine writes what it started with in its log, so ask the log
+rather than trusting the restart:
+
+```powershell
+Select-String -Path "$env:LOCALAPPDATA\Ollama\server.log" -Pattern "OLLAMA_KV_CACHE_TYPE" |
+    Select-Object -Last 1
+```
+
+It has to say `q8_0`. If it is empty, quit Ollama from the tray and start it again from the
+Start menu - or, for a scheduled task, stop every `ollama` process and start the task - and
+sign out and back in if even that leaves it empty.

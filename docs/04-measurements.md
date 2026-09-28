@@ -588,6 +588,11 @@ holds it:
 | The thesis's audit trail | - | 1,723 records, 250 runs; walked in 1.0-1.8 s; 9 runs with no end recorded | ADR-104 |
 | Rows of the assurance chapter that read *held* | - | 5 false: three fixed, two open | ADR-105 |
 
+And on 28 September, with the engine's cache at 8 bits: qwen2.5:14b at a 32k window from
+15.74 GB, 93% on the card, to 12.18 GB, all of it on the card - the first restart had left it
+at 15.74 to the byte, because the engine reads its environment when it starts
+(`guides/running-the-server-day-to-day.md`).
+
 Two of these are the chapter's shape in miniature. `resolve` reported silence that was
 the tool's, not the papers' - the pattern of the list above. And the assurance rows were
 sentences true when written, still reading *held* long after the code beside them moved.
