@@ -70,8 +70,12 @@ the rule reads as a setting nothing reaches. It was right about the shape: those
 with every redraw and the question does not. They are kept apart, in a map of where each
 corpus's waiting is on the screen now.
 
-Not yet seen with a real engine: the stand-in answers in one to five seconds, a real one in
-tens.
+Not yet seen with a real engine when this was written: the stand-in answers in one to five
+seconds, a real one in tens. **Seen on 28 September**, driving the real window against the
+real server: a question to the 1,300-quotation corpus, prepared in 4.5 seconds and sent to
+qwen2.5:14b; the window moved to *Where it stands*; the answer arrived 20 seconds later,
+with nobody looking, and was kept and marked unseen; back in Ask, the note that it arrived
+elsewhere was on the screen, with two readings and both quotations found.
 
 ## Trade-off
 
