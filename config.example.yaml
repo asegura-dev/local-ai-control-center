@@ -34,6 +34,14 @@ workspace_in_repository: false
 # value is a clear error rather than a guessed default.
 model: qwen2.5:3b
 
+# A model per skill, for any skill that should not use `model`. Two models measured on
+# the same material differed in kind: the larger was more faithful to what it was
+# handed, the smaller more productive, and running one for everything takes the worse
+# half of both. The routing is a rule you write, never a choice a model makes (ADR-051).
+# models:
+#   extract_claims: qwen2.5:14b
+#   ask_corpus: qwen2.5:32b
+
 # Skills whose output shape the engine is made to produce, named one per line.
 # Empty by default, which means nothing is constrained. Constraining decoding stops
 # the model from emitting anything that does not fit the skill's declared fields -
@@ -82,6 +90,12 @@ output_language: English
 # the audit records how much there was. Set it to false for such a model (ADR-098).
 # thinking: false
 
+# Standing context about your project: a file inside the workspace that the skills which
+# ask for it are given beside the document, so a model reads a paper knowing what your
+# work is about. It is a document LACC never quotes from and never counts as material
+# (ADR-090). Empty by default.
+# context_file: contexto.md
+
 # The largest file LACC will read or convert, in bytes. 32 MiB by default.
 # A document is read into memory whole, so this is a ceiling about the machine, not
 # about the model: whether the text then fits the model's context window is a
@@ -95,6 +109,17 @@ max_input_bytes: 33554432
 # not a grant. It is also the ceiling over `engine_host` and `notifier` below:
 # neither of them reaches anywhere while this is false.
 network_access: false
+
+# Where to ask what a DOI is: `lacc resolve` and `lacc identify`. Empty by default, and
+# empty means no registry is reached at all. It also needs `network_access: true` -
+# neither switch implies the other - and what leaves is a DOI and nothing else: no
+# document, no quotation, no question (ADR-067).
+# registry_url: https://api.crossref.org
+
+# An address to identify yourself to the registry, for its faster queue. Empty by
+# default and never filled in for you: it is your personal data, and trading it for
+# throughput is yours to decide (ADR-067).
+# registry_mailto: you@example.com
 
 # Where the Ollama engine runs. Empty by default, which means this machine.
 # Local-first means not depending on someone else's computer, not staying on one

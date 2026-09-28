@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -364,3 +365,18 @@ def test_thinking_is_unset_unless_written() -> None:
 @pytest.mark.parametrize("value", [True, False])
 def test_thinking_takes_what_is_written(value: bool) -> None:
     assert Config(workspace_root=Path("/tmp/lacc"), thinking=value).thinking is value
+
+
+def test_every_setting_is_documented_in_the_example() -> None:
+    """The first-time guide says every field is documented in the example file.
+
+    On 27-sep four were not - the registry's two, the per-skill models and the standing
+    context - and a person copying the example had no way to know they existed. A setting
+    added without its line in the example, commented or not, fails here.
+    """
+    example = Path(__file__).resolve().parents[1] / "config.example.yaml"
+    text = example.read_text(encoding="utf-8")
+    missing = [
+        name for name in Config.model_fields if not re.search(rf"^#?\s*{name}\s*:", text, re.M)
+    ]
+    assert not missing, f"settings with no line in config.example.yaml: {missing}"

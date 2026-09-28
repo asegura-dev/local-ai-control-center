@@ -127,6 +127,19 @@ systemd holds the environment from the unit file, so there is no login session t
 from and no race of the kind Windows has. If the interface is not up in time, add
 `After=tailscaled.service` to the unit.
 
+### Checking it from where you work
+
+From the machine you run LACC on:
+
+```
+lacc engine test
+```
+
+It asks the host your configuration names whether it can be reached, what it holds,
+whether your model is among them and whether it produces a token, and exits non-zero on
+the first that fails - the check after a restart. Producing a token loads the model onto
+the card, as a run would; the window's *Engines* button does the same.
+
 ## The arrangement that avoids all of this
 
 The race exists because Ollama is told to bind to an address that does not exist yet.
@@ -159,6 +172,10 @@ A model's weights are not all it occupies. The context window LACC asks for is h
 VRAM too, and it is not small: a 14B model at Q4 is about 9 GB of weights, and a 32,768
 token window adds roughly 6 GB more at 16-bit - which is why the measurement at the top of
 this page reads 13.63 GB rather than 9.
+
+A model that reasons before answering holds the card for the whole of it: one sentence
+took 40 seconds on qwen3.5:9b with its reasoning and half a second without. `thinking:
+false` in LACC's configuration asks it not to (ADR-098).
 
 Holding that cache at 8 bits roughly halves it, at no cost worth noticing:
 

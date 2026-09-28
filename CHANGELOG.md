@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The guides and two messages said what the program no longer is.** The example configuration
+  documented fourteen of eighteen settings while the first-time guide said it documented every
+  one; it documents all of them now, and a test fails when a setting arrives without its line.
+  The corpus guide sent a fresh clone to `--using draft`, a skill that is not built in - it
+  now says how to declare it - and gained reviewing your own draft, where the corpus is thin,
+  and citing. A long document was told "LACC cannot yet cut one out for you" long after
+  `sections --take` began doing it, and a test pinned the old sentence; both name the way now.
+  The window's missing-toolkit message recommended bare `uv` where it breaks.
 - **Three promises the code had stopped keeping** (ADR-105), found by checking every row of
   `docs/05-assurance.md` against the source. A question to a corpus was kept word for word in
   the trail under the default `audit_level: standard`, which promises not to keep what was

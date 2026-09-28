@@ -61,7 +61,9 @@ what it is. A total never is.
 
 Scratch scripts belong in a temporary directory, not the repository. When a measurement turns
 out to be worth taking again, it moves into `tools/measure.py` - which prints nothing to a
-file, because [a stored number goes stale](#7-the-traps-in-this-particular-project).
+file, because [a stored number goes stale](#7-the-traps-in-this-particular-project) - or,
+when it is about the window, into `tools/measure_window.py`, which drives the real one
+(ADR-095).
 
 ---
 

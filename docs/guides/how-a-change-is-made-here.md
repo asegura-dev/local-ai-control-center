@@ -62,13 +62,21 @@ logic" check walked top-level functions only, which covered `cli.py` and **barel
 
 Every serious defect in this project was found this way and none was found by a test:
 
-| found by | how many |
+| found by, through 24-sep | how many |
 |---|---|
 | using the tool on real documents | **seven** |
 | the test suite | none of those seven |
 
 The suite was green through all of them, because each was a difference between a real
 document and the documents the tests imagined.
+
+It kept happening. Since then the window was driven with a real mouse (ADR-096) and
+against a stand-in engine (ADR-099), `resolve` was run on the thesis's own papers
+(ADR-101), a bibliography was rendered through pandoc (ADR-102), six sentences were found
+by using the program (ADR-103) - and five promises in the assurance chapter turned out
+false when each was checked against the code (ADR-105). For the window, "real material"
+is the real window: `tools/measure_window.py` drives it and reports text cut off,
+sections out of reach, the wheel, Ask and Audit.
 
 **Decide what you expect before you run it.** `review` was graded on five paragraphs whose
 correct answers were written down first; it caught both planted errors, and the one

@@ -139,12 +139,32 @@ spends about 48 seconds embedding it and writes the vectors to a file beside it;
 question after that is about three seconds. The vectors are a cache - delete the file and it
 rebuilds.
 
-It matters most across languages and as the corpus grows. At 777 citable quotations with a
-32k window the budget admits about 214 of them whatever the ranking says, so what retrieval
-decides at that size is the order and the discards rather than what gets in at all. The share
-falls as you collect more, which is when the ranking starts deciding membership too.
+It matters most across languages and as the corpus grows. At 1,129 citable quotations with a
+32k window the budget admits about 220 of them - a fifth - whatever the ranking says, so
+what gets in at all is now the ranking's decision (ADR-091). At 777 it was a quarter; the
+share falls as you collect more.
 
 ## Drafting
+
+`draft` is not built in: it is a skill you declare, in a `skills/` folder beside your
+configuration - `configs/skills/draft.yaml` for `configs/yours.yaml`. A declared skill may
+only read, and `over: corpus` makes it one you ask a corpus with (ADR-048):
+
+```yaml
+name: draft
+summary: Draft a passage from checked quotations
+over: corpus
+instructions: |
+  Write continuous academic prose, not a list. Where studies disagree, say so.
+fields:
+  - name: paragraph
+    describe: the prose, three to six sentences
+  - name: quote
+    describe: one exact sentence from the passages that the paragraph is anchored to
+    quotation: true
+  - name: source
+    describe: the document named beside that passage
+```
 
     lacc ask "<your question>" --from everything.md --using draft --judge
 
@@ -154,6 +174,42 @@ sentence can establish, which is why this is the command where `--judge` earns i
 
 The loop: draft, read what was flagged, take the candidate that fits or find a better one,
 write the sentence yourself.
+
+## Reading your own draft against the corpus
+
+    lacc review chapter.md --against everything.md --into chapter.review.md
+
+The check turned around: paragraph by paragraph, what your corpus holds up, what it
+contradicts, and what it does not cover - *not covered* meaning nothing you collected holds
+it, which is not the same as wrong (ADR-068). It asks before it sends anything, and no is the
+default. The window's *Reviews* section paints the findings over the draft.
+
+## Where the corpus is thin
+
+    lacc coverage topics.md --against everything.md --into coverage.md
+
+One subject per line, and one line starting with `!` that is deliberately outside your
+field: the rest are read against it. For each topic, how far the nearest quotation is, and
+that quotation printed under it so the number can be checked. **Nothing is called a gap** -
+a similarity orders topics, it does not measure an absence (ADR-088). It needs
+`embedding_model`, and asks before sending the topics and quotations to be embedded.
+
+## Citing what you use
+
+Metadata comes from the registry that assigns DOIs, never from a model - a 14B asked for
+journal names invented twelve of twenty-four (ADR-047). Both switches have to be on in the
+configuration: `network_access: true` and `registry_url: https://api.crossref.org`.
+
+    lacc resolve papers/*.md --into bibliography.md
+    lacc identify "paper without a DOI.md"
+    lacc bib bibliography.registry.json --into new.bib --adding-to yours.bib
+
+`resolve` reads each document's own DOI - from the PDF beside a converted file (ADR-101) -
+and says how many it would send, and where, before sending. `identify` lists the DOIs a
+document prints and chooses none of them: a paper prints the DOIs of what it cites too.
+Name the right one with `--doi`, and it is recorded beside the file. `bib` writes the
+answers as BibTeX with no network: keys like `giesel2016`, never one already in the file you
+name with `--adding-to`, so what it writes can be appended to it (ADR-102).
 
 ## What it will not do
 

@@ -1012,7 +1012,11 @@ def test_a_long_document_says_what_it_will_cost_before_the_question(tmp_path: Pa
     )
     assert "passes" in result.stdout
     assert "rarely one you need in full" in result.stdout
-    assert "cannot yet cut one out" in result.stdout, "and it must not promise otherwise"
+    # It said "LACC cannot yet cut one out" - true when written, and still printed long after
+    # `sections --take` began doing exactly that (ADR-076, ADR-103). It names the way now.
+    said = " ".join(result.stdout.split())
+    assert "lacc sections <document> --about" in said
+    assert "cannot yet cut one out" not in said
     assert "Declined" in result.stdout
 
 

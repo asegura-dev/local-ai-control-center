@@ -402,7 +402,8 @@ def _say_what_it_will_cost(
             "A document this long is rarely one you need in full - it is a guideline or a "
             "manual, and the part you are citing is a chapter. Reading only that chapter "
             "costs minutes rather than an afternoon, and every claim that comes back is "
-            "about the part you will actually cite. LACC cannot yet cut one out for you."
+            "about the part you will actually cite: `lacc sections <document> --about` says "
+            "which, and `--take <number> --into <file>` takes it out (ADR-076)."
         )
 
 
@@ -2456,8 +2457,9 @@ def window(
         _show(
             "[red]The window needs CustomTkinter.[/red] Install it with "
             r"`pip install local-ai-control-center\[gui]`, or with uv: "
-            r"`uv sync --extra gui` and run it as `uv run --extra gui lacc window`. "
-            "Everything else works without it."
+            r"`uv sync --extra gui` and run it as `uv run --extra gui lacc window` - "
+            r"with `.\run.ps1` in place of `uv` when the checkout is in a synchronised "
+            "folder (ADR-084). Everything else works without it."
         )
         raise typer.Exit(code=1) from None
     # Hidden, in the workspace: the window's own preferences are not the user's documents

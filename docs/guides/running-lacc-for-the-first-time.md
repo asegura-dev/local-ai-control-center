@@ -56,7 +56,8 @@ a repository. When you have several, name the one you want:
 uv run lacc run summarize_file paper.md --config configs/desk.yaml
 ```
 
-Every field is documented in the file itself. Three decide whether your first run works:
+Every field is documented in the file itself - a test fails if one is added without its
+line. Three decide whether your first run works:
 
 ```yaml
 workspace_root: ~/lacc-workspace   # required
@@ -84,16 +85,21 @@ A quarter of the window is held back for the answer, and the estimate runs delib
 high, so these are conservative. Most single papers fit comfortably at 32,768. A whole
 thesis does not, and LACC refuses such a run by default rather than quietly answering from a
 fragment. There are two ways through it: `--in-passes --pages-per-pass N` reads it in
-overlapping passes and says how many it took, and `lacc sections <document> --take <number>`
-writes one numbered section out beside it, without touching the document itself.
+overlapping passes and says how many it took, and
+`lacc sections <document> --take <number> --into <file>` writes one numbered section to a
+file of its own - with a note beside it of where it came from - without touching the
+document itself. `lacc sections <document> --about "<question>"` says which section to
+take.
 
 The window costs memory. `lacc profile` prints the cost per model, and the same 3B model
 held 2.0 GB at 4,096 tokens and 3.5 GB at 32,768.
 
 ## Choosing a workspace
 
-`workspace_root` is the only directory LACC will read from or write to. Paths that escape
+`workspace_root` is the only directory a command reads from or writes to. Paths that escape
 it - through `..`, a symlink or an absolute path - are refused before anything is opened.
+The window writes configurations when you ask it to, after showing what would change;
+[every file LACC writes](../stack/files-on-disk.md) is listed.
 
 It is on **the machine you run LACC from**, always. Even when the model runs somewhere
 else, your documents do not move: LACC reads them here, and only the prompt built from
@@ -122,7 +128,8 @@ You get a preview, and a confirmation that **defaults to no**. Answering `y` wri
 `paper.md` beside it - Markdown you can open and correct, with page markers preserved.
 Those markers are what makes page checking possible later, so keep them.
 
-Ingestion never overwrites: if `paper.md` exists, the run is refused.
+Ingestion never overwrites: if `paper.md` exists, the run is refused - *"LACC writes its
+results only to new files"*.
 
 It also **drops page furniture** - running headers, footers and page numbers repeated across
 pages - and says how many lines it removed. This is not pure transcription: a journal's
@@ -193,11 +200,19 @@ with different models and compare how many quotations hold:
 
 ```bash
 # edit `model:` in configs/config.yaml between runs
-uv run lacc run extract_claims paper.md
+uv run lacc measure extract_claims paper.md --runs 3
 ```
 
-A model that fabricates more quotations is worse at the job for a measurable reason, and
-you see it in one run rather than after a month of using it.
+`lacc measure` runs the skill several times, after one warm-up, and reports the spread -
+because a single run cannot be compared with another single run: at temperature zero a
+warm-up answer differed from the four that followed it. A model that fabricates more
+quotations is worse at the job for a measurable reason, and you see it in minutes rather
+than after a month of using it.
+
+**Models that reason before answering** - qwen3.5, gemma4 and their kind - spend that time
+whether you read it or not: one sentence took 40 seconds on qwen3.5:9b with its reasoning
+and half a second without. `thinking: false` in the configuration asks them not to; LACC
+never reads the reasoning, and the audit records only how long it was (ADR-098).
 
 ## Proposing a revision
 
@@ -207,7 +222,7 @@ uv run lacc run revise_file draft.md
 
 You approve against a **diff**, not a preview - the revised text does not exist until the
 model answers, so a preview could not show it. Approving writes `draft.revised.md` beside
-the original. Nothing LACC writes ever replaces a file that already existed.
+the original. What a command writes for you never replaces a file that already existed.
 
 That protection ends where you take over: once you copy the revision over the original,
 it is an ordinary file you edited.
@@ -221,21 +236,24 @@ each record carries the hash of the one before it.
 uv run lacc verify
 ```
 
-This walks the chain and reports whether it is intact, and when the trail starts and ends.
+This walks the chain and reports whether it is intact, when the trail starts and ends, and
+what the anchor beside it says.
 
-**Know exactly what it catches**, because two of these were tested and one was assumed. A
-record edited, removed from the middle, or reordered breaks the chain and `verify` says
-where. **Records removed from the end do not** - a shorter chain is still a valid chain, and
-no hash chain can catch that from the file alone. Neither is a deliberate rewrite: whatever
-can write the file can recompute the digests.
+**Know exactly what it catches.** A record edited, removed from the middle, or reordered
+breaks the chain and `verify` says where. **Records removed from the end** leave a valid
+chain - no hash chain can catch that from the file alone - and are caught by the anchor,
+which remembers how long the trail was: `verify` says how many are missing (ADR-049). A
+deliberate rewrite is caught by neither: whatever can write the file can recompute the
+digests, and the anchor sits under the same permissions.
 
-The dates are your only check against a truncated trail. One ending before your last run has
-lost something.
+To read what the trail holds rather than whether it holds, open the window's **Audit**
+section: every run by day, how it ended, and each of its records -
+[reading what was done](reading-what-was-done.md).
 
 By default the trail records metadata only: which capabilities were requested, whether
-they were granted, which model was called. Prompt and completion text are written only
-under `audit_level: full`, which you opt into deliberately, because prompts contain
-whatever you were working on.
+they were granted, which model was called. Prompt and completion text - and the question
+you ask a corpus - are written only under `audit_level: full`, which you opt into
+deliberately, because they contain whatever you were working on.
 
 ## What to do when a run is refused
 
@@ -246,7 +264,8 @@ meet:
 |---|---|
 | the workspace boundary | The path escapes `workspace_root`. Move the file in. |
 | a repository | Your workspace is inside a git working tree. Move it out, or acknowledge it. |
-| the prompt being too large | The document does not fit the window. Raise `context_tokens`, or use a shorter source. |
+| the prompt being too large | The document does not fit the window. Read it `--in-passes`, raise `context_tokens`, or take one section with `lacc sections`. |
+| a file that already exists | A result would go where a file already is. LACC writes its results only to new files: move it, or name another. |
 | a file being too large | Over `max_input_bytes`, 32 MiB by default. It is a limit about memory, not about the model. |
 
 A refused run exits non-zero. A run you declined exits zero: nothing failed there - you
@@ -254,6 +273,12 @@ were asked and said no, which is the system working.
 
 ## Next
 
+- **The window.** `uv sync --extra gui`, then `uv run --extra gui lacc window` - or
+  `.\run.ps1` in place of `uv` inside a synchronised folder. Fourteen sections: where the
+  work stands, your corpora, reviews and documents, questions behind a preview, and what
+  was done. `lacc status` says the first of those in a terminal.
+- [Asking a corpus and writing from it](asking-a-corpus-and-writing-from-it.md), when you
+  have more than one paper.
 - [Setting up the machine that runs the model](setting-up-the-server-machine.md), when
   this one is not the place the work should be good - including notifications, for runs
   long enough that you walk away.
