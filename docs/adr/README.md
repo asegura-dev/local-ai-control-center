@@ -608,3 +608,15 @@ The most load-bearing fact about a session - which folder every file comes from 
 [`ADR-094-what-it-does-and-what-it-may-do.md`](ADR-094-what-it-does-and-what-it-may-do.md)
 
 The configuration was the only thing left that you had to leave the window to change, and the setting you most want to change is the one you cannot check - which models are actually installed, here and on the machine the configuration names. Both are answered, behind one line: **the window may change what LACC does; it may not change what LACC is allowed to do.** `network_access` and `workspace_in_repository` are not settings but refusals being lifted, and a toggle is not a deliberate decision. A diff is the confirmation, with no extra ceremony for the riskier settings - a ritual on some changes teaches people to click through the ritual. Three defects came out of driving it: the window was using two configurations at once and contradicting itself on one screen, a form nobody touched proposed rewriting three lines, and saving destroyed every comment in the file.
+
+### 095 - the rail outgrew its column
+
+[`ADR-095-the-rail-outgrew-its-column.md`](ADR-095-the-rail-outgrew-its-column.md)
+
+The theme block at the bottom of the rail was drawn at 45 pixels of the 89 it asked for, and a shorter window than the one it was built on lost whole sections off the bottom - the pack order of ADR-092 again, one direction over: whatever must not shrink has to be packed before whatever may. The theme goes first, the section list scrolls, and the wheel scrolls the column under the pointer. `tools/measure_window.py` asks what runs off the right and what cannot be reached, at any height.
+
+### 096 - the wheel had nothing to stop against
+
+[`ADR-096-the-wheel-had-nothing-to-stop-against.md`](ADR-096-the-wheel-had-nothing-to-stop-against.md)
+
+Driven with a real mouse for the first time: a notch moved **three pixels**, the wheel went past both ends of the panel, and the scrollbar filled its track. One bare `bind("<Configure>", ...)` had replaced the toolkit's own binding and left the panel without a scroll region, and a scroll unit is a pixel on Windows. A notch is three measured lines, partial notches carry, and a test fails on any `.bind(` without `add`. Restoring the region exposed a panel that never got shorter.

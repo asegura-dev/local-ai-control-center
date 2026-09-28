@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The rail outgrew its column** (ADR-095). The theme block at the bottom was drawn at 45
+  pixels of the 89 it asked for, and a window shorter than the one it was built on lost whole
+  sections off the bottom. The theme is packed first, the section list scrolls, and the wheel
+  scrolls the column under the pointer - before, every notch went to the panel.
+- **The wheel had nothing to stop against** (ADR-096). Found by driving the window with a
+  real mouse for the first time. A bare `bind("<Configure>", ...)` on the panel had replaced
+  the toolkit's own binding, the one that tells the canvas how tall the content is: the panel
+  had no scroll region, so its scrollbar filled the track, dragging it did nothing, and the
+  wheel went past both ends and carried the offset into the next section. And a notch moved
+  **three pixels**, because on Windows a scroll unit is a pixel and ADR-084 had read it as a
+  line. A notch now moves three lines (57 pixels at 125%), a partial notch from a touchpad is
+  carried rather than rounded to nothing, a section that fits does not move, and a new
+  section starts at the top.
+- **The panel never got shorter.** Restoring the scroll region showed that after a long
+  section, a short one still measured ~3,940 pixels: Tk keeps a frame at its last size when
+  its last child is destroyed. Emptying the panel now lets it shrink.
+
+### Added
+- **`tools/measure_window.py` drives the wheel**: pixels per notch in each column, whether
+  the panel stops at both ends, whether a section that fits moves, whether a new section
+  starts at the top, and what four quarter-notches add up to.
+- **A test fails on any `.bind(` without `add`** in the window and the views - the call that
+  emptied the scroll region, caught by its shape.
+
 ## [2.10.0] - 2026-09-23
 
 ### Added

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from tkinter import font as tkfont
 from tkinter import ttk
 
 import customtkinter as ctk
@@ -67,7 +68,14 @@ INSET = 28
 """Padding between a label and the edge of whatever holds it."""
 
 LINES_PER_NOTCH = 3
-"""How far one notch of the wheel scrolls, which is what the rest of the system does."""
+"""How far one notch of the wheel scrolls, in lines, which is what the rest of the system does.
+
+Lines and not units: on Windows CustomTkinter makes a scroll unit one pixel, so "three
+units" moved the panel three pixels a notch (ADR-096).
+"""
+
+READING_SIZE = 13
+"""The size of the text a line is measured in - what the cards are written in."""
 
 
 SECTIONS: tuple[Section, ...] = in_groups(
@@ -141,7 +149,14 @@ class Window(ctk.CTk):
         self._rail(available)
         self._middle()
         self._panel()
-        self.right.bind("<Configure>", self._reflow)
+        # **Added, not substituted.** The scrollable frame keeps its canvas told how tall
+        # the content is through its own `<Configure>` binding, and a bare `bind` replaced
+        # it: the panel had no scroll region, a full scrollbar and nothing to stop the wheel
+        # at either end (ADR-096).
+        self.right.bind("<Configure>", self._reflow, add="+")
+        self._notch = LINES_PER_NOTCH * self._line_height()
+        self._carry = 0.0
+        self._carried_for: object = None
         # Bound on the whole window, not on the panel and its children. Tk delivers the
         # wheel to the widget under the pointer, and a label neither handles it nor passes
         # it on - so binding per widget left gaps, and a panel scrolled only after being
@@ -202,14 +217,23 @@ class Window(ctk.CTk):
 
         self._where(rail, available)
 
+        # The theme before the list, so the list takes what is left rather than pushing the
+        # theme off the bottom. Measured before this: the theme block needed 89 pixels and
+        # had 45, and the section list had 20 to spare on a 1025-pixel window (ADR-095).
+        self._theme_picker(rail)
+        self.list = ctk.CTkScrollableFrame(
+            rail, fg_color="transparent", scrollbar_button_color=skin.card
+        )
+        self.list.pack(side="top", fill="both", expand=True, padx=0, pady=0)
+
         self.buttons: dict[str, ctk.CTkButton] = {}
         group = ""
         for section in SECTIONS:
             if section.group and section.group != group:
                 group = section.group
-                paint.text(rail, f"  {group}", skin.faint, 10, bold=True, wrap=180)
+                paint.text(self.list, f"  {group}", skin.faint, 10, bold=True, wrap=170)
             button = ctk.CTkButton(
-                rail,
+                self.list,
                 text=section.name,
                 anchor="w",
                 height=32,
@@ -223,8 +247,11 @@ class Window(ctk.CTk):
             button.pack(fill="x", padx=12, pady=1)
             self.buttons[section.name] = button
 
+    def _theme_picker(self, rail: ctk.CTkFrame) -> None:
+        """How it looks, pinned to the bottom so the list never pushes it off."""
+        skin = self.skin
         under = ctk.CTkFrame(rail, fg_color="transparent")
-        under.pack(fill="x", side="bottom", pady=(0, 16))
+        under.pack(fill="x", side="bottom", pady=(6, 16))
         paint.text(under, "  THEME", skin.faint, 10, bold=True, wrap=180)
         themes = ctk.CTkOptionMenu(
             under,
@@ -304,7 +331,7 @@ class Window(ctk.CTk):
         style.map("Side.Treeview", background=[("selected", skin.accent)])
         self.tree = ttk.Treeview(side, show="tree", style="Side.Treeview", selectmode="browse")
         self.tree.pack(fill="both", expand=True, padx=10, pady=12)
-        self.tree.bind("<<TreeviewSelect>>", self._chosen)
+        self.tree.bind("<<TreeviewSelect>>", self._chosen, add="+")
 
     def _panel(self) -> None:
         """A heading, a summary, and whatever the selection calls for."""
@@ -400,11 +427,10 @@ class Window(ctk.CTk):
         self._pending = self.after(90, self._rewrap)
 
     def _rewrap(self) -> None:
-        """Give every label the current width, and let the wheel work anywhere on it.
+        """Give every label the current width.
 
-        The wheel is bound on every child because Tk delivers it to the widget under the
-        pointer and a label does not pass it on - without this a panel scrolled only while
-        the pointer was over the gaps between its cards.
+        It used to bind the wheel on every child as well. That moved to one `bind_all`
+        (ADR-084), and this docstring went on saying otherwise until ADR-096.
         """
         self._pending = None
         # The **viewport**, not the panel frame and not the holder. Inside a scrollable
@@ -432,20 +458,65 @@ class Window(ctk.CTk):
         walk(self.right, 0)
 
     def _wheel(self, event: object) -> str:
-        """Scroll from anywhere in the window, and stop the event travelling further.
+        """Scroll whichever column the pointer is over, and stop the event travelling on.
 
-        Windows sends 120 per notch, and a notch is three lines everywhere else on the
-        system. Moving one unit per notch made a long record feel stuck (ADR-084).
+        **Which column** matters now that both scroll: bound with `bind_all`, every notch
+        went to the panel wherever the pointer was, so a rail too long to fit could not be
+        scrolled at all (ADR-095).
+
+        **How far** is three lines of the reading text per notch of 120. What a notch does
+        not complete is carried rather than rounded away - a precision touchpad can send
+        less than 120 at a time, and `int(delta / 120)` turned all of it into nothing. A column
+        whose content already fits is left alone, as the toolkit's own handler does; turning
+        it anyway slid a short section into empty space (ADR-096).
         """
         turned = getattr(event, "delta", 0)
-        canvas = getattr(self.right, "_parent_canvas", None)
-        if canvas is not None and turned:
-            canvas.yview_scroll(-int(turned / 120) * LINES_PER_NOTCH, "units")
+        if not turned:
+            return "break"
+        edge = self.rail.winfo_rootx() + self.rail.winfo_width()
+        over_rail = getattr(event, "x_root", edge + 1) <= edge
+        scrolling = self.list if over_rail else self.right
+        canvas = getattr(scrolling, "_parent_canvas", None)
+        if canvas is None or canvas.yview() == (0.0, 1.0):
+            return "break"
+        if scrolling is not self._carried_for:
+            self._carry, self._carried_for = 0.0, scrolling
+        increment = int(float(canvas.cget("yscrollincrement"))) or 1
+        self._carry -= turned / 120 * self._notch / increment
+        whole = int(self._carry)
+        self._carry -= whole
+        if whole:
+            canvas.yview_scroll(whole, "units")
         return "break"
 
+    def _line_height(self) -> int:
+        """One line of the reading text, in physical pixels, at this display's scaling.
+
+        Measured from the font rather than written down, because the pixels a notch should
+        move depend on both (ADR-096).
+        """
+        scaling = ctk.ScalingTracker.get_widget_scaling(self) or 1.0
+        family = ctk.CTkFont(size=READING_SIZE).cget("family")
+        reading = tkfont.Font(root=self, family=family, size=-round(READING_SIZE * scaling))
+        return int(reading.metrics("linespace"))
+
+    def _to_top(self) -> None:
+        """Start the panel at its top, not where the previous section left it (ADR-096)."""
+        canvas = getattr(self.right, "_parent_canvas", None)
+        if canvas is not None:
+            canvas.yview_moveto(0.0)
+
     def _clear(self) -> None:
+        """Empty the panel, and let it be as short as whatever goes in next.
+
+        Tk keeps a frame at its last size when its last child is destroyed, so a section
+        opened after Workspaces measured 3,957 pixels of which some 3,800 were empty -
+        invisible while the panel had no scroll region, and a long empty scroll once it had
+        one (ADR-096).
+        """
         for child in self.panel_body.winfo_children():
             child.destroy()
+        self.panel_body.configure(height=1)
 
     def _theme(self, name: str) -> None:
         """Remember the theme. It applies when the window is opened again."""
@@ -487,6 +558,7 @@ class Window(ctk.CTk):
                 self.side.pack(side="left", fill="y", after=self.rail)
         else:
             self.side.pack_forget()
+        self._to_top()
 
     def _chosen(self, _event: object) -> None:
         """Hand the selection to the section that made it."""
@@ -495,6 +567,7 @@ class Window(ctk.CTk):
             return
         self._clear()
         self.section.open(selected[0], self, self._state())
+        self._to_top()
 
 
 def show(

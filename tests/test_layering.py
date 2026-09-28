@@ -145,6 +145,10 @@ _PRESENTATION = frozenset(
         "bind",
         "after",
         "yview_scroll",
+        # Moving the view to a place is presentation as much as moving it by an amount;
+        # the rule knew one of the pair and called a method that used the other logic
+        # (ADR-096).
+        "yview_moveto",
     }
 )
 """The vocabulary that makes a function part of a view.

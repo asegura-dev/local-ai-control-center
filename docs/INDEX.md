@@ -22,7 +22,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Ninety-four records front to back is a history. These are the threads through them, for
+Ninety-six records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -176,6 +176,8 @@ not to reach for an approximate algorithm to find them.
 | 092 | [what-a-screenshot-showed](adr/ADR-092-what-a-screenshot-showed-and-a-test-could-not.md) | The bottom bar was a **column on the right**, taking 250 pixels and hiding half of itself. And `wraplength` is scaled twice, so text wrapped 25% wider than its space - **identical at 100% scaling**, which is why two fixes missed it. `reqwidth > width` on a label is the defect, and can be asked of every label: 0 of 656. Also: 61 documents where there were 28, an empty column that ate a quarter of the window, and eleven names in a flat list. |
 | 093 | [a-workspace-is-chosen-where-you-can-see-it](adr/ADR-093-a-workspace-is-chosen-where-you-can-see-it.md) | Which folder everything comes from sat at the bottom of the rail under the theme, so somebody who had used the window all day asked for workspaces. It moves to the top, and the window may write **one new configuration** - never edit one. A git working tree is refused (a fact); a sync folder is allowed (a folder name is a guess) with the setting that removes most of the exposure named beside the warning. |
 | 094 | [what-it-does-and-what-it-may-do](adr/ADR-094-what-it-does-and-what-it-may-do.md) | The configuration becomes editable from the window, behind one line: **it may change what LACC does, never what LACC is allowed to do.** `network_access` and `workspace_in_repository` are refusals being lifted, not settings, and a toggle is not a deliberate decision. A diff is the confirmation. With it, the engines can be asked which models they hold. Three defects found by driving it, including a window using two configurations at once. |
+| 095 | [the-rail-outgrew-its-column](adr/ADR-095-the-rail-outgrew-its-column.md) | The theme block was drawn at **45 of the 89 pixels** it asked for, and a shorter window lost whole sections off the bottom of the rail - the pack order of ADR-092 again. The theme is packed first, the list scrolls, and the wheel scrolls the column under the pointer. `tools/measure_window.py` asks, at any height, what runs off the right and what cannot be reached. |
+| 096 | [the-wheel-had-nothing-to-stop-against](adr/ADR-096-the-wheel-had-nothing-to-stop-against.md) | Driven with a real mouse for the first time: a notch moved **three pixels** and the wheel went past both ends of the panel. A bare `bind` had replaced the toolkit's own `<Configure>` binding, so the panel had **no scroll region**; and on Windows a scroll unit is a pixel. A notch is three measured lines, partial notches carry, a test fails on any `.bind(` without `add`, and the panel that never got shorter now does. |
 
 ## Guides (`docs/guides/`)
 
