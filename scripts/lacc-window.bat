@@ -14,7 +14,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "run.ps1" run lacc window -c
 if errorlevel 1 (
   echo.
   echo The window did not open. If the toolkit is missing, run:
-  echo     .un.ps1 sync --extra gui
+  echo     .\run.ps1 sync --extra gui
   pause
 )
 endlocal

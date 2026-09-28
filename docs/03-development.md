@@ -104,10 +104,8 @@ The virtual environment has its own version of this problem, for different reaso
 
 ## Taking the measurements
 
-    .
-un.ps1 run python tools/measure.py                  the project
-    .
-un.ps1 run python tools/measure.py ~/lacc-workspace  the project and the material
+    .\run.ps1 run python tools/measure.py                  the project
+    .\run.ps1 run python tools/measure.py ~/lacc-workspace  the project and the material
 
 Layers and their sizes, logic that has drifted into a view, records against their index, the
 suite, and for a workspace: every document with its tokens, pages and structure, and every
@@ -125,8 +123,7 @@ steps, and [`docs/adr/TEMPLATE.md`](adr/TEMPLATE.md) is the record to copy.
 
 ## The record-to-code inventory
 
-    .
-un.ps1 run python tools/record_coverage.py
+    .\run.ps1 run python tools/record_coverage.py
 
 Prints, for every decision record, the symbols it names and where the source uses them, plus
 what a record names that the source never mentions. **It detects nothing**, and a symbol low

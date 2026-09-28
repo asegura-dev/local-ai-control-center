@@ -620,3 +620,9 @@ The theme block at the bottom of the rail was drawn at 45 pixels of the 89 it as
 [`ADR-096-the-wheel-had-nothing-to-stop-against.md`](ADR-096-the-wheel-had-nothing-to-stop-against.md)
 
 Driven with a real mouse for the first time: a notch moved **three pixels**, the wheel went past both ends of the panel, and the scrollbar filled its track. One bare `bind("<Configure>", ...)` had replaced the toolkit's own binding and left the panel without a scroll region, and a scroll unit is a pixel on Windows. A notch is three measured lines, partial notches carry, and a test fails on any `.bind(` without `add`. Restoring the region exposed a panel that never got shorter.
+
+### 097 - the launcher's name, split in two
+
+[`ADR-097-the-launchers-name-split-in-two.md`](ADR-097-the-launchers-name-split-in-two.md)
+
+`.\run.ps1` lost its backslash and its `r` to a carriage return in the window launcher and in three places of the development chapter. The launcher was once declared the only case in the repository, measured byte by byte; the chapter was missed because the search counted stray carriage returns, and there the return had become an ordinary line break. The launcher's digest had certified the broken file, which is the limit ADR-071 stated, met. A test asks every text file whether a line begins with `un.ps1` and whether a carriage return ends no line.

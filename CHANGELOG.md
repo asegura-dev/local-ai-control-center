@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The panel never got shorter.** Restoring the scroll region showed that after a long
   section, a short one still measured ~3,940 pixels: Tk keeps a frame at its last size when
   its last child is destroyed. Emptying the panel now lets it shrink.
+- **The launcher's name was split in two** (ADR-097). `.\run.ps1` had lost its backslash
+  and its `r` to a carriage return: the window launcher printed `.un.ps1 sync --extra gui`,
+  and the development chapter showed a lone dot and a command beginning `un.ps1` in three
+  places. The launcher's recorded digest had certified the broken file. It was once
+  declared the only case in the repository; the chapter was missed because the search
+  counted stray carriage returns, and there it had become an ordinary line break.
 
 ### Added
 - **`tools/measure_window.py` drives the wheel**: pixels per notch in each column, whether
@@ -31,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   starts at the top, and what four quarter-notches add up to.
 - **A test fails on any `.bind(` without `add`** in the window and the views - the call that
   emptied the scroll region, caught by its shape.
+- **A test asks every text file** whether a line begins with `un.ps1` and whether a
+  carriage return ends no line - the chapter's shape and the launcher's (ADR-097).
 
 ## [2.10.0] - 2026-09-23
 
