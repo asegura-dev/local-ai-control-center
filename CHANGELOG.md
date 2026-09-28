@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The window opened off the screen** (ADR-100). Left to Windows, each opening landed further
+  down than the last - the second 156 pixels below a 1140-pixel work area, with the status bar
+  and the theme picker out of sight. It now asks the system for the work area and opens at
+  its top, centred, shrunk to fit it when the screen is smaller than the default. Where the
+  system cannot say, it opens as before.
 - **An answer that arrived while you were in another section was lost** (ADR-099). The
   watch that kept the answer also drew it, and stopped when its widgets were destroyed - so
   the turn was recorded only if somebody was still looking; the audit had it, the screen

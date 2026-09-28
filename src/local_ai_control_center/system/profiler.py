@@ -12,6 +12,7 @@ import json
 import os
 import platform
 import shutil
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -260,6 +261,30 @@ def _estimate_fits(total_memory_gb: float) -> tuple[ModelFit, ...]:
                 )
             )
     return tuple(fits)
+
+
+def work_area() -> tuple[int, int, int, int] | None:
+    """The part of the primary screen a window may use, without the taskbar, or ``None``.
+
+    Left, top, right and bottom in physical pixels, from the system itself. Windows only:
+    anywhere else, or when the call fails, the answer is that nobody knows - and a window
+    that does not know opens where it always did rather than somewhere guessed (ADR-100).
+    """
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        rect = wintypes.RECT()
+        spi_getworkarea = 0x0030
+        if not ctypes.windll.user32.SystemParametersInfoW(
+            spi_getworkarea, 0, ctypes.byref(rect), 0
+        ):
+            return None
+        return (rect.left, rect.top, rect.right, rect.bottom)
+    except (AttributeError, OSError):
+        return None
 
 
 def _processor_name() -> str:

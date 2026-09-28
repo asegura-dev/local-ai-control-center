@@ -394,6 +394,25 @@ def _ask_flow(window: Window) -> None:
     print(f"  Start over: thread empty {turns() == 0}")
 
 
+def _where_it_opened(window: Window) -> None:
+    """Where the window opened against the work area, before anything moved it (ADR-100)."""
+    from local_ai_control_center.system.profiler import work_area
+
+    area = work_area()
+    x, y = window.winfo_rootx(), window.winfo_rooty()
+    wide, tall = window.winfo_width(), window.winfo_height()
+    print("Where it opened")
+    if area is None:
+        print(f"  at {x},{y}, {wide} by {tall}; the system does not say what its work area is")
+        return
+    left, top, right, bottom = area
+    inside = left <= x and x + wide <= right and top <= y and y + tall <= bottom
+    print(
+        f"  client area at {x},{y}, {wide} by {tall}; work area {left},{top} to {right},{bottom}: "
+        f"{'inside' if inside else 'NOT inside'}"
+    )
+
+
 def main() -> int:
     parsed = argparse.ArgumentParser(description=__doc__)
     parsed.add_argument("-c", "--config", default="configs/config.yaml", type=pathlib.Path)
@@ -408,6 +427,8 @@ def main() -> int:
     _settle(window)
 
     print(f"{len(SECTIONS)} sections, at this display's scaling")
+    print()
+    _where_it_opened(window)
     print()
     print("The rail, by window height")
     for height in (int(one) for one in args.heights.split(",")):

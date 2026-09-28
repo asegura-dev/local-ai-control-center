@@ -149,6 +149,8 @@ _PRESENTATION = frozenset(
         # the rule knew one of the pair and called a method that used the other logic
         # (ADR-096).
         "yview_moveto",
+        # The window's own size and place (ADR-100).
+        "geometry",
     }
 )
 """The vocabulary that makes a function part of a view.

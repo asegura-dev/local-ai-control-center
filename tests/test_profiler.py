@@ -205,3 +205,20 @@ def test_the_report_includes_the_weights_not_only_the_cache() -> None:
     cost = next(c for c in _estimate_window_costs(_model(), 36864, 16.0) if c.window_tokens == 4096)
     assert cost.total_gb > 1.8
     assert cost.cache_gb < cost.total_gb
+
+
+def test_the_work_area_is_the_system_s_answer_or_nobody_knows() -> None:
+    """On Windows, four edges of a real rectangle; anywhere else, None - never a guess
+    (ADR-100)."""
+    import sys
+
+    from local_ai_control_center.system.profiler import work_area
+
+    area = work_area()
+    if sys.platform != "win32":
+        assert area is None
+        return
+    assert area is not None
+    left, top, right, bottom = area
+    assert right > left
+    assert bottom > top

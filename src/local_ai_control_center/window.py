@@ -34,12 +34,13 @@ from tkinter import ttk
 
 import customtkinter as ctk
 
-from local_ai_control_center.features.appearance import Palette, Preferences, remember
+from local_ai_control_center.features.appearance import Palette, Preferences, placement, remember
 from local_ai_control_center.features.ask import Asked, Prepared
 from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.status import EngineSeen, Status
 from local_ai_control_center.features.workspaces import points_of, risk_of
+from local_ai_control_center.system.profiler import work_area
 from local_ai_control_center.views import (
     asking,
     making,
@@ -136,7 +137,7 @@ class Window(ctk.CTk):
         self.section = SECTIONS[0]
 
         self.title("LACC")
-        self.geometry(f"{WIDTH}x{HEIGHT}")
+        self._place()
         ctk.set_appearance_mode(self.skin.mode)
         self.configure(fg_color=self.skin.surface)
 
@@ -488,6 +489,21 @@ class Window(ctk.CTk):
         if whole:
             canvas.yview_scroll(whole, "units")
         return "break"
+
+    def _place(self) -> None:
+        """Open at the top of the work area, fitted to it, rather than wherever Windows says.
+
+        Left to Windows, the second opening landed 156 pixels below a 1140-pixel work area,
+        with the status bar and the theme picker off the screen (ADR-100). Where the system
+        cannot say what the work area is, the default size is asked for and nothing is placed.
+        """
+        area = work_area()
+        if area is None:
+            self.geometry(f"{WIDTH}x{HEIGHT}")
+            return
+        scaling = ctk.ScalingTracker.get_window_scaling(self) or 1.0
+        wide, tall, across, top = placement(area, scaling, WIDTH, HEIGHT)
+        self.geometry(f"{wide}x{tall}+{across}+{top}")
 
     def _line_height(self) -> int:
         """One line of the reading text, in physical pixels, at this display's scaling.

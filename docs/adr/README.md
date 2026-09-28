@@ -638,3 +638,9 @@ Newer models reason before answering unless told not to, and the reasoning arriv
 [`ADR-099-an-answer-that-arrives-while-you-are-elsewhere.md`](ADR-099-an-answer-that-arrives-while-you-are-elsewhere.md)
 
 A question sent from Ask, the section changed while the engine worked, and the answer - two quotations found, in the audit - never reached the screen. Keeping and drawing were one step, and a change of section cancelled both. They are separate now: the answer is kept, waits, and says it arrived while you were elsewhere; a question in flight is shown waiting when you come back; the heading counts every turn and Start over is always there. One question per corpus at a time.
+
+### 100 - the window opens where it can be seen
+
+[`ADR-100-the-window-opens-where-it-can-be-seen.md`](ADR-100-the-window-opens-where-it-can-be-seen.md)
+
+Windows placed each new window further down than the last, and on a 1140-pixel work area the second opening lost its bottom 156 pixels - the status bar and the theme picker - with nothing to say so. The window now asks for the work area and opens at its top, centred, fitted to it. Tested as arithmetic without a display; checked by opening it twice in a row.

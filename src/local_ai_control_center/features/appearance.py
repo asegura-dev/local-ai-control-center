@@ -30,6 +30,37 @@ one is a different set of papers and may well want a different theme.
 """
 
 
+FRAME = 60
+"""Physical pixels left for the window's own frame when it is fitted to the work area.
+
+Measured at 125%: the title bar and the lower border take 47 between them. The figure is a
+margin over that, not a measurement at every scaling (ADR-100).
+"""
+
+
+def placement(
+    area: tuple[int, int, int, int],
+    scaling: float,
+    width: int,
+    height: int,
+    frame: int = FRAME,
+) -> tuple[int, int, int, int]:
+    """Where a window of ``width`` by ``height`` logical pixels opens, fitted to ``area``.
+
+    ``area`` is the work area - the screen without the taskbar - as left, top, right and bottom
+    in physical pixels. The answer is width and height in logical pixels, which the toolkit
+    scales, and the left and top of the frame in physical ones, which it does not: at the top
+    of the work area and centred across it, never larger than it. Left to Windows, the window
+    opened wherever the last one had been offset to, 156 pixels below the screen on the
+    second opening (ADR-100).
+    """
+    left, top, right, bottom = area
+    wide = min(width, int((right - left) / scaling))
+    tall = min(height, int((bottom - top - frame) / scaling))
+    across = left + max(0, (right - left - round(wide * scaling)) // 2)
+    return wide, tall, across, top
+
+
 class Palette(BaseModel):
     """The colours a window is drawn with."""
 
