@@ -1098,6 +1098,7 @@ def answer_prepared(
         f"Selected {prepared.selected} of {prepared.considered} passages",
         {
             "question": prepared.question,
+            "question_sha256": digest_of(prepared.question),
             "retriever": prepared.how,
             "selected": prepared.selected,
             "set_aside": prepared.set_aside,

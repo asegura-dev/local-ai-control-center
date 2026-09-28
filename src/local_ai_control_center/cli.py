@@ -1928,6 +1928,7 @@ def ask(
         f"Selected {made.selected} of {made.considered} passages",
         {
             "question": question,
+            "question_sha256": digest_of(question),
             "retriever": made.how,
             "selected": made.selected,
             "set_aside": made.set_aside,
@@ -2304,7 +2305,9 @@ def review(
         f"[bold]{len(blocks)} paragraphs[/bold] against [bold]{len(passages)} quotations[/bold]: "
         f"about {judgements} judgements, a few seconds each."
     )
-    if not typer.confirm("Read it?", default=True):
+    # No is the default, as everywhere else an engine is reached. It said yes, and Enter
+    # sent a whole draft for judging (ADR-105).
+    if not typer.confirm("Read it?", default=False):
         raise typer.Exit(code=1)
 
     provider = _build_provider(ProviderChoice.ollama, config)
@@ -2552,8 +2555,14 @@ def coverage(
     cache = corpus_path.with_suffix(corpus_path.suffix + VECTOR_SUFFIX)
     _show(
         f"[bold]{len(topics)} topics[/bold] against {len(passages)} quotations, by meaning. "
-        f"[dim]{config.embedding_model} on {host}[/dim]"
+        f"The topics, and every quotation not already embedded beside the corpus, would be sent "
+        f"to [bold]{config.embedding_model}[/bold] on [bold]{host}[/bold]."
     )
+    # Asked before anything is sent. It measured in the same breath as it announced, and the
+    # host can be another machine (ADR-105).
+    if not typer.confirm("Send them?", default=False):
+        _show("Nothing was sent, and nothing was written.")
+        raise typer.Exit(code=1)
     try:
         vectors = tuple(DenseRetriever(embedder, cache).vectors_for(passages))
         found = reach_of(topics, passages, vectors, embedder)

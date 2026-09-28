@@ -1497,3 +1497,44 @@ def test_ingest_says_how_much_is_hidden_out_of_how_much(tmp_path: Path) -> None:
     result = runner.invoke(app, ["ingest", "paper.pdf", "-c", str(config)], input="y\n")
     assert result.exit_code == 0, result.stdout
     assert "1 of 3 pieces of text" in " ".join(result.stdout.split())
+
+
+def _draft_and_corpus(tmp_path: Path) -> Path:
+    """A workspace holding the small corpus and a one-paragraph draft against it."""
+    config = _corpus_file(tmp_path)
+    (tmp_path / "ws" / "draft.md").write_text(
+        "The sensitivity for pelvic lymph nodes was high in this cohort." + chr(10),
+        encoding="utf-8",
+    )
+    return config
+
+
+def test_review_defaults_to_no_before_it_reaches_the_engine(tmp_path: Path) -> None:
+    """Pressing Enter sent a whole draft for judging: the default was yes (ADR-105)."""
+    config = _draft_and_corpus(tmp_path)
+    result = runner.invoke(
+        app, ["review", "draft.md", "--against", "corpus.md", "-c", str(config)], input="\n"
+    )
+    assert result.exit_code == 1
+    assert "[y/N]" in result.stdout
+
+
+def test_coverage_asks_before_it_sends_anything_to_be_embedded(tmp_path: Path) -> None:
+    """It announced and embedded in the same breath, to a host that can be another machine."""
+    config = _corpus_file(tmp_path)
+    config.write_text(
+        config.read_text(encoding="utf-8") + "embedding_model: bge-m3" + chr(10), encoding="utf-8"
+    )
+    (tmp_path / "ws" / "topics.md").write_text(
+        "lymph node detection" + chr(10) + "! the migration of birds" + chr(10), encoding="utf-8"
+    )
+    result = runner.invoke(
+        app,
+        ["coverage", "topics.md", "--against", "corpus.md", "-c", str(config)],
+        input="\n",
+    )
+    said = " ".join(result.stdout.split())
+    assert result.exit_code == 1
+    assert "Send them? [y/N]" in said
+    assert "Nothing was sent" in said
+    assert not any(path.suffix == ".vectors" for path in (tmp_path / "ws").iterdir())

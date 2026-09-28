@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Three promises the code had stopped keeping** (ADR-105), found by checking every row of
+  `docs/05-assurance.md` against the source. A question to a corpus was kept word for word in
+  the trail under the default `audit_level: standard`, which promises not to keep what was
+  said: it is now content, kept only under `full`, with its digest always. `lacc review`
+  asked `Read it? [Y/n]` - Enter sent a whole draft for judging; no is the default now, as
+  everywhere else an engine is reached. `lacc coverage` embedded the topics and quotations
+  in the same breath as it announced them, on a host that can be another machine; it asks
+  first. Two gaps are named rather than closed: preparing a question embeds it before the
+  preview, and four commands that reach the engine or the network are not audited.
 - **Six things the program said that were not so** (ADR-103), each found by using it. The
   Commands section offered `lacc review draft against --into`, which did not run: a required
   option lost its `--` and nothing marked what to fill in - every usage line now parses in

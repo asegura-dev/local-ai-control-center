@@ -668,3 +668,9 @@ Each a sentence a person would have acted on, and each found by using the progra
 [`ADR-104-what-was-done-read-in-the-window-it-was-done-from.md`](ADR-104-what-was-done-read-in-the-window-it-was-done-from.md)
 
 The program says everything significant it does is audited, and the only way to read the audit was a command that says whether it holds. The Audit section reads it: runs by day, how each ended by its own records, every record with its prompt and answer cut and counted. One trail - the workspace's - because the boundary answers the question of which. The walk runs on a worker because on the thesis's trail it takes seconds, and the sentences about integrity moved into a slice so the window and `lacc verify` cannot drift apart. It cannot change anything.
+
+### 105 - three promises the code had stopped keeping
+
+[`ADR-105-three-promises-the-code-had-stopped-keeping.md`](ADR-105-three-promises-the-code-had-stopped-keeping.md)
+
+Bringing the documentation up to date meant checking each promise in the assurance chapter against the code, and three were broken: the default audit level kept every question word for word, `review` defaulted to yes, and `coverage` sent to be embedded before asking. Each is fixed, each with a test that fails on the old behaviour. Two larger gaps are named in the record and in the chapter rather than hidden: embedding a question before its preview, and four commands that leave no record.

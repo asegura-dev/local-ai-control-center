@@ -261,3 +261,13 @@ def test_the_run_is_recorded_whichever_way_it_went(tmp_path: Path) -> None:
     _sent(root, _Refuses())
     written = (root / AUDIT_FILENAME).read_text(encoding="utf-8")
     assert "passages_selected" in written
+
+
+def test_under_the_default_level_a_question_is_kept_only_as_its_digest(tmp_path: Path) -> None:
+    """A question is content. Under `standard` it was kept word for word, because nothing had
+    told the filter so (ADR-105)."""
+    root = tmp_path / "private"
+    _sent(root, _Refuses())
+    written = (root / AUDIT_FILENAME).read_text(encoding="utf-8")
+    assert "pelvic lymph node sensitivity" not in written
+    assert "question_sha256" in written

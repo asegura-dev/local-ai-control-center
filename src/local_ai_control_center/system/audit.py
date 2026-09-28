@@ -334,8 +334,13 @@ def walk(path: Path) -> Walked:
     return Walked(chain=chain, events=tuple(events), vouched=tuple(vouched))
 
 
-_CONTENT_KEYS = frozenset({"prompt", "completion"})
-"""Detail keys treated as user content, omitted unless the level is ``full``."""
+_CONTENT_KEYS = frozenset({"prompt", "completion", "question"})
+"""Detail keys treated as user content, omitted unless the level is ``full``.
+
+`question` joined on 27-sep: a question to a corpus was kept word for word under the default
+level, because nothing had told the filter it was content (ADR-105). Its digest is recorded
+beside it, which says which question without saying what it was.
+"""
 
 
 ANCHOR_SUFFIX = ".anchor"

@@ -310,3 +310,16 @@ def test_the_trail_reports_when_it_starts_and_ends(tmp_path: Path) -> None:
     assert result.first_seen
     assert result.last_seen
     assert result.first_seen <= result.last_seen
+
+
+def test_a_question_is_content_and_is_kept_only_under_full(tmp_path: Path) -> None:
+    """ADR-105: `question` is dropped below `full`, like the prompt and the answer."""
+    detail = {"question": "what does the corpus say?", "question_sha256": "abc"}
+    standard = _log(tmp_path / "s")
+    full = _log(tmp_path / "f", audit_level="full")
+    kept_standard = standard.record("r", "passages_selected", "Selected", detail)
+    kept_full = full.record("r", "passages_selected", "Selected", detail)
+    assert kept_standard is not None and kept_full is not None
+    assert "question" not in kept_standard.detail
+    assert kept_standard.detail["question_sha256"] == "abc"
+    assert kept_full.detail["question"] == "what does the corpus say?"
