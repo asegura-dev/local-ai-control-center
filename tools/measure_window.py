@@ -20,6 +20,10 @@ long as that stood. The wheel is now driven here: pixels per notch in each colum
 the panel stops where its content does, whether a section that fits moves at all, whether a
 new section starts at the top, and what four quarter-notches add up to.
 
+**What Ask keeps.** An answer that arrived while somebody was in another section used to be
+lost (ADR-099). Ask is driven here against a stand-in engine that answers after a delay - no
+model, no network - through the same buttons a person presses.
+
 It reports. It concludes nothing: a label wider than its box may be a heading that is meant
 to clip, and a rail showing a fifth of itself is a small window, not a defect. The figures
 are for a person to read.
@@ -243,6 +247,153 @@ def _wheel(window: Window) -> None:
     _settle(window, 2)
 
 
+def _stand_in(delay: float) -> tuple[Any, Any]:
+    """A prepare and a send that reach nothing: the send answers after ``delay`` seconds."""
+    from local_ai_control_center.features.ask import Asked, Prepared, Reading
+
+    def prepare(question: str, corpus: str, carried: tuple[Any, ...]) -> Prepared:
+        return Prepared(
+            question=question.strip() or "a question",
+            corpus=corpus,
+            selected=3,
+            considered=10,
+            set_aside=7,
+            how="a stand-in",
+            model="a stand-in",
+            reaches="nothing",
+            tokens=100,
+        )
+
+    def send(prepared: Prepared) -> Asked:
+        time.sleep(delay)
+        return Asked(
+            prepared=prepared,
+            answer='POINT: a stand-in\nQUOTE: "x"\nSOURCE: y',
+            readings=(Reading(claim="a stand-in", quote="x", found=True),),
+            seconds=delay,
+        )
+
+    return prepare, send
+
+
+def _press(window: Window, text: str) -> bool:
+    """Press the first button in the panel labelled ``text``, as a click would."""
+    for button in _descendants(window.panel_body, ctk.CTkButton):
+        if button.cget("text") == text and button.cget("state") != "disabled":
+            button.invoke()
+            _settle(window, 4)
+            return True
+    return False
+
+
+def _shows(window: Window, words: str) -> bool:
+    return any(
+        words in str(label.cget("text")) for label in _descendants(window.right, ctk.CTkLabel)
+    )
+
+
+def _ask_flow(window: Window) -> None:
+    """Ask, driven against a stand-in engine: what survives a change of section (ADR-099)."""
+    from local_ai_control_center.views import asking
+
+    delay = 1.0
+    window.prepare_question, window.send_question = _stand_in(delay)
+    ask = next(s for s in SECTIONS if s.name == "Ask")
+    elsewhere = SECTIONS[0]
+    window._go(ask)
+    _settle(window, 4)
+    rows = window.tree.get_children()
+    if not rows:
+        print("  no corpus to ask; nothing driven")
+        return
+    key = rows[0]
+    corpus = pathlib.Path(key).name
+
+    def open_corpus() -> None:
+        window._go(ask)
+        _settle(window, 4)
+        window.tree.selection_set(key)
+        _settle(window, 4)
+
+    def ask_it(question: str) -> None:
+        box = _descendants(window.panel_body, ctk.CTkTextbox)[0]
+        box.delete("1.0", "end")
+        box.insert("1.0", question)
+        _press(window, "Prepare")
+        _press(window, "Send to the engine")
+
+    def wait(seconds: float) -> None:
+        _settle(window, max(1, int(seconds / 0.05)))
+
+    def turns() -> int:
+        thread = asking._THREADS.get(corpus)
+        return len(thread.turns) if thread is not None else 0
+
+    open_corpus()
+    ask_it("first")
+    window._go(elsewhere)
+    wait(delay + 1)
+    print(
+        f"  answered while in another section: kept {turns() == 1}, marked unseen "
+        f"{corpus in asking._UNSEEN}"
+    )
+    open_corpus()
+    start_over = any(
+        button.cget("text") == "Start over"
+        for button in _descendants(window.panel_body, ctk.CTkButton)
+    )
+    print(
+        f"     back in Ask: heading counts it {window.summary.cget('text').startswith('1 ')}, "
+        f"says it arrived elsewhere {_shows(window, 'arrived while you were')}, "
+        f"Start over there {start_over}"
+    )
+
+    ask_it("second")
+    box = _descendants(window.panel_body, ctk.CTkTextbox)[0]
+    box.delete("1.0", "end")
+    box.insert("1.0", "a draft")
+    wait(delay + 1)
+    box = _descendants(window.panel_body, ctk.CTkTextbox)[0]
+    counted = window.summary.cget("text").startswith("2 ")
+    kept = box.get("1.0", "end").strip() == "a draft"
+    print(f"  answered while looking: heading counts it {counted}, draft kept {kept}")
+
+    # Slower, because opening another section counts the whole workspace and can take longer
+    # than a one-second stand-in: the first run of this check came back to an answer already
+    # in, and reported the waiting card missing. Opened again after the swap, because a
+    # corpus's buttons keep the callables it was drawn with - the second run sent through the
+    # fast one and reported the same thing.
+    slow = 5.0
+    window.prepare_question, window.send_question = _stand_in(slow)
+    open_corpus()
+    ask_it("third")
+    window._go(elsewhere)
+    open_corpus()
+    print(
+        f"  in flight after a change of section: still waiting on the screen "
+        f"{_shows(window, 'Asking the engine')}"
+    )
+    _press(window, "Prepare")
+    refused = _press(window, "Send to the engine") and _shows(window, "already with the engine")
+    print(f"     a second send while it waits is refused {refused}")
+    wait(slow + 1)
+    print(f"     then answered: {turns() == 3}")
+    window.prepare_question, window.send_question = _stand_in(delay)
+    open_corpus()
+
+    before = turns()
+    ask_it("fourth")
+    _press(window, "Stop waiting")
+    wait(delay + 1)
+    print(
+        f"  stopped waiting: answer discarded {turns() == before}, nothing left in flight "
+        f"{corpus not in asking._PENDING}"
+    )
+
+    _press(window, "Start over")
+    print(f"  Start over: thread empty {turns() == 0}")
+
+
 def main() -> int:
     parsed = argparse.ArgumentParser(description=__doc__)
     parsed.add_argument("-c", "--config", default="configs/config.yaml", type=pathlib.Path)
@@ -278,6 +429,9 @@ def main() -> int:
     print()
     print("The wheel")
     _wheel(window)
+    print()
+    print("Ask, against a stand-in engine")
+    _ask_flow(window)
     window.destroy()
     return 0
 

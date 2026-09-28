@@ -30,6 +30,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import customtkinter as ctk
@@ -55,6 +56,42 @@ _THREADS: dict[str, Thread] = {}
 record is the audit log, which holds every question, every prompt and every answer and is
 hash-chained. Closing the window ends them (ADR-091).
 """
+
+
+@dataclass
+class _Pending:
+    """A question with the engine, and where its answer is drawn if anybody is looking."""
+
+    key: str
+    state: State
+    prepared: Prepared
+    answers: queue.Queue[Asked]
+    stopped: threading.Event
+    began: float
+
+
+_PENDING: dict[str, _Pending] = {}
+"""Questions in flight, by corpus.
+
+A change of section destroys every widget in the panel and none of these. Keeping the answer
+used to happen only while its widgets were alive, so an answer that arrived while somebody
+was looking at another section was lost - in the audit, and nowhere on the screen (ADR-099).
+"""
+
+_LAST: dict[str, Asked] = {}
+"""The last answer each corpus received, so its check is still there after a change of
+section."""
+
+_UNSEEN: set[str] = set()
+"""Corpora whose last answer arrived while nobody was looking at them."""
+
+_DRAWN: dict[str, tuple[ctk.CTkLabel, ctk.CTkButton]] = {}
+"""Where each corpus's waiting is on the screen right now - the label counting the seconds
+and the button that stops it. Kept apart from the question: they change with every redraw,
+and the question does not."""
+
+_BOXES: dict[str, ctk.CTkTextbox] = {}
+"""The box each open corpus is written in, so a redraw keeps what was being typed."""
 
 
 def _alive(widget: object) -> bool:
@@ -105,8 +142,12 @@ def _list_corpora(side: Sidebar, panel: Panel, state: State) -> None:
     )
 
 
-def _open_corpus(key: str, panel: Panel, state: State) -> None:
-    """The box to write in, then the thread so far, newest first."""
+def _open_corpus(key: str, panel: Panel, state: State, draft: str = "") -> None:
+    """The box to write in, then the thread so far, newest first.
+
+    Also what is still waiting, or the last answer's check with a line saying it arrived while
+    you were elsewhere - both survive a change of section (ADR-099).
+    """
     if state.prepare_question is None or state.send_question is None:
         panel.said("Questions are unavailable", "This window was opened without them.")
         return
@@ -131,6 +172,9 @@ def _open_corpus(key: str, panel: Panel, state: State) -> None:
         font=ctk.CTkFont(size=13),
     )
     box.pack(fill="x", pady=(2, 8))
+    if draft:
+        box.insert("1.0", draft)
+    _BOXES[corpus] = box
     said = (
         "The ranking is by the words you use. It does not cross languages unless an "
         "embedding model is configured."
@@ -156,7 +200,7 @@ def _open_corpus(key: str, panel: Panel, state: State) -> None:
         hover_color=panel.skin.accent,
         text_color=panel.skin.ink,
         font=ctk.CTkFont(size=12),
-        command=lambda: _prepare(box, corpus, below, panel, state),
+        command=lambda: _prepare(box, key, below, panel, state),
     ).pack(side="left")
     if thread.turns:
         ctk.CTkButton(
@@ -172,12 +216,34 @@ def _open_corpus(key: str, panel: Panel, state: State) -> None:
             command=lambda: _forget(corpus, key, panel, state),
         ).pack(side="left", padx=10)
 
+    pending = _PENDING.get(corpus)
+    if pending is not None and not pending.stopped.is_set():
+        _draw_waiting(pending, below, panel)
+    elif corpus in _LAST:
+        if corpus in _UNSEEN:
+            _UNSEEN.discard(corpus)
+            paint.text(
+                below,
+                "This answer arrived while you were in another section.",
+                panel.skin.dim,
+                11,
+            )
+        _draw(_LAST[corpus], below, panel)
     _draw_thread(thread, below, panel)
 
 
 def _forget(corpus: str, key: str, panel: Panel, state: State) -> None:
-    """Drop the thread and draw the section again, empty."""
+    """Drop the thread and draw the section again, empty.
+
+    Anything still in flight is stopped too: its answer belonged to the thread just ended
+    (ADR-099).
+    """
+    pending = _PENDING.get(corpus)
+    if pending is not None:
+        pending.stopped.set()
     _THREADS[corpus] = Thread(corpus=corpus)
+    _LAST.pop(corpus, None)
+    _UNSEEN.discard(corpus)
     for child in panel.body.winfo_children():
         child.destroy()
     _open_corpus(key, panel, state)
@@ -209,11 +275,12 @@ def _draw_thread(thread: Thread, below: ctk.CTkFrame, panel: Panel) -> None:
 
 
 def _prepare(
-    box: ctk.CTkTextbox, corpus: str, below: ctk.CTkFrame, panel: Panel, state: State
+    box: ctk.CTkTextbox, key: str, below: ctk.CTkFrame, panel: Panel, state: State
 ) -> None:
     """Rank the corpus and draw what would be sent. The prompt itself goes nowhere."""
     if state.prepare_question is None:
         return
+    corpus = Path(key).name
     for child in below.winfo_children():
         child.destroy()
     thread = _thread_for(corpus)
@@ -261,36 +328,74 @@ def _prepare(
         hover_color=panel.skin.accent,
         text_color=panel.skin.ink,
         font=ctk.CTkFont(size=12, weight="bold"),
-        command=lambda: _send(prepared, corpus, below, panel, state),
+        command=lambda: _send(prepared, key, below, panel, state),
     ).pack(anchor="w", pady=(10, 0))
     _draw_thread(thread, below, panel)
 
 
-def _send(prepared: Prepared, corpus: str, below: ctk.CTkFrame, panel: Panel, state: State) -> None:
-    """Start the run on a worker thread and begin watching for its result."""
+def _send(prepared: Prepared, key: str, below: ctk.CTkFrame, panel: Panel, state: State) -> None:
+    """Start the run on a worker thread and begin watching for its result.
+
+    One question per corpus at a time: a second answer would have taken the first one's
+    place in the thread (ADR-099).
+    """
     if state.send_question is None:
+        return
+    corpus = Path(key).name
+    waiting_already = _PENDING.get(corpus)
+    if waiting_already is not None and not waiting_already.stopped.is_set():
+        refused = paint.card(below, panel.skin, stripe=panel.skin.contradicted)
+        paint.text(
+            refused,
+            "A question on this corpus is already with the engine. Wait for its answer, or "
+            "stop waiting for it, before sending another.",
+            panel.skin.ink,
+            12,
+        )
         return
     for child in below.winfo_children():
         child.destroy()
-    card = paint.card(below, panel.skin, stripe=panel.skin.accent)
-    waiting = paint.text(card, "Asking the engine...", panel.skin.ink, 13, bold=True)
-    paint.text(
-        card,
-        f"{prepared.selected} passages went with your question. A 14B model over a window "
-        "this size took 28 seconds when this was measured; yours depends on your machine.",
-        panel.skin.faint,
-        11,
-    )
 
-    answers: queue.Queue[Asked] = queue.Queue()
-    stopped = threading.Event()
+    pending = _Pending(
+        key=key,
+        state=state,
+        prepared=prepared,
+        answers=queue.Queue(),
+        stopped=threading.Event(),
+        began=time.monotonic(),
+    )
+    _PENDING[corpus] = pending
     send = state.send_question
+    answers = pending.answers
 
     def work() -> None:
         """The worker. It touches no widget - that is the whole of its contract."""
         answers.put(send(prepared))
 
-    ctk.CTkButton(
+    _draw_waiting(pending, below, panel)
+    threading.Thread(target=work, daemon=True, name="lacc-asking").start()
+    _watch(corpus, panel)
+
+
+def _draw_waiting(pending: _Pending, below: ctk.CTkFrame, panel: Panel) -> None:
+    """The card that counts the seconds, and the button that stops the waiting."""
+    card = paint.card(below, panel.skin, stripe=panel.skin.accent)
+    waiting = paint.text(
+        card,
+        f"Asking the engine... {time.monotonic() - pending.began:.0f}s",
+        panel.skin.ink,
+        13,
+        bold=True,
+    )
+    paint.text(
+        card,
+        f"{pending.prepared.selected} passages went with your question. A 14B model over a "
+        "window this size took 28 seconds when this was measured; yours depends on your "
+        "machine.",
+        panel.skin.faint,
+        11,
+    )
+    stop = ctk.CTkButton(
         card,
         text="Stop waiting",
         width=130,
@@ -300,58 +405,68 @@ def _send(prepared: Prepared, corpus: str, below: ctk.CTkFrame, panel: Panel, st
         hover_color=panel.skin.contradicted,
         text_color=panel.skin.dim,
         font=ctk.CTkFont(size=11),
-        command=lambda: _give_up(stopped, waiting, panel),
-    ).pack(anchor="w", pady=(10, 0))
+        command=lambda: _give_up(pending, panel),
+    )
+    stop.pack(anchor="w", pady=(10, 0))
+    _DRAWN[Path(pending.key).name] = (waiting, stop)
     paint.text(
         card,
         "Stopping stops this window waiting. The engine keeps generating and the run is "
-        "already in the audit log - the answer is discarded unread.",
+        "already in the audit log - the answer is discarded unread. Changing section does not "
+        "stop it: the answer is kept, and shown when you come back.",
         panel.skin.faint,
         10,
     )
 
-    threading.Thread(target=work, daemon=True, name="lacc-asking").start()
-    _watch(answers, stopped, time.monotonic(), waiting, below, panel, corpus)
 
-
-def _give_up(stopped: threading.Event, waiting: ctk.CTkLabel, panel: Panel) -> None:
+def _give_up(pending: _Pending, panel: Panel) -> None:
     """Stop watching. Say exactly what that did and what it did not do."""
-    stopped.set()
+    pending.stopped.set()
+    drawn = _DRAWN.get(Path(pending.key).name)
+    if drawn is None:
+        return
+    waiting, stop = drawn
     if _alive(waiting):
         waiting.configure(
-            text="Stopped waiting. The engine was not told - it is still generating.",
+            text="Stopped waiting. The engine was not told and may still be generating; "
+            "whatever it returns is discarded unread.",
             text_color=panel.skin.dim,
         )
+    if _alive(stop):
+        stop.configure(state="disabled")
 
 
-def _watch(
-    answers: queue.Queue[Asked],
-    stopped: threading.Event,
-    began: float,
-    waiting: ctk.CTkLabel,
-    below: ctk.CTkFrame,
-    panel: Panel,
-    corpus: str,
-) -> None:
-    """Count the seconds, and put the answer in the thread when it arrives.
+def _watch(corpus: str, panel: Panel) -> None:
+    """Count the seconds, and keep the answer when it arrives - whoever is looking.
 
-    **The only place in this feature that writes to a widget after a send**, and it runs on
-    the Tk thread because `after` puts it there. The worker never reaches past the queue.
+    **Scheduled on the panel's frame, which lives as long as the window.** It used to be
+    scheduled on the widgets it drew into, and stopped when they were destroyed - so a change
+    of section threw the answer away (ADR-099). Keeping is separate from drawing now: the turn
+    is recorded in any case, and drawn only if its corpus is on the screen.
 
     What goes into the thread is the turn, and what the turn carries forward is
     `established_by` - the passages whose quotations were **found**. An invention contributes
     nothing to the next question, which is the whole of ADR-091.
     """
-    if stopped.is_set() or not _alive(below):
+    pending = _PENDING.get(corpus)
+    if pending is None:
         return
+    if pending.stopped.is_set():
+        # Whatever the worker puts in the queue later is never read.
+        _PENDING.pop(corpus, None)
+        _DRAWN.pop(corpus, None)
+        return
+    drawn = _DRAWN.get(corpus)
     try:
-        answered = answers.get_nowait()
+        answered = pending.answers.get_nowait()
     except queue.Empty:
-        if _alive(waiting):
-            waiting.configure(text=f"Asking the engine... {time.monotonic() - began:.0f}s")
-        below.after(EVERY, lambda: _watch(answers, stopped, began, waiting, below, panel, corpus))
+        if drawn is not None and _alive(drawn[0]):
+            drawn[0].configure(text=f"Asking the engine... {time.monotonic() - pending.began:.0f}s")
+        panel.body.after(EVERY, lambda: _watch(corpus, panel))
         return
 
+    _PENDING.pop(corpus, None)
+    _DRAWN.pop(corpus, None)
     _THREADS[corpus] = _thread_for(corpus).after(
         Turn(
             question=answered.prepared.question,
@@ -369,10 +484,17 @@ def _watch(
             invented=answered.invented,
         )
     )
-    for child in below.winfo_children():
+    _LAST[corpus] = answered
+    if drawn is None or not _alive(drawn[0]):
+        _UNSEEN.add(corpus)
+        return
+    # On the screen: drawn again whole, so the heading counts the new turn and Start over is
+    # there - and whatever was being typed in the box is put back.
+    box = _BOXES.get(corpus)
+    draft = box.get("1.0", "end").strip() if box is not None and _alive(box) else ""
+    for child in panel.body.winfo_children():
         child.destroy()
-    _draw(answered, below, panel)
-    _draw_thread(_THREADS[corpus], below, panel)
+    _open_corpus(pending.key, panel, pending.state, draft)
 
 
 def _draw(answered: Asked, below: ctk.CTkFrame, panel: Panel) -> None:

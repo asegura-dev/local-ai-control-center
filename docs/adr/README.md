@@ -632,3 +632,9 @@ Driven with a real mouse for the first time: a notch moved **three pixels**, the
 [`ADR-098-a-model-that-thinks-is-told-whether-to.md`](ADR-098-a-model-that-thinks-is-told-whether-to.md)
 
 Newer models reason before answering unless told not to, and the reasoning arrives in a field LACC never reads: nothing breaks, a run just takes a minute where it took seconds - 40 seconds for one sentence on qwen3.5:9b, half a second with `think: false`. A `thinking` setting is sent explicitly when written; unset sends nothing, because whether the engine accepts `false` for a model that cannot reason has not been measured. The audit records how much the engine reasoned and never what. Written with the engine switched off, and says which parts still need it.
+
+### 099 - an answer that arrives while you are elsewhere
+
+[`ADR-099-an-answer-that-arrives-while-you-are-elsewhere.md`](ADR-099-an-answer-that-arrives-while-you-are-elsewhere.md)
+
+A question sent from Ask, the section changed while the engine worked, and the answer - two quotations found, in the audit - never reached the screen. Keeping and drawing were one step, and a change of section cancelled both. They are separate now: the answer is kept, waits, and says it arrived while you were elsewhere; a question in flight is shown waiting when you come back; the heading counts every turn and Start over is always there. One question per corpus at a time.

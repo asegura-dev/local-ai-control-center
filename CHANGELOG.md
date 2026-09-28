@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **An answer that arrived while you were in another section was lost** (ADR-099). The
+  watch that kept the answer also drew it, and stopped when its widgets were destroyed - so
+  the turn was recorded only if somebody was still looking; the audit had it, the screen
+  never did. Keeping is separate from drawing now: the answer is kept, the corpus says it
+  arrived while you were elsewhere, and a question still in flight is shown waiting when
+  you come back. The heading counts every turn and **Start over** is there without choosing
+  the corpus again. One question per corpus at a time; Start over stops waiting too.
 - **The rail outgrew its column** (ADR-095). The theme block at the bottom was drawn at 45
   pixels of the 89 it asked for, and a window shorter than the one it was built on lost whole
   sections off the bottom. The theme is packed first, the section list scrolls, and the wheel
