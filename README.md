@@ -6,8 +6,9 @@ A local-first framework for private, reproducible, auditable AI-assisted
 workflows.
 
 **New here, or returning after a while?** [docs/ORIENTATION.md](docs/ORIENTATION.md) is one
-page: how to run it without breaking the environment, where everything lives, and the four
-rules that are not style preferences.
+page: how to run it without breaking the environment, where everything lives, and the five
+rules that are not style preferences. What it is made of, and where each part is used, is
+[docs/stack/](docs/stack/README.md).
 
 ## What LACC is
 
@@ -21,9 +22,10 @@ local inference engines such as Ollama, rather than to replace them: the engine
 provides the model, while LACC is intended to handle permissions, previews,
 confirmation, and audit around each action.
 
-The project is in early development. Where something is not yet implemented, this
-document describes it as intent rather than as a guarantee - and where a property is
-enforced rather than merely intended, it says which mechanism enforces it.
+LACC is used every day on a real master's thesis, and still changes week by week. Where
+something is not yet implemented, this document describes it as intent rather than as a
+guarantee - and where a property is enforced rather than merely intended, it says which
+mechanism enforces it.
 
 ## Design principles
 
@@ -65,7 +67,15 @@ mkdir -p configs                          # LACC looks here; git ignores it
 cp config.example.yaml configs/config.yaml   # set workspace_root, model, context_tokens
 uv run lacc ingest paper.pdf         # PDF or Word into text LACC can read
 uv run lacc run extract_claims paper.md
+
+uv sync --extra gui                  # the window is optional
+uv run --extra gui lacc window
 ```
+
+**On Windows, or with the checkout inside OneDrive, Dropbox or iCloud**, run everything
+through `.\run.ps1` in place of `uv` - `.\run.ps1 sync`, `.\run.ps1 run lacc ...` - which
+keeps the environment out of the synchronised folder. Bare `uv` there fails with *Access
+is denied* partway through a build; the guide below says why.
 
 One setting decides whether your first run tells you the truth. Leaving `context_tokens`
 unset does not mean unlimited - the engine falls back to its own default of 4096 tokens
@@ -88,6 +98,13 @@ refuses a prompt too large for it.
   context window really needs.
 - [Keeping the virtual environment out of a sync folder](docs/guides/virtualenv-outside-a-sync-folder.md)
   - read this first if your checkout is inside OneDrive or Dropbox.
+- [Asking a corpus and writing from it](docs/guides/asking-a-corpus-and-writing-from-it.md)
+  - from a folder of papers to a paragraph whose quotations were checked.
+- [Reading what was done](docs/guides/reading-what-was-done.md) - the audit trail, in the
+  window and in a terminal, and what it proves.
+- [How a change is made here](docs/guides/how-a-change-is-made-here.md) and
+  [the same, in detail](docs/guides/working-this-way-in-detail.md) - the working method this
+  project is a product of.
 
 The [documentation](docs/README.md) explains the design, and every decision has a record
 in [`docs/adr/`](docs/adr/) with its context, its trade-off and the alternative rejected.
@@ -95,7 +112,8 @@ in [`docs/adr/`](docs/adr/) with its context, its trade-off and the alternative 
 ## Status
 
 v2.10.0, working end to end against a real local model and measured against a real
-bibliography rather than against documents written for the test.
+bibliography rather than against documents written for the test. What has landed since
+is under *Unreleased* in the [changelog](CHANGELOG.md), and marked *(unreleased)* below.
 
 Every run takes the same shape: LACC plans the action, shows a preview, asks for
 confirmation defaulting to no, reads what it was pointed at inside the workspace
@@ -114,7 +132,8 @@ append-only, hash-chained audit log.
   quotation is still checked against the whole document, and the answer says how
   many passes it took.
 - `lacc run revise_file <path>` proposes a clearer version *beside* the original,
-  approved against a diff. Nothing LACC writes replaces a file that already existed.
+  approved against a diff. What LACC writes for you never replaces a file that already
+  existed ([every file it writes](docs/stack/files-on-disk.md)).
 - `lacc ingest <document>` turns a PDF or Word file into Markdown you can open and
   correct, preserving page markers so quotations stay checkable.
 - `lacc collect <skill> <documents> --into <file>` runs one skill across a whole
@@ -136,9 +155,12 @@ append-only, hash-chained audit log.
   actually is, instead of asking a model. It is the first destination in this program that
   is not your own machine, and it needs both `network_access` and a `registry_url` written
   in your configuration.
-- `lacc bib <answers> --into refs.bib` writes what the registry answered as BibTeX, for
-  biber and pandoc, with no network. `--adding-to` names the `.bib` you already cite from:
-  what it holds is left out and none of its keys is handed out again.
+- `lacc bib <answers> --into refs.bib` *(unreleased)* writes what the registry answered as
+  BibTeX, for biber and pandoc, with no network. `--adding-to` names the `.bib` you already
+  cite from: what it holds is left out and none of its keys is handed out again.
+- `lacc references <documents>` reports what more than one of your papers cites, and
+  whether you hold it; `lacc metadata` prints what each document says about itself - title,
+  authors, DOI, date - with no model and no network.
 - `lacc sections <document>` lists the sections a document numbers for itself, `--about`
   ranks them by a question, and `--take` writes one out - so a guideline too large for any
   window can be read one part at a time without cutting the file.
@@ -159,11 +181,16 @@ append-only, hash-chained audit log.
   before the button that sends it exists, on a worker thread so the window never stops
   repainting, and asking again carries **the passages whose quotations were found** - never
   what the model said, because a conversation is how an invented quotation comes to verify
-  one turn later. **Audit** lists every run your workspace's trail holds, checks the chain
-  as it reads, and can change nothing.
+  one turn later. **Audit** *(unreleased)* lists every run your workspace's trail holds,
+  checks the chain as it reads, and can change nothing.
 - `lacc preview` shows what would happen without doing it, `lacc profile` reports what
-  the machine offers, `lacc verify` walks the audit chain, and `lacc notify test`
-  checks notification settings before you rely on them.
+  the machine offers, `lacc verify` walks the audit chain, `lacc engine test` checks that
+  the configured engine answers, and `lacc notify test` checks notification settings before
+  you rely on them. `lacc outline` lists a document's sections with their pages, and
+  `lacc measure` runs a skill several times and reports the spread rather than one number.
+- `thinking: false` in the configuration *(unreleased)* asks a model that reasons before
+  answering not to: one sentence took 40 seconds on qwen3.5:9b with its reasoning, and half
+  a second without.
 
 Why the checking matters, in one measured number: across 24 papers of a real bibliography,
 a 14B model produced 237 quotations and **48 of them are not in the document they cite** -

@@ -1,7 +1,7 @@
 # Orientation - read this first
 
 One page. What this is, how to run it without breaking anything, where things live, and the
-four rules that are not style preferences.
+five rules that are not style preferences.
 
 ---
 
@@ -31,7 +31,7 @@ The same applies to anything that launches LACC: `scripts/lacc-window.bat` goes 
 
 | | |
 |---|---|
-| **Where does the work stand?** | `.\run.ps1 run lacc status -c <config>`, or the window's first section |
+| **Where does the work stand?** | `.\run.ps1 run lacc status -c <config>`, or the window's first section, *Where it stands* |
 | **What does my corpus barely cover?** | `.\run.ps1 run lacc coverage <topics> --against <corpus>` |
 | **What is the project like right now?** | `.\run.ps1 run python tools/measure.py` |
 | **Why is anything the way it is?** | [`docs/adr/README.md`](adr/README.md) - every record, annotated |
@@ -39,9 +39,13 @@ The same applies to anything that launches LACC: `scripts/lacc-window.bat` goes 
 | **How is a change made here?** | [`guides/how-a-change-is-made-here.md`](guides/how-a-change-is-made-here.md) |
 | **The same, in detail** | [`guides/working-this-way-in-detail.md`](guides/working-this-way-in-detail.md) |
 | **What was measured and what was wrong** | [`docs/04-measurements.md`](04-measurements.md) |
+| **What did LACC do, and when?** | The window's *Audit* section, or `lacc verify` - [`guides/reading-what-was-done.md`](guides/reading-what-was-done.md) |
+| **What is it made of, and where is each module?** | [`docs/stack/`](stack/README.md), [`src/README.md`](../src/README.md), [`tests/README.md`](../tests/README.md) |
+| **How do I work from a corpus?** | [`guides/asking-a-corpus-and-writing-from-it.md`](guides/asking-a-corpus-and-writing-from-it.md) |
 
-**Take a figure rather than remembering one.** Both tools above print everything fresh and
-store nothing, because this project's most frequent defect is a true sentence that aged.
+**Take a figure rather than remembering one.** `lacc status` and `tools/measure.py` print
+everything fresh and store nothing, and `coverage` writes its report only where you name one,
+because this project's most frequent defect is a true sentence that aged.
 
 ## The shape of the code
 
@@ -49,13 +53,15 @@ store nothing, because this project's most frequent defect is a true sentence th
     ports/      abstract classes and the contracts that cross them
     adapters/   implements a port: Ollama, Crossref, ntfy, documents
     features/   one capability each: corpus, review, sections, prompts...
-    views/      the window's sections - draws, never decides
+    views/      the window's fourteen sections - draws, never decides
+    system/     the machine, not behind a port: the audit trail, the profiler
     cli.py      the driving adapter          window.py  the second one
     cycle.py    the one place that runs an action through the whole system
 
-`tests/test_layering.py` enforces all of that, in both directions.
+`tests/test_layering.py` enforces all of that, in both directions - except `system/`, whose
+imports no test bounds yet. Every module, one line each: [`src/README.md`](../src/README.md).
 
-## Four rules that are not preferences
+## Five rules that are not preferences
 
 **Nothing is verified by remembering.** A quotation is checked against its document by string
 comparison. A figure is counted now. A stage reports what is *missing*, not only what is done.

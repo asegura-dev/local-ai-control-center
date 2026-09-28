@@ -19,7 +19,10 @@ choices:
 - **Not a model runtime.** The engine provides the model; LACC is intended to
   handle the permissions, preview, confirmation, and audit around each action.
 - **Not a cloud service.** It is designed to run without paid APIs or internet
-  access, keeping local data on the machine and out of version control.
+  access, keeping local data on the machine and out of version control. Two destinations
+  beyond your own machines are reachable, both off unless your configuration names them: a
+  registry that says what a DOI is, to which only DOIs are sent (ADR-067), and a
+  notification server you choose (ADR-060).
 
 ## Why it matters
 
@@ -33,8 +36,10 @@ this book defends the decisions that follow from it.
 We deliberately favor **control and honesty over capability**. LACC starts
 restrictive: permissions are disabled by default and each skill opts into only
 what it needs. This makes the tool less immediately powerful than one that acts
-freely, in exchange for being trustworthy and auditable. Capability grows later,
-in small reviewed increments, once the control and audit foundations are real.
+freely, in exchange for being trustworthy and auditable. Capability grows in small
+reviewed increments on top of those foundations - which are real now: twenty commands, a
+window of fourteen sections, and a thesis's bibliography worked through end to end - and each
+increment has had to show that it keeps them.
 
 ## Map of the book
 
@@ -52,6 +57,11 @@ This book grows with the code, one decision at a time:
 Decisions are recorded separately as ADRs (`adr/`), each with its context, the
 choice, the trade-off, and the alternative rejected. The one-line-per-file map is
 [INDEX.md](INDEX.md).
+
+Beside the book: [ORIENTATION.md](ORIENTATION.md), one page to read first; `guides/`, step by
+step, from a first run to reading what was done; and `stack/`, what LACC is made of and every
+file it writes. There are two ways in - the `lacc` command, and a window (`lacc window`) that
+reads everything the command produces and asks one kind of question.
 
 ## Summary
 

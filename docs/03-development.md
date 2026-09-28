@@ -22,14 +22,19 @@ On macOS and Linux, follow the official installation instructions for
 ## Setup
 
 Clone the repository, then create the environment and install the development
-tools:
+tools - with the window's toolkit, which is optional:
 
 ```text
-uv sync
+.\run.ps1 sync --extra gui
 ```
 
 This creates a virtual environment and installs the linter, type checker, and
-test runner defined in the project.
+test runner defined in the project. Without `--extra gui` the window cannot open, and the
+one layering test that imports it is skipped rather than run.
+
+This project is developed inside a synchronised folder, so every command here goes through
+`run.ps1`; on a checkout outside one, plain `uv` does the same - `uv sync --extra gui`,
+`uv run ...` - and the section below says why the difference matters.
 
 ### If the checkout sits in a synchronised folder
 
@@ -50,24 +55,34 @@ fixes it is leaving nothing of the environment inside the folder at all:
 ```
 
 `run.ps1` sets `UV_PROJECT_ENVIRONMENT` to `%USERPROFILE%\.venvs\lacc` and forwards
-everything to uv. On a checkout outside a synchronised folder it is unnecessary, and
-plain `uv` works as above. Setting `UV_PROJECT_ENVIRONMENT` in the shell does the same
-thing on any platform; the script only saves remembering it.
+everything to uv. On a checkout outside a synchronised folder it is unnecessary.
+Setting `UV_PROJECT_ENVIRONMENT` in the shell does the same thing on any platform; the
+script only saves remembering it - and bypassing it once, here, built a 111 MB `.venv` in
+the synchronised folder and four `Access is denied` failures in a day (ADR-084). The
+window's launcher goes through it for the same reason.
 
 ## Quality gate
 
 Before committing, the following checks are expected to pass:
 
 ```text
-uv run ruff check .
-uv run ruff format --check .
-uv run python -m mypy src
-uv run python -m pytest -q
+.\run.ps1 run ruff check .
+.\run.ps1 run ruff format --check .
+.\run.ps1 run mypy src
+.\run.ps1 run pytest -q
 ```
 
 In order, these lint the code, verify formatting without changing files, type
 check the package in strict mode, and run the test suite. If formatting fails,
-`uv run ruff format .` applies the changes.
+`.\run.ps1 run ruff format .` applies the changes. The same four run on every push in CI
+(`.github/workflows/quality-gate.yml`), on a clean runner where plain `uv` is safe.
+
+Some of the suite is about the code's own shape rather than its behaviour - the layers, the
+indexes of `src/` and `tests/`, that nothing is defined only a test reaches, that the
+launcher's name is never split in two. [`tests/README.md`](../tests/README.md) lists them
+first. The window's widgets are not tested - Tk needs a display - and
+`tools/measure_window.py` drives the real window instead, reporting text cut off, sections
+out of reach, the wheel, Ask and Audit.
 
 Run each check on its own rather than piping it through something that trims the
 output. A pipeline reports the exit status of its last command, so `ruff check . | tail`
@@ -85,8 +100,9 @@ DOIs - and the rule is not *no network*: it is that **every destination is writt
 file the user wrote**, with `network_access` as a ceiling that is off by default and that no
 environment variable can lift (ADR-030, ADR-067).
 
-`uv run mypy` and `uv run pytest` may fail with `failed to canonicalize script path` when
-uv has just reinstalled the project; invoking them as `python -m` avoids it.
+`mypy` and `pytest` may fail with `failed to canonicalize script path` when uv has just
+reinstalled the project; invoking them as `python -m mypy` and `python -m pytest` avoids
+it.
 
 ## Where to keep a workspace
 
@@ -154,19 +170,25 @@ from plan to implementation, its documentation moves with it.
 
 ## Releasing
 
-Version numbers live in three places, and all three move together:
+Version numbers live in four places, and all four move together:
 
 - `pyproject.toml`
 - `src/local_ai_control_center/__init__.py`
 - `CITATION.cff` - both `version` and `date-released`
+- `README.md`, the first line of *Status*
+
+And the changelog's `[Unreleased]` becomes the version's heading, with its date.
 
 A `CITATION.cff` naming an older version is worse than none: it tells someone citing the
-project that they used a release they did not. Then `uv lock`, a green gate, a commit, an
-annotated tag, and push both the branch and the tag.
+project that they used a release they did not. Then `.\run.ps1 lock`, a green gate, a
+commit, an annotated tag, and push both the branch and the tag - with the synchronising
+client stopped while git writes. Pushing a `v*` tag creates the GitHub release
+(`.github/workflows/release.yml`).
 
 ## Chapter layout
 
-The documentation is written as a short book of numbered chapters, compiled into
-a single navigable HTML file. Chapters are added when there is something true to
-say; empty chapters are not created in advance. Numbering leaves room for
-chapters that are introduced in later phases.
+The documentation is written as a short book of numbered chapters, read as Markdown - on
+the repository's page, or in the window's Documentation section, which draws every chapter,
+record and guide with no generation step (ADR-070). Chapters are added when there is
+something true to say; empty chapters are not created in advance. Around them sit the
+records (`adr/`), the guides (`guides/`), and what the program is made of (`stack/`).
