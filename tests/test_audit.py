@@ -19,7 +19,7 @@ from local_ai_control_center.system.audit import (
     ChainCheck,
     digest_of,
     digest_of_file,
-    verify_chain,
+    walk,
 )
 
 
@@ -182,7 +182,7 @@ def test_an_intact_trail_verifies(tmp_path: Path) -> None:
     log = AuditLog(Workspace.ensure(tmp_path), Config(workspace_root=tmp_path))
     for index in range(4):
         log.record("run-1", "run_started", f"record {index}")
-    result = verify_chain(log.path)
+    result = walk(log.path).chain
     assert result.intact is True
     assert result.records == 4
     assert result.broken_at is None
@@ -198,7 +198,7 @@ def test_an_edited_record_breaks_the_chain_where_it_was_edited(tmp_path: Path) -
     lines[1] = lines[1].replace("record 1", "something else")
     log.path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    result = verify_chain(log.path)
+    result = walk(log.path).chain
     assert result.intact is False
     assert result.broken_at == 2
 
@@ -213,7 +213,7 @@ def test_a_removed_record_breaks_the_chain(tmp_path: Path) -> None:
     del lines[2]
     log.path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    assert verify_chain(log.path).intact is False
+    assert walk(log.path).chain.intact is False
 
 
 def test_the_chain_survives_the_log_being_reopened(tmp_path: Path) -> None:
@@ -221,7 +221,7 @@ def test_the_chain_survives_the_log_being_reopened(tmp_path: Path) -> None:
     workspace, config = Workspace.ensure(tmp_path), Config(workspace_root=tmp_path)
     AuditLog(workspace, config).record("run-1", "run_started", "before")
     AuditLog(workspace, config).record("run-2", "run_started", "after")
-    assert verify_chain(tmp_path / "audit.jsonl").intact is True
+    assert walk(tmp_path / "audit.jsonl").chain.intact is True
 
 
 def test_records_written_before_the_chain_are_unverifiable_not_broken(tmp_path: Path) -> None:
@@ -232,7 +232,7 @@ def test_records_written_before_the_chain_are_unverifiable_not_broken(tmp_path: 
         '"message":"from before","detail":{}}\n',
         encoding="utf-8",
     )
-    result = verify_chain(path)
+    result = walk(path).chain
     assert result.intact is True
     assert result.unverifiable == 1
 
@@ -262,7 +262,7 @@ def _tampered(tmp_path: Path, mutate: Callable[[list[str]], list[str]]) -> Chain
         log.record("run", "run_started", f"event {index}")
     lines = log.path.read_text(encoding="utf-8").splitlines()
     log.path.write_text("\n".join(mutate(lines)) + "\n", encoding="utf-8")
-    return verify_chain(log.path)
+    return walk(log.path).chain
 
 
 def test_an_edited_record_breaks_the_chain(tmp_path: Path) -> None:

@@ -248,48 +248,90 @@ class ChainCheck(BaseModel):
     unreadable_at: int | None = None
 
 
-def verify_chain(path: Path) -> ChainCheck:
-    """Walk the trail at ``path`` and report whether its chain holds, and where it does not.
+class Walked(BaseModel):
+    """A trail read once: what its chain says, and every record in it that could be read."""
+
+    model_config = ConfigDict(frozen=True)
+
+    chain: ChainCheck
+    events: tuple[AuditEvent, ...] = ()
+    vouched: tuple[bool, ...] = ()
+    """For each record kept, whether the chain vouches for it.
+
+    False from the first break or unreadable line on, and for a record written before the
+    chain existed. Records past a break are kept rather than dropped: they are shown, marked,
+    because hiding them would hide the evidence (ADR-104).
+    """
+
+    exists: bool = True
+
+
+def walk(path: Path) -> Walked:
+    """Read the trail at ``path`` once: check each link, and keep every record that parses.
 
     Detects modification by anything that does not know the file is a chain. It does not
-    detect a deliberate rewrite: whatever can write the file can recompute every digest
-    from the point it changed. That limit is the claim's boundary, not a gap in it
-    (ADR-023).
+    detect a deliberate rewrite: whatever can write the file can recompute every digest from
+    the point it changed. That limit is the claim's boundary, not a gap in it (ADR-023).
+
+    It replaced `verify_chain`, which walked the chain and kept nothing. The window needs the
+    records too, and walking twice - once to vouch for them, once to show them - paid twice for
+    the slowest thing here, on a file that only grows (ADR-104). The chain reports exactly what
+    it reported before: the first unreadable line or the first break, whichever comes first.
     """
     try:
         lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
     except OSError:
-        return ChainCheck(intact=False, records=0, unreadable_at=1)
+        return Walked(
+            chain=ChainCheck(intact=False, records=0, unreadable_at=1), exists=path.exists()
+        )
 
     previous = GENESIS_DIGEST
     unverifiable = 0
     stamps: list[str] = []
+    events: list[AuditEvent] = []
+    vouched: list[bool] = []
+    unreadable_at: int | None = None
+    broken_at: int | None = None
     for position, line in enumerate(lines, start=1):
         try:
             recorded = AuditEvent.model_validate_json(line)
-            stamps.append(recorded.timestamp)
         except ValueError:
-            return ChainCheck(intact=False, records=len(lines), unreadable_at=position)
+            if unreadable_at is None and broken_at is None:
+                unreadable_at = position
+            continue
+        stamps.append(recorded.timestamp)
+        events.append(recorded)
+        if unreadable_at is not None or broken_at is not None:
+            vouched.append(False)
+            continue
         if not recorded.digest:
             unverifiable += 1
+            vouched.append(False)
             continue
         expected = recorded.model_copy(update={"digest": ""})
         recomputed = digest_of(expected.model_dump_json())
         if recorded.previous != previous or recomputed != recorded.digest:
-            return ChainCheck(
-                intact=False,
-                records=len(lines),
-                unverifiable=unverifiable,
-                broken_at=position,
-            )
+            broken_at = position
+            vouched.append(False)
+            continue
         previous = recorded.digest
-    return ChainCheck(
-        intact=True,
-        records=len(lines),
-        unverifiable=unverifiable,
-        first_seen=stamps[0] if stamps else "",
-        last_seen=stamps[-1] if stamps else "",
-    )
+        vouched.append(True)
+
+    if unreadable_at is not None:
+        chain = ChainCheck(intact=False, records=len(lines), unreadable_at=unreadable_at)
+    elif broken_at is not None:
+        chain = ChainCheck(
+            intact=False, records=len(lines), unverifiable=unverifiable, broken_at=broken_at
+        )
+    else:
+        chain = ChainCheck(
+            intact=True,
+            records=len(lines),
+            unverifiable=unverifiable,
+            first_seen=stamps[0] if stamps else "",
+            last_seen=stamps[-1] if stamps else "",
+        )
+    return Walked(chain=chain, events=tuple(events), vouched=tuple(vouched))
 
 
 _CONTENT_KEYS = frozenset({"prompt", "completion"})

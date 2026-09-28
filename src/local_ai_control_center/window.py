@@ -1,11 +1,17 @@
-"""The second view: a window that reads, and runs one thing (ADR-069, ADR-075, ADR-085).
+"""The second view: a window that reads, and does four things when asked to (ADR-069).
 
-**Eight sections read. One asks.** No skill is run from here, no document written, nothing
-converted - the single action the window may take is a question against a corpus that is
-already there, which is the only thing this program does that leaves the workspace exactly as
-it found it. It happens behind a preview, on a worker thread, and the ability to do it is
-handed in rather than obtained: `cli.py` passes the two callables, and without them the
-section says so and the rest is unaffected (ADR-085).
+**Most sections read. Four act, and only when asked.** Ask sends a question against a corpus
+that is already there, the only thing this program does that leaves the workspace as it found
+it (ADR-085). Engines asks a host what it holds, when a button is pressed (ADR-094).
+Configuration rewrites the configuration after drawing every line that would change
+(ADR-094), and Workspaces makes a new one after saying what it would cost (ADR-093). No skill
+is run from here, no document converted. What reaches past `features/` - an engine, the
+cycle, the audit - is handed in by `cli.py` rather than obtained, and without it the section
+says so and the rest is unaffected. Audit reads what was done and cannot change it
+(ADR-104).
+
+This paragraph said "eight sections read, one asks" until 27-sep, two records after it
+stopped being true (ADR-104).
 
 **And it decides nothing.** Which reviews exist, what a finding means, which files are
 corpora, what a configuration declares, which colours a theme has: all answered in
@@ -18,8 +24,10 @@ window iterates over them and knows nothing about any of them. Adding one used t
 four places, and getting three of the four right produced a section that appeared in the menu
 and did nothing at all.
 
-**The one thing it writes is its own appearance**, in a file of its own. The configuration is
-the user's: choosing one here changes *which* is read, never what is in it.
+**What it writes**: its own appearance, in a file of its own; a new configuration from
+Workspaces, after saying what it would cost; and a configuration's settings from
+Configuration, after drawing every change, never the ceiling it sets (ADR-094). Choosing a
+configuration in the picker changes *which* is read, never what is in it.
 
 Tk cannot be exercised headlessly, so nothing here is covered by a test. That is why it is
 this thin.
@@ -39,10 +47,12 @@ from local_ai_control_center.features.ask import Asked, Prepared
 from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.status import EngineSeen, Status
+from local_ai_control_center.features.trail import Trail
 from local_ai_control_center.features.workspaces import points_of, risk_of
 from local_ai_control_center.system.profiler import work_area
 from local_ai_control_center.views import (
     asking,
+    audit,
     making,
     paint,
     program,
@@ -84,6 +94,7 @@ SECTIONS: tuple[Section, ...] = in_groups(
     asking.SECTIONS,
     workspace.SECTIONS,
     making.SECTIONS,
+    audit.SECTIONS,
     program.SECTIONS,
     settings.SECTIONS,
     records.SECTIONS,
@@ -108,6 +119,7 @@ class Window(ctk.CTk):
         prepare_question: Callable[..., Prepared] | None = None,
         send_question: Callable[[Prepared], Asked] | None = None,
         context_file: str = "",
+        read_trail: Callable[[], Trail] | None = None,
     ) -> None:
         super().__init__()
         self._pending: str | None = None
@@ -124,6 +136,7 @@ class Window(ctk.CTk):
         self.prepare_question = prepare_question
         self.send_question = send_question
         self.context_file = context_file
+        self.read_trail = read_trail
         self.engine = EngineSeen()
         self.preferences = preferences
         self.saved = saved
@@ -182,11 +195,26 @@ class Window(ctk.CTk):
         """Add a row to the sidebar, optionally under a group."""
         self.tree.insert(under, "end", iid=key, text=f"  {shortened(shown)}")
         self._rows.add(key)
+        self._reveal_side()
         return key
 
     def group(self, shown: str, open_now: bool = False) -> str:
         """Add a group that rows sit under."""
-        return str(self.tree.insert("", "end", text=f"  {shown}", open=open_now))
+        added = str(self.tree.insert("", "end", text=f"  {shown}", open=open_now))
+        self._reveal_side()
+        return added
+
+    def _reveal_side(self) -> None:
+        """Show the list column once it holds something, whenever that happens.
+
+        `_go` hides it when a section lists nothing (ADR-092), and looked only once, right
+        after the listing. The audit fills its list after a walk on a worker, so its rows
+        arrived into a column that had already been put away (ADR-104).
+        """
+        if not self.side.winfo_ismapped():
+            # `after` the rail rather than `before` the panel: a scrollable frame packs an
+            # inner widget, so naming it here asks Tk about something it never saw.
+            self.side.pack(side="left", fill="y", after=self.rail)
 
     def _state(self) -> State:
         return State(
@@ -199,6 +227,7 @@ class Window(ctk.CTk):
             send_question=self.send_question,
             context_file=self.context_file,
             ask_engine=self.ask_engine,
+            read_trail=self.read_trail,
         )
 
     # --- the three columns -----------------------------------------------------------------
@@ -568,10 +597,7 @@ class Window(ctk.CTk):
         # beside it, which reads as something failing to load rather than as a page with no
         # list (ADR-092). `before` keeps the column between the rail and the panel.
         if self.tree.get_children():
-            if not self.side.winfo_ismapped():
-                # `after` the rail rather than `before` the panel: a scrollable frame packs
-                # an inner widget, so naming it here asks Tk about something it never saw.
-                self.side.pack(side="left", fill="y", after=self.rail)
+            self._reveal_side()
         else:
             self.side.pack_forget()
         self._to_top()
@@ -599,6 +625,7 @@ def show(
     prepare_question: Callable[..., Prepared] | None = None,
     send_question: Callable[[Prepared], Asked] | None = None,
     context_file: str = "",
+    read_trail: Callable[[], Trail] | None = None,
 ) -> None:
     """Open the window and hand control to Tk until it closes.
 
@@ -619,4 +646,5 @@ def show(
         prepare_question,
         send_question,
         context_file,
+        read_trail,
     ).mainloop()

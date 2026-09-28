@@ -155,6 +155,7 @@ from local_ai_control_center.features.review import (
 )
 from local_ai_control_center.features.stages import TAKEN_FROM, stages_in
 from local_ai_control_center.features.status import EngineSeen, status_of
+from local_ai_control_center.features.trail import Said, Trail, integrity_of, trail_of
 from local_ai_control_center.ports.converter import ConversionError, Converter
 from local_ai_control_center.ports.embedder import EmbeddingError
 from local_ai_control_center.ports.notifier import Notification, NotifierMisconfigured
@@ -162,11 +163,10 @@ from local_ai_control_center.ports.provider import Provider, ProviderError
 from local_ai_control_center.ports.registry import RegistryError, Work
 from local_ai_control_center.ports.retriever import Passage, Retriever
 from local_ai_control_center.system.audit import (
-    AnchorCheck,
     AuditLog,
     check_anchor,
     digest_of,
-    verify_chain,
+    walk,
 )
 from local_ai_control_center.system.profiler import SystemProfile, profile_system
 
@@ -2433,11 +2433,13 @@ def window(
 ) -> None:
     """Open a window on the work in your workspace, and ask it one kind of question.
 
-    **Eight sections read; one asks.** No skill is run from here and nothing is written - the
-    single action available is a question against a corpus that is already there, behind a
-    preview that has to be drawn before the control that sends it exists (ADR-085). A review
-    is still produced by `lacc review --into`; this opens the findings and paints them over
-    the draft (ADR-069).
+    **Most sections read; four act, each behind what it shows first.** Ask sends a question
+    once its preview is drawn (ADR-085), Engines asks a host what it holds when a button is
+    pressed (ADR-094), Configuration rewrites the configuration after showing every line that
+    would change (ADR-094), and Workspaces makes a new one after saying what it would cost
+    (ADR-093). No skill is run from here: a review is still produced by `lacc review --into`,
+    and this opens the findings and paints them over the draft (ADR-069). Audit reads what
+    was done, and cannot change it (ADR-104).
 
     Needs the optional toolkit: `pip install local-ai-control-center[gui]`.
     """
@@ -2476,6 +2478,7 @@ def window(
         lambda host: _engine_at(config, host),
         *_asking_for_the_window(config, workspace),
         config.context_file or "",
+        _trail_for_the_window(config, workspace),
     )
 
 
@@ -2831,6 +2834,10 @@ def status(
     _show(f"[dim]{work.settled} of {len(work.stages)} stages have nothing outstanding.[/dim]")
 
 
+_MARKUP = {"good": "green", "warn": "yellow", "bad": "red", "plain": "", "quiet": "dim"}
+"""How each tone of a sentence about the trail is printed in a terminal."""
+
+
 @app.command()
 def verify(
     config_path: Annotated[
@@ -2838,88 +2845,60 @@ def verify(
         typer.Option("--config", "-c", help="Path to the configuration file."),
     ] = DEFAULT_CONFIG_PATH,
 ) -> None:
-    """Check that the audit trail has not been altered since it was written."""
+    """Check that the audit trail has not been altered since it was written.
+
+    The sentences are `features/trail.py`'s, which the window's Audit section draws too: one
+    writer for both (ADR-104). A workspace where nothing has been recorded has no trail yet,
+    which is not a failure.
+    """
     _, workspace = _load(config_path)
     audit = AuditLog(workspace, load_config(config_path))
-    result = verify_chain(audit.path)
-
-    if result.unreadable_at is not None:
-        console.print(
-            f"[red]The trail cannot be read[/red] at record {result.unreadable_at} ({audit.path})."
-        )
+    walked = walk(audit.path)
+    anchor = check_anchor(audit.path)
+    for said in integrity_of(walked.chain, anchor, str(audit.path), walked.exists):
+        _print_said(said)
+    if walked.exists and not walked.chain.intact:
         raise typer.Exit(code=1)
 
-    if not result.intact:
-        console.print(
-            f"[red]The trail has been altered.[/red] The chain first breaks at record "
-            f"{result.broken_at} of {result.records} in {audit.path}. Every record from "
-            "there on is no longer vouched for by the ones before it."
-        )
-        raise typer.Exit(code=1)
 
-    console.print(
-        f"[green]The trail holds.[/green] {result.records} records in {audit.path}, "
-        "each linked to the one before it."
-    )
-    if result.first_seen:
-        console.print(f"From {result.first_seen} to {result.last_seen}.")
-    if result.unverifiable:
-        console.print(
-            f"[yellow]{result.unverifiable} of them predate the chain[/yellow] and cannot "
-            "be vouched for either way."
-        )
-    _report_the_anchor(check_anchor(audit.path))
-    # Two limits, and the one that was never stated is the easier attack. Tested: editing,
-    # deleting a middle record and reordering are all caught; removing records from the end
-    # is not, and no chain can catch it from the file alone (ADR-043).
-    console.print(
-        "[dim]The chain catches a record edited, removed from the middle, or reordered. It "
-        "does not catch records removed from the end - a shorter chain is still a valid "
-        "chain - nor a deliberate rewrite, since whatever can write the file can recompute "
-        "the digests. The anchor beside the trail catches loss, and sits under the same "
-        "permissions as the trail, so it does not catch a person who wants it gone. If you "
-        "keep your notifications, those are the only record of this that is not on this "
-        "machine.[/dim]"
-    )
+def _print_said(said: Said) -> None:
+    """One sentence about the trail, stressed the way its tone says."""
+    colour = _MARKUP[said.tone]
+    if said.tone == "quiet":
+        console.print(f"[dim]{' '.join(part for part in (said.lead, said.rest) if part)}[/dim]")
+    elif colour and said.lead:
+        console.print(f"[{colour}]{said.lead}[/{colour}] {said.rest}")
+    else:
+        console.print(" ".join(part for part in (said.lead, said.rest) if part))
 
 
-def _report_the_anchor(anchor: AnchorCheck) -> None:
-    """Say what the sidecar beside the trail knows, and what it cannot know.
+def _trail_for_the_window(config: Config, workspace: Workspace) -> Callable[[], Trail]:
+    """Compose the audit the window reads (ADR-104).
 
-    Three outcomes rather than two: shorter than it was, and a changed last record, are
-    different events with different causes (ADR-049).
+    Composition, for the reason `_asking_for_the_window` is: a section may reach neither the
+    audit log nor the chain that vouches for it. What it is handed walks the trail once and
+    keeps the answer until the file changes, so opening the section again costs nothing.
+    It is called on a worker thread; it touches no widget.
     """
-    if not anchor.present:
-        console.print(
-            "[dim]This trail has no anchor beside it - it was written before anchors "
-            "existed. One will be written the next time something is recorded.[/dim]"
-        )
-        return
-    if anchor.agrees:
-        console.print(
-            f"[green]The anchor agrees:[/green] {anchor.expected_records} records, and the "
-            "last one is the last one it saw."
-        )
-        return
-    if anchor.lost:
-        console.print(
-            f"[red]{anchor.lost} records are missing from the end.[/red] The anchor "
-            f"remembers {anchor.expected_records} and the trail holds {anchor.found_records}. "
-            "A crashed write, a synchronisation conflict or a restored backup will do this; "
-            "so will somebody removing them."
-        )
-        return
-    if anchor.head_changed:
-        console.print(
-            "[red]The last record is not the one the anchor saw.[/red] The count matches, so "
-            "nothing was removed - the final record was replaced."
-        )
-        return
-    console.print(
-        f"[yellow]The trail is longer than the anchor remembers[/yellow] "
-        f"({anchor.found_records} against {anchor.expected_records}). Something wrote to it "
-        "without going through LACC."
-    )
+    path = AuditLog(workspace, config).path
+    kept: dict[tuple[int, int], Trail] = {}
+
+    def read() -> Trail:
+        try:
+            seen = path.stat()
+            stamp = (seen.st_mtime_ns, seen.st_size)
+        except OSError:
+            stamp = (0, 0)
+        if stamp in kept:
+            return kept[stamp]
+        walked = walk(path)
+        said = integrity_of(walked.chain, check_anchor(path), str(path), walked.exists)
+        trail = trail_of(walked.events, said, str(path), walked.vouched)
+        kept.clear()
+        kept[stamp] = trail
+        return trail
+
+    return read
 
 
 @app.command()

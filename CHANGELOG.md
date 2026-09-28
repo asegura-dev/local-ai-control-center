@@ -59,6 +59,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counted stray carriage returns, and there it had become an ordinary line break.
 
 ### Added
+- **Audit: what was done, read in the window** (ADR-104). A fourteenth section lists the
+  runs the workspace's trail holds - newest first, under their day, each with what ran and
+  how its own records say it ended - and opens any of them record by record, with the
+  prompt and the answer cut and counted under `audit_level: full`. It walks the chain as it
+  reads, on a worker, and says whether it holds in the words `lacc verify` uses, which now
+  come from one place. A broken trail is still shown, marked from the break on. One trail,
+  the workspace's: that was the question, and the workspace boundary answers it. Over the
+  thesis's trail: 250 runs in 11 days, nine of them with no end recorded. `lacc verify`
+  says a workspace with nothing recorded has no trail yet, instead of calling it unreadable.
 - **`lacc bib`: a BibTeX file from the answers the registry already gave** (ADR-102). No
   network and no model: it reads the `.registry.json` that `resolve` keeps and writes a `.bib`
   that biber and pandoc read. Keys are the first author's family name and the year, and

@@ -662,3 +662,9 @@ The thesis is written in Markdown, previewed through pandoc and typeset with bib
 [`ADR-103-six-things-the-program-said-that-were-not-so.md`](ADR-103-six-things-the-program-said-that-were-not-so.md)
 
 Each a sentence a person would have acted on, and each found by using the program rather than by a test: a usage line that did not run, a hint contradicting the preview beneath it, a refusal naming the wrong command, 594 lines of one warning, "3 of 3" for three pieces in 1,594, and a DOI one command saw and the next did not. The warning was measured before it was silenced - the library it asks for changes spacing and no word - and the usage lines are now held by the CLI's own parser.
+
+### 104 - what was done, read in the window it was done from
+
+[`ADR-104-what-was-done-read-in-the-window-it-was-done-from.md`](ADR-104-what-was-done-read-in-the-window-it-was-done-from.md)
+
+The program says everything significant it does is audited, and the only way to read the audit was a command that says whether it holds. The Audit section reads it: runs by day, how each ended by its own records, every record with its prompt and answer cut and counted. One trail - the workspace's - because the boundary answers the question of which. The walk runs on a worker because on the thesis's trail it takes seconds, and the sentences about integrity moved into a slice so the window and `lacc verify` cannot drift apart. It cannot change anything.

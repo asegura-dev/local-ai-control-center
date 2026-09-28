@@ -24,6 +24,10 @@ new section starts at the top, and what four quarter-notches add up to.
 lost (ADR-099). Ask is driven here against a stand-in engine that answers after a delay - no
 model, no network - through the same buttons a person presses.
 
+**What the Audit section reads.** The real trail, walked on a worker (ADR-104): how long until
+the runs are listed, what is listed, whether leaving before the walk is done leaves anything
+behind, and how long the second opening takes.
+
 It reports. It concludes nothing: a label wider than its box may be a heading that is meant
 to clip, and a rail showing a fifth of itself is a small window, not a defect. The figures
 are for a person to read.
@@ -51,6 +55,7 @@ from local_ai_control_center.cli import (  # noqa: E402
     _engine_at,
     _known_skills,
     _load,
+    _trail_for_the_window,
     app,
 )
 from local_ai_control_center.features.appearance import (  # noqa: E402
@@ -110,6 +115,7 @@ def _open(config_path: pathlib.Path) -> Window:
         lambda host: _engine_at(config, host),
         *_asking_for_the_window(config, workspace),
         config.context_file or "",
+        _trail_for_the_window(config, workspace),
     )
 
 
@@ -394,6 +400,52 @@ def _ask_flow(window: Window) -> None:
     print(f"  Start over: thread empty {turns() == 0}")
 
 
+def _listed_after(window: Window, section: Any, most: float = 30.0) -> float:
+    """Open a section and wait until its list has something in it; the seconds it took."""
+    started = time.perf_counter()
+    window._go(section)
+    while time.perf_counter() - started < most and not window.tree.get_children():
+        _settle(window, 2)
+    return time.perf_counter() - started
+
+
+def _audit(window: Window) -> None:
+    """The trail, read on a worker: how long, what is listed, what leaving early does."""
+    audit = next(s for s in SECTIONS if s.name == "Audit")
+    elsewhere = SECTIONS[0]
+
+    window._go(audit)
+    window._go(elsewhere)
+    _settle(window, 60)
+    left_clean = not window.tree.get_children() and not window.side.winfo_ismapped()
+    print(f"  left before the walk was done: nothing drawn into the next section {left_clean}")
+
+    took = _listed_after(window, audit)
+    days = window.tree.get_children()
+    runs = [key for day in days for key in window.tree.get_children(day)]
+    print(
+        f"  first opening: listed after {took:.1f} s, {len(runs)} runs under {len(days)} days, "
+        f"list column shown {bool(window.side.winfo_ismapped())}"
+    )
+    print(f"  heading: {window.summary.cget('text')[:110]}")
+    print(
+        f"  says the trail holds {_shows(window, 'The trail holds.')}, "
+        f"the anchor agrees {_shows(window, 'The anchor agrees')}"
+    )
+    endings: dict[str, int] = {}
+    for key in runs:
+        ending = str(window.tree.item(key, "text")).rsplit(" - ", 1)[-1].strip()
+        endings[ending] = endings.get(ending, 0) + 1
+    print(f"  how the listed runs ended: {endings}")
+    if runs:
+        window.tree.selection_set(runs[0])
+        _settle(window, 8)
+        cards = len(_descendants(window.panel_body, ctk.CTkLabel))
+        print(f"  the newest run: {window.title_label.cget('text')} ({cards} labels drawn)")
+    again = _listed_after(window, audit)
+    print(f"  second opening, the trail unchanged: listed after {again:.2f} s")
+
+
 def _where_it_opened(window: Window) -> None:
     """Where the window opened against the work area, before anything moved it (ADR-100)."""
     from local_ai_control_center.system.profiler import work_area
@@ -453,6 +505,9 @@ def main() -> int:
     print()
     print("Ask, against a stand-in engine")
     _ask_flow(window)
+    print()
+    print("Audit, against the real trail")
+    _audit(window)
     window.destroy()
     return 0
 

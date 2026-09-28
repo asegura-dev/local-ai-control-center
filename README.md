@@ -154,11 +154,13 @@ append-only, hash-chained audit log.
   each one is, and **chooses none of them**: a document prints the DOIs of what it cites
   too, and no test separated the two. With `--doi` it records the one you established
   beside the file, never inside it.
-- `lacc window` opens a desktop window on all of it: twelve sections in three groups, and
-  one of them asks. A question goes behind a preview you have to see before the button that
-  sends it exists, on a worker thread so the window never stops repainting, and asking again
-  carries **the passages whose quotations were found** - never what the model said, because
-  a conversation is how an invented quotation comes to verify one turn later.
+- `lacc window` opens a desktop window on all of it: fourteen sections in three groups. Most
+  read; four act, and only when asked. A question goes behind a preview you have to see
+  before the button that sends it exists, on a worker thread so the window never stops
+  repainting, and asking again carries **the passages whose quotations were found** - never
+  what the model said, because a conversation is how an invented quotation comes to verify
+  one turn later. **Audit** lists every run your workspace's trail holds, checks the chain
+  as it reads, and can change nothing.
 - `lacc preview` shows what would happen without doing it, `lacc profile` reports what
   the machine offers, `lacc verify` walks the audit chain, and `lacc notify test`
   checks notification settings before you rely on them.

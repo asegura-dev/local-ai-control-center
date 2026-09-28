@@ -21,6 +21,7 @@ from local_ai_control_center.features.ask import Asked, Prepared
 from local_ai_control_center.features.commands import Command
 from local_ai_control_center.features.prompts import Prompt
 from local_ai_control_center.features.status import EngineSeen
+from local_ai_control_center.features.trail import Trail
 from local_ai_control_center.ports.retriever import Passage
 
 
@@ -83,6 +84,13 @@ class State:
 
     Called only from a button, which is the rule the line along the bottom has kept since it
     was written (ADR-077, ADR-094).
+    """
+
+    read_trail: Callable[[], Trail] | None = None
+    """Walk this workspace's audit trail and say what it holds. Slow, so called off the Tk thread.
+
+    Handed in for the reason the other two are: a section may reach neither the audit log nor
+    the chain that vouches for it (ADR-104). It reads and writes nothing else.
     """
 
     send_question: Callable[[Prepared], Asked] | None = None

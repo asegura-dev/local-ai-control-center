@@ -41,7 +41,8 @@ was written and needs re-checking like any other measurement.
 | Every place that reaches an engine is accounted for | `REACHES_THE_ENGINE` names all three, and a fourth fails the suite | **held by test** |
 | Content only under `audit_level: full` | The detail filter drops `prompt` and `completion` at any other level | **held by test** |
 | A refusal is recorded, not only a success | `run_refused` carries the missing capabilities and the out-of-bounds paths | **held by test** |
-| The trail cannot be altered unnoticed | Hash chain, checked by `lacc verify` (ADR-023, ADR-043) | **held by test** |
+| The trail cannot be altered unnoticed | Hash chain, checked by `lacc verify` and by the window's Audit section as it reads (ADR-023, ADR-043, ADR-104) | **held by test** |
+| What was done can be read, and not changed | The Audit section lists every run the workspace's trail holds and each of its records; it has no control that writes, and the trail is append-only (ADR-104) | **held by test** |
 | Records removed from the end are noticed | Sidecar anchor, plus the head digest carried in every notification (ADR-049) | **held by test** |
 | Which file was read is recoverable | `files_read` carries the path **and the SHA-256 of its contents** | **held** |
 | Which reading got which verdict is recoverable | `readings_judged` carries a row per reading: the digests of the quotation, the claim, and what was asked | **held** |
