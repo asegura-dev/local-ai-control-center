@@ -27,7 +27,11 @@ from rich.table import Table
 from rich.text import Text
 
 from local_ai_control_center.adapters.asking import AskingJudge
-from local_ai_control_center.adapters.crossref import CrossrefRegistry, RememberedRegistry
+from local_ai_control_center.adapters.crossref import (
+    CrossrefRegistry,
+    RememberedRegistry,
+    answers_in,
+)
 from local_ai_control_center.adapters.dense import DenseRetriever, FusedRetriever
 from local_ai_control_center.adapters.documents import (
     HiddenText,
@@ -114,6 +118,7 @@ from local_ai_control_center.features.ask import (
     prepare,
 )
 from local_ai_control_center.features.bibliography import as_entry, bibliography
+from local_ai_control_center.features.bibtex import Held, bibtex, held_in
 from local_ai_control_center.features.commands import commands_of
 from local_ai_control_center.features.corpus import (
     assembled,
@@ -1169,6 +1174,82 @@ def resolve(
         _show(f"[yellow]{len(unknown)} the registry does not hold.[/yellow] Usually a mangled DOI.")
     if silent:
         _show(f"[dim]{len(silent)} documents carry no DOI of their own.[/dim]")
+
+
+@app.command()
+def bib(
+    sources: Annotated[
+        list[Path],
+        typer.Argument(help="Kept registry answers: the .registry.json beside what resolve wrote."),
+    ],
+    into: Annotated[Path, typer.Option("--into", help="The .bib file to write. Never replaced.")],
+    adding_to: Annotated[
+        Path | None,
+        typer.Option(
+            "--adding-to",
+            help="A .bib you already cite from. Works it holds are left out, and no key in it "
+            "is given again.",
+        ),
+    ] = None,
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Write a BibTeX file from the answers a registry already gave. No network, no model.
+
+    Each entry carries what the registry held for a DOI `resolve` asked about - authors, title,
+    journal, year, volume, issue, pages - and a field it did not hold is named above the entry,
+    never filled in. Keys are the first author's family name and the year, `giesel2016`.
+
+    **A key you cite must never change.** Name the file you already cite from with
+    `--adding-to`: the works it holds are left out, and no key in it is handed out again, so
+    what this writes can be appended to it (ADR-102).
+    """
+    _, workspace = _load(config_path)
+    if into.suffix.lower() != ".bib":
+        _show(f"[red]A BibTeX file ends in .bib, and {into} does not.[/red] Nothing was written.")
+        raise typer.Exit(code=1)
+    try:
+        destination = workspace.resolve_within(into)
+        works: list[Work] = []
+        nothing = 0
+        for source in sources:
+            answers = answers_in(workspace.resolve_within(source))
+            works += [answer for answer in answers.values() if answer is not None]
+            nothing += sum(1 for answer in answers.values() if answer is None)
+        held = Held(keys=frozenset(), dois=frozenset())
+        if adding_to is not None:
+            cited = workspace.resolve_within(adding_to)
+            if not cited.is_file():
+                raise ValueError(
+                    f"{adding_to} is not in the workspace. LACC reads nothing outside it: copy "
+                    "the .bib you cite from into the workspace and name the copy."
+                )
+            held = held_in(cited.read_text(encoding="utf-8", errors="replace"))
+    except (ValueError, OSError) as error:
+        _show(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    written = bibtex(works, held)
+    if written.entries:
+        _write_or_exit(destination, written.text)
+        _show(f"[green]{len(written.entries)} entries[/green] -> {into}")
+    else:
+        _show("[yellow]Nothing new to write.[/yellow] Nothing was written.")
+    if written.already:
+        _show(f"{len(written.already)} left out: {adding_to} already holds them.")
+    if nothing:
+        _show(f"[dim]{nothing} DOIs the registry holds nothing for, so nothing to write.[/dim]")
+    if written.unwritable:
+        _show(
+            f"[yellow]{len(written.unwritable)} DOIs would break the file and were left out:"
+            f"[/yellow] {', '.join(written.unwritable)}"
+        )
+    if written.unread:
+        _show(
+            f"[dim]{written.unread} were received before volume, issue and pages were read; "
+            "each says so above its entry. Resolving again into a new file reads them.[/dim]"
+        )
 
 
 @app.command()

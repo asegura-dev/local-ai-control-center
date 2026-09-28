@@ -517,7 +517,8 @@ about 214 of them, so roughly a quarter enters whatever the ranking says.
 that it had - twelve fabrications in twenty-four, with an explicit instruction not to. It now
 comes from the `Registry` port and `lacc resolve`: a DOI goes out and nothing else, behind
 two switches that both have to be on, with a preview that names how many and where
-(ADR-067, ADR-083).
+(ADR-067, ADR-083). `lacc bib` writes the answers kept as BibTeX, offline, escaped as a
+third party's text and with the keys a person already cites left alone (ADR-102).
 
 What the structure still does not have is coverage - which parts of a subject a bibliography
 speaks to and which it does not. Its precondition is unchanged and is why it has not been

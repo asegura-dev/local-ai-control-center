@@ -136,6 +136,9 @@ append-only, hash-chained audit log.
   actually is, instead of asking a model. It is the first destination in this program that
   is not your own machine, and it needs both `network_access` and a `registry_url` written
   in your configuration.
+- `lacc bib <answers> --into refs.bib` writes what the registry answered as BibTeX, for
+  biber and pandoc, with no network. `--adding-to` names the `.bib` you already cite from:
+  what it holds is left out and none of its keys is handed out again.
 - `lacc sections <document>` lists the sections a document numbers for itself, `--about`
   ranks them by a question, and `--take` writes one out - so a guideline too large for any
   window can be read one part at a time without cutting the file.

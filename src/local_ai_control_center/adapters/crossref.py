@@ -42,6 +42,7 @@ endless one does not (ADR-078)."""
 _LONGEST_TITLE = 500
 _LONGEST_NAME = 120
 _LONGEST_CONTAINER = 300
+_LONGEST_LOCATOR = 40
 _MOST_AUTHORS = 60
 """Bounds on what is accepted from a third party, so a field cannot become a payload."""
 
@@ -121,7 +122,8 @@ def work_from(message: dict[str, Any], doi: str, fetched_on: str) -> Work:
 
     A pure function over the parsed answer, so what this project accepts from a third party
     can be tested without a network (ADR-067). Anything not named here is not read, which
-    includes the abstract.
+    includes the abstract. Volume, issue and pages are short and bounded like the rest
+    (ADR-102).
     """
     return Work(
         doi=doi,
@@ -130,6 +132,9 @@ def work_from(message: dict[str, Any], doi: str, fetched_on: str) -> Work:
         container=_first_of(message.get("container-title"), _LONGEST_CONTAINER),
         year=_year_from(message.get("issued")),
         kind=_clean(message.get("type"), 60),
+        volume=_clean(message.get("volume"), _LONGEST_LOCATOR),
+        issue=_clean(message.get("issue"), _LONGEST_LOCATOR),
+        pages=_clean(message.get("page"), _LONGEST_LOCATOR),
         fetched_on=fetched_on,
     )
 
@@ -185,6 +190,27 @@ class CrossrefRegistry(Registry):
         if not isinstance(message, dict):
             return None
         return work_from(message, wanted, datetime.now(UTC).strftime("%Y-%m-%d"))
+
+
+def answers_in(path: Path) -> dict[str, Work | None]:
+    """What a file of kept answers holds: each DOI asked, and what the registry said.
+
+    ``None`` for a DOI the registry answered it does not hold. Raises ``ValueError`` when the
+    file is not one of these, because a bibliography written from a misread file would be
+    written from nothing and look like something (ADR-102).
+    """
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"{path.name} cannot be read as kept registry answers: {error}") from error
+    if not isinstance(loaded, dict):
+        raise ValueError(f"{path.name} is not a file of kept registry answers.")
+    answers: dict[str, Work | None] = {}
+    for doi, answer in loaded.items():
+        if not isinstance(answer, dict):
+            raise ValueError(f"{path.name} is not a file of kept registry answers.")
+        answers[doi] = Work(**answer) if answer else None
+    return answers
 
 
 class RememberedRegistry(Registry):

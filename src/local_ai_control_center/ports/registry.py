@@ -48,6 +48,16 @@ class Work(BaseModel):
     kind: str = ""
     """What the registry calls it: journal-article, posted-content, book-chapter."""
 
+    volume: str | None = None
+    issue: str | None = None
+    pages: str | None = None
+    """Where in the container the work is, which a thesis bibliography prints (ADR-102).
+
+    ``None`` means *not read*, which is different from empty: answers kept before these were
+    read carry none of them, and saying the registry held no pages for a work whose record
+    has them would be the filled-in field this module exists to refuse, turned inside out.
+    """
+
     fetched_on: str = ""
     """The date this was received, as YYYY-MM-DD.
 

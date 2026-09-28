@@ -49,6 +49,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counted stray carriage returns, and there it had become an ordinary line break.
 
 ### Added
+- **`lacc bib`: a BibTeX file from the answers the registry already gave** (ADR-102). No
+  network and no model: it reads the `.registry.json` that `resolve` keeps and writes a `.bib`
+  that biber and pandoc read. Keys are the first author's family name and the year, and
+  `--adding-to` names the file you already cite from, so no key in it is handed out again
+  and what is written can be appended to it. Every LaTeX special character is written as a
+  character, and a word whose capitals belong to it is kept as written - pandoc had printed
+  `3D u-Net`. Volume, issue and pages are now read from the registry's answer; answers kept
+  before say so above their entry rather than claiming the record lacks them. Over the
+  thesis's own answers: 189 new entries beside 18 cited, no key shared, and biber and pandoc
+  read both with no warning.
 - **`thinking`: whether a model that can reason is asked to** (ADR-098). Newer models reason
   unless told not to: one sentence took 40 seconds and about 5,000 characters of reasoning
   on qwen3.5:9b, and half a second with `thinking: false`. Unset sends nothing, as every run

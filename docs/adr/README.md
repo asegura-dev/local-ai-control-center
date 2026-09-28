@@ -650,3 +650,9 @@ Windows placed each new window further down than the last, and on a 1140-pixel w
 [`ADR-101-one-rule-for-what-a-converted-file-says-about-itself.md`](ADR-101-one-rule-for-what-a-converted-file-says-about-itself.md)
 
 A document's own DOI is in its PDF's metadata; the workspace works from the Markdown made of it. `references` knew to look beside a converted file for its PDF and `resolve` did not, so the same papers had DOIs for one command and none for the next, and the metadata reader opened Markdown as PDF and filled the screen with the library's complaints. One function answers for all three, by `ingest`'s own naming; only PDFs are opened.
+
+### 102 - a bibliography LaTeX can cite from, written from what the registry said
+
+[`ADR-102-a-bibliography-latex-can-cite-from.md`](ADR-102-a-bibliography-latex-can-cite-from.md)
+
+The thesis is written in Markdown, previewed through pandoc and typeset with biber, and all three read BibTeX; its `.bib` had come from a script outside LACC. `lacc bib` writes one from the answers `resolve` keeps, with no network and no model. A key someone cites is never handed out again, which is only possible against a file that is named; every LaTeX special character is written as a character, because the fields are a third party's; and volume, issue and pages are now read, with *not read* kept distinct from *empty*. Using it found what the tests had not: pandoc printed `3D u-Net`, and says "ahead of print" of every article whose pages were never read.
