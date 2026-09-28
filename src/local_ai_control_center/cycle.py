@@ -511,6 +511,9 @@ def _ask(
             "measured_prompt_tokens": completion.prompt_tokens,
             "measured_answer_tokens": completion.answer_tokens,
             "finish_reason": completion.finish_reason,
+            # A count and never the text: where the time went, not what was thought
+            # (ADR-098).
+            "measured_thought_characters": completion.thought_characters,
             "prompt": prompt,
             "completion": completion.text,
         },

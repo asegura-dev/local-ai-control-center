@@ -626,3 +626,9 @@ Driven with a real mouse for the first time: a notch moved **three pixels**, the
 [`ADR-097-the-launchers-name-split-in-two.md`](ADR-097-the-launchers-name-split-in-two.md)
 
 `.\run.ps1` lost its backslash and its `r` to a carriage return in the window launcher and in three places of the development chapter. The launcher was once declared the only case in the repository, measured byte by byte; the chapter was missed because the search counted stray carriage returns, and there the return had become an ordinary line break. The launcher's digest had certified the broken file, which is the limit ADR-071 stated, met. A test asks every text file whether a line begins with `un.ps1` and whether a carriage return ends no line.
+
+### 098 - a model that thinks is told whether to
+
+[`ADR-098-a-model-that-thinks-is-told-whether-to.md`](ADR-098-a-model-that-thinks-is-told-whether-to.md)
+
+Newer models reason before answering unless told not to, and the reasoning arrives in a field LACC never reads: nothing breaks, a run just takes a minute where it took seconds - 40 seconds for one sentence on qwen3.5:9b, half a second with `think: false`. A `thinking` setting is sent explicitly when written; unset sends nothing, because whether the engine accepts `false` for a model that cannot reason has not been measured. The audit records how much the engine reasoned and never what. Written with the engine switched off, and says which parts still need it.

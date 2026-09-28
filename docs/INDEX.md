@@ -22,7 +22,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-Ninety-seven records front to back is a history. These are the threads through them, for
+Ninety-eight records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -179,6 +179,7 @@ not to reach for an approximate algorithm to find them.
 | 095 | [the-rail-outgrew-its-column](adr/ADR-095-the-rail-outgrew-its-column.md) | The theme block was drawn at **45 of the 89 pixels** it asked for, and a shorter window lost whole sections off the bottom of the rail - the pack order of ADR-092 again. The theme is packed first, the list scrolls, and the wheel scrolls the column under the pointer. `tools/measure_window.py` asks, at any height, what runs off the right and what cannot be reached. |
 | 096 | [the-wheel-had-nothing-to-stop-against](adr/ADR-096-the-wheel-had-nothing-to-stop-against.md) | Driven with a real mouse for the first time: a notch moved **three pixels** and the wheel went past both ends of the panel. A bare `bind` had replaced the toolkit's own `<Configure>` binding, so the panel had **no scroll region**; and on Windows a scroll unit is a pixel. A notch is three measured lines, partial notches carry, a test fails on any `.bind(` without `add`, and the panel that never got shorter now does. |
 | 097 | [the-launchers-name-split-in-two](adr/ADR-097-the-launchers-name-split-in-two.md) | `.\run.ps1` lost its backslash and its `r` to a carriage return: the window launcher printed `.un.ps1`, and the development chapter showed the same break in three places - missed when the launcher was declared **the only case**, because the search counted stray carriage returns and in the chapter the return had become a line break. The launcher's digest had certified the broken file. A test now asks every text file both questions. |
+| 098 | [a-model-that-thinks-is-told-whether-to](adr/ADR-098-a-model-that-thinks-is-told-whether-to.md) | Newer models reason unless told not to: **40 seconds and ~5,000 characters** for one sentence on qwen3.5:9b, half a second with `think: false`. A `thinking` setting, sent explicitly when written and not at all when unset - because whether the engine accepts `false` for a model that cannot reason is not yet measured. The audit counts the reasoning and never keeps it. Asked for none, two models took *knowledge distillation* in its everyday sense: the trade, not only the saving. |
 
 ## Guides (`docs/guides/`)
 

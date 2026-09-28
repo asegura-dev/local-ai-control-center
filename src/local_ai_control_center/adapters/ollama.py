@@ -147,6 +147,16 @@ def _as_count(value: object) -> int | None:
     return value if isinstance(value, int) and value >= 0 else None
 
 
+def _thought_length(value: object) -> int | None:
+    """How long the reasoning the engine returned was, or ``None`` when it returned none.
+
+    Only the length leaves this function. The reasoning is not an answer, nothing checks
+    it, and keeping it would put text in the audit that no step of a run relied on
+    (ADR-098).
+    """
+    return len(value) if isinstance(value, str) and value else None
+
+
 class OllamaProvider(Provider):
     """A provider backed by a local Ollama instance (ADR-013).
 
@@ -157,7 +167,11 @@ class OllamaProvider(Provider):
     """
 
     def __init__(
-        self, model: str, context_tokens: int | None = None, host: str | None = None
+        self,
+        model: str,
+        context_tokens: int | None = None,
+        host: str | None = None,
+        thinking: bool | None = None,
     ) -> None:
         """Create the provider for a model name and, optionally, a context window.
 
@@ -169,6 +183,7 @@ class OllamaProvider(Provider):
         """
         self._host = host if host is not None else ollama_host()
         self._context_tokens = context_tokens
+        self._thinking = thinking
         if not model:
             raise ProviderError(
                 "No model configured. Name one in your config (see 'lacc profile' "
@@ -207,6 +222,11 @@ class OllamaProvider(Provider):
             # nothing said when to stop (ADR-019 decided the budget; this keeps it).
             options["num_predict"] = answer_reserve(self._context_tokens)
         payload["options"] = options
+        if self._thinking is not None:
+            # Sent only when the configuration says. Unset leaves it to the engine, because
+            # whether it accepts `false` for a model that cannot reason has not been
+            # measured (ADR-098).
+            payload["think"] = self._thinking
         if schema is not None:
             # The engine constrains decoding to this, so the shape stops being a request
             # and becomes something the model cannot emit its way around (ADR-052).
@@ -244,6 +264,7 @@ class OllamaProvider(Provider):
             prompt_tokens=_as_count(payload.get("prompt_eval_count")),
             answer_tokens=_as_count(payload.get("eval_count")),
             finish_reason=payload.get("done_reason") or None,
+            thought_characters=_thought_length(payload.get("thinking")),
         )
 
     def _translate_http_error(self, error: urllib.error.HTTPError) -> ProviderError:
@@ -330,12 +351,20 @@ class EngineCheck(BaseModel):
         return self.answered
 
 
-def check_engine(model: str, host: str, context_tokens: int | None = None) -> EngineCheck:
+def check_engine(
+    model: str,
+    host: str,
+    context_tokens: int | None = None,
+    thinking: bool | None = None,
+) -> EngineCheck:
     """Ask the engine the questions a run is about to assume the answers to.
 
     Reaching it, listing what it holds, finding the configured model among them, and
     getting one token out of it. Never raises: the point is to report a fault, and a check
     that fails by raising is a check you cannot script.
+
+    It asks the way a run would, `thinking` included: whether a model answers must not take
+    forty seconds because it decided to reason about the word *ready* (ADR-098).
     """
     url = f"{host}/api/tags"
     try:
@@ -359,7 +388,9 @@ def check_engine(model: str, host: str, context_tokens: int | None = None) -> En
 
     started = time.monotonic()
     try:
-        OllamaProvider(model, context_tokens, host).complete("Reply with the word ready.", 0.0)
+        OllamaProvider(model, context_tokens, host, thinking).complete(
+            "Reply with the word ready.", 0.0
+        )
     except ProviderError as error:
         return EngineCheck(
             host=host,

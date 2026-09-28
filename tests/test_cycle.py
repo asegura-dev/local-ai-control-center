@@ -29,7 +29,7 @@ from local_ai_control_center.cycle import (
     run_conversion,
 )
 from local_ai_control_center.ports.converter import ConversionError
-from local_ai_control_center.ports.provider import Completion
+from local_ai_control_center.ports.provider import Completion, Provider
 from local_ai_control_center.system.audit import AuditLog
 
 
@@ -834,3 +834,32 @@ def test_nothing_is_checked_unless_the_skill_asks(tmp_path: Path) -> None:
         prompt_template=_TEMPLATE,
     )
     assert "quotations_checked" not in _kinds(audit)
+
+
+class _Thinker(Provider):
+    """A provider that reports having reasoned before answering."""
+
+    @property
+    def name(self) -> str:
+        return "thinker"
+
+    def complete(
+        self, prompt: str, temperature: float = 0.0, schema: dict[str, object] | None = None
+    ) -> Completion:
+        return Completion(text="the answer", provider=self.name, thought_characters=4961)
+
+
+def test_the_audit_records_how_much_the_engine_reasoned(tmp_path: Path) -> None:
+    """Where the time went, as a count: forty seconds on one sentence was measured, and
+    nothing in the trail said where they went (ADR-098)."""
+    workspace = Workspace.ensure(tmp_path)
+    config = Config(workspace_root=tmp_path)
+    audit = AuditLog(workspace, config)
+    action = IntendedAction(name="summarize", summary="Summarize", required=frozenset())
+    run_action(
+        action, "the prompt", Permissions(), config, workspace, _Thinker(), audit, "run-1", _accept
+    )
+    call = next(event for event in _events(audit) if event["kind"] == "provider_called")
+    detail = call["detail"]
+    assert isinstance(detail, dict)
+    assert detail["measured_thought_characters"] == 4961

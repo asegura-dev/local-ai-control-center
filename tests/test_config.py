@@ -353,3 +353,14 @@ def test_the_address_lives_in_the_file_and_the_secrets_do_not(tmp_path: Path) ->
     )
     assert config.notifier.ntfy.server_url == "https://ntfy.example"
     assert config.notifier.ntfy.topic_env == "NTFY_TOPIC", "the topic is still named"
+
+
+def test_thinking_is_unset_unless_written() -> None:
+    """Unset sends nothing to the engine, which is what every run did before the setting
+    existed (ADR-098)."""
+    assert Config(workspace_root=Path("/tmp/lacc")).thinking is None
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_thinking_takes_what_is_written(value: bool) -> None:
+    assert Config(workspace_root=Path("/tmp/lacc"), thinking=value).thinking is value

@@ -74,6 +74,14 @@ output_language: English
 # memory: the same 3B model held 1990 MB at 2048 tokens and 2300 MB at 8192.
 # context_tokens: 32768
 
+# Whether a model that can reason before answering is asked to. Unset by default,
+# which sends nothing and leaves it to the engine - what every run did before this
+# setting existed. Newer models reason unless told not to: one sentence took 40
+# seconds and about 5,000 characters of reasoning on qwen3.5:9b, and half a second
+# with thinking false. The reasoning is never read, so it costs time and never text;
+# the audit records how much there was. Set it to false for such a model (ADR-098).
+# thinking: false
+
 # The largest file LACC will read or convert, in bytes. 32 MiB by default.
 # A document is read into memory whole, so this is a ceiling about the machine, not
 # about the model: whether the text then fits the model's context window is a

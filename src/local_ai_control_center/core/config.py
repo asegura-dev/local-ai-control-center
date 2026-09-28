@@ -262,6 +262,18 @@ class Config(BaseModel):
             "what each installed model supports. A larger window costs memory."
         ),
     )
+    thinking: bool | None = Field(
+        default=None,
+        description=(
+            "Whether a model that can reason before answering is asked to. Unset by "
+            "default, which sends nothing and leaves it to the engine - what every run did "
+            "before this setting existed. Measured with Ollama 0.34: unasked, qwen3.5:9b "
+            "spent about 5,000 characters reasoning and 40 seconds on one sentence; with "
+            "thinking false, half a second. The reasoning is never read, so it costs time "
+            "and never text. Set it to false for a model that thinks, when an answer should "
+            "be fast (ADR-098)."
+        ),
+    )
     context_file: str = Field(
         default="",
         description="Standing context about the project, inside the workspace.",

@@ -429,3 +429,57 @@ def test_a_tiny_window_never_falls_below_the_floor() -> None:
     from local_ai_control_center.adapters.ollama import generation_timeout
 
     assert generation_timeout(1024) == 300
+
+
+def test_thinking_is_not_sent_when_the_configuration_says_nothing() -> None:
+    """Unset leaves it to the engine, which is what every run did before the setting existed.
+    Whether the engine accepts `false` for a model that cannot reason has not been measured
+    (ADR-098)."""
+    body = _captured_request_body(OllamaProvider("qwen2.5:3b"))
+    assert "think" not in body
+
+
+@pytest.mark.parametrize("thinking", [False, True])
+def test_thinking_is_sent_exactly_as_configured(thinking: bool) -> None:
+    """Either value is sent explicitly, never inferred from the model's name."""
+    body = _captured_request_body(OllamaProvider("qwen3.5:9b", thinking=thinking))
+    assert body["think"] is thinking
+
+
+def _fake_response_with(payload: dict[str, object]) -> object:
+    """A stand-in for urlopen's return carrying exactly ``payload``."""
+
+    class _Resp:
+        def read(self) -> bytes:
+            return json.dumps(payload).encode("utf-8")
+
+        def __enter__(self) -> _Resp:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    return _Resp()
+
+
+def test_the_length_of_the_reasoning_is_kept_and_never_the_reasoning() -> None:
+    """The engine returns its reasoning in a field of its own. Only its length leaves the
+    adapter: it is not an answer, and nothing checks it (ADR-098)."""
+    from unittest.mock import patch
+
+    reasoning = "Let me think about this. " * 200
+    engine = _fake_response_with({"response": "ready", "thinking": reasoning, "done": True})
+    with patch("urllib.request.urlopen", return_value=engine):
+        completion = OllamaProvider("qwen3.5:9b").complete("hi")
+    assert completion.text == "ready"
+    assert completion.thought_characters == len(reasoning)
+    assert "Let me think" not in completion.model_dump_json()
+
+
+def test_an_engine_that_reports_no_reasoning_is_recorded_as_none() -> None:
+    """None is "not reported", distinct from a reasoning that was empty."""
+    from unittest.mock import patch
+
+    with patch("urllib.request.urlopen", return_value=_fake_generate_response("ready")):
+        completion = OllamaProvider("qwen2.5:3b").complete("hi")
+    assert completion.thought_characters is None

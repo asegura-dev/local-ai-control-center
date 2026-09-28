@@ -29,6 +29,11 @@ from local_ai_control_center.core.config import Config
 CHANGEABLE: tuple[tuple[str, str], ...] = (
     ("workspace_root", "the folder every file comes from and goes to"),
     ("model", "which model answers"),
+    (
+        "thinking",
+        "whether a model that can reason before answering is asked to: false answers fast, "
+        "true reasons first. Empty leaves it to the engine",
+    ),
     ("context_tokens", "the window it is asked for - unset means the engine's own 4096"),
     ("embedding_model", "choosing passages by meaning as well as by words. Empty turns it off"),
     ("engine_host", "where the engine is. Inert unless network_access is on"),

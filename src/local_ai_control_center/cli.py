@@ -710,7 +710,7 @@ def _build_provider(choice: ProviderChoice, config: Config, skill: str = "") -> 
     if choice is ProviderChoice.mock:
         return MockProvider()
     host = resolve_engine_host(config.engine_host, config.network_access)
-    return OllamaProvider(config.model_for(skill), config.context_tokens, host)
+    return OllamaProvider(config.model_for(skill), config.context_tokens, host, config.thinking)
 
 
 def _say_which_model(config: Config, skill: str) -> None:
@@ -2271,7 +2271,7 @@ def _engine_at(config: Config, host: str) -> EngineSeen:
     if not config.model:
         return EngineSeen(asked=True, host=host, detail="No model is configured.")
     reachable = resolve_engine_host(host, config.network_access)
-    found = check_engine(config.model, reachable, config.context_tokens)
+    found = check_engine(config.model, reachable, config.context_tokens, config.thinking)
     return EngineSeen(
         asked=True,
         reached=found.reached,
@@ -2994,7 +2994,7 @@ def engine_test(
         console.print("[red]No model configured.[/red] Name one with `model:` in the config.")
         raise typer.Exit(code=1)
 
-    check = check_engine(config.model, host, config.context_tokens)
+    check = check_engine(config.model, host, config.context_tokens, config.thinking)
     if not check.reached:
         console.print(f"[red]{check.detail}[/red]")
         raise typer.Exit(code=1)

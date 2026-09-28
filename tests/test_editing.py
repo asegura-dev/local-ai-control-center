@@ -161,3 +161,28 @@ def test_what_is_written_is_a_configuration_that_loads(tmp_path) -> None:  # typ
     from local_ai_control_center.core.config import load_config
 
     assert load_config(path).model == "qwen2.5:32b"
+
+
+def test_thinking_is_changeable_and_what_is_written_loads_as_a_setting(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """It decides how work is done, not what is allowed, so it is on the editable side
+    (ADR-098)."""
+    after, refused = changed(NOW, (Wanted(key="thinking", value="false"),))
+    assert not refused
+    path = tmp_path / "made.yaml"
+    path.write_text(after, encoding="utf-8")
+    from local_ai_control_center.core.config import load_config
+
+    assert load_config(path).thinking is False
+
+
+def test_a_form_nobody_touched_leaves_a_thinking_line_as_it_was() -> None:
+    """The file says `false`, the parsed value prints as `False`: an untouched form must not
+    propose rewriting the line because of the difference (ADR-094, ADR-098)."""
+    written = NOW + "thinking: false\n"
+    typed = tuple(
+        Wanted(key=key, value=value)
+        for key, value, _ in settings_shown(written, _config(thinking=False))
+    )
+    after, refused = changed(written, typed)
+    assert not refused
+    assert after == written

@@ -34,6 +34,11 @@ class Completion(BaseModel):
     """Why generation stopped, when the engine says. An answer that stopped because it
     ran out of room ends mid-thought and looks like an answer."""
 
+    thought_characters: int | None = None
+    """How much the engine reasoned before answering, when it says. The reasoning itself is
+    neither read nor kept - it is not an answer and nothing checks it. The length is where
+    the time went (ADR-098)."""
+
 
 class Provider(ABC):
     """Abstract port for anything that turns a prompt into a completion.

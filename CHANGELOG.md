@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counted stray carriage returns, and there it had become an ordinary line break.
 
 ### Added
+- **`thinking`: whether a model that can reason is asked to** (ADR-098). Newer models reason
+  unless told not to: one sentence took 40 seconds and about 5,000 characters of reasoning
+  on qwen3.5:9b, and half a second with `thinking: false`. Unset sends nothing, as every run
+  did before; true or false is sent explicitly, by every run and by the engine check. The
+  audit records how much the engine reasoned as a count of characters - never the reasoning,
+  which is not an answer and nothing checks. The window's configuration form offers it.
 - **`tools/measure_window.py` drives the wheel**: pixels per notch in each column, whether
   the panel stops at both ends, whether a section that fits moves, whether a new section
   starts at the top, and what four quarter-notches add up to.
