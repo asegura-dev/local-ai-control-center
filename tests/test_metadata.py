@@ -83,3 +83,33 @@ def test_the_journal_is_never_reported(tmp_path: Path) -> None:
     """
     path = _pdf(tmp_path / "paper.pdf", Title="A Paper")
     assert not hasattr(embedded_metadata(path), "journal")
+
+
+def test_a_markdown_file_says_what_the_pdf_it_came_from_says(tmp_path: Path) -> None:
+    """`ingest` writes `name.md` beside `name.pdf`; that naming is the whole link (ADR-101)."""
+    from local_ai_control_center.adapters.documents import metadata_of
+
+    _pdf(tmp_path / "paper.pdf", Title="A Paper")
+    (tmp_path / "paper.md").write_text("<!-- page 1 -->\nText.", encoding="utf-8")
+    assert metadata_of(tmp_path / "paper.md").title == "A Paper"
+    assert metadata_of(tmp_path / "paper.pdf").title == "A Paper"
+
+
+def test_a_markdown_file_without_its_pdf_says_nothing(tmp_path: Path) -> None:
+    """Written under another name, it has no PDF to find - and says so, as before."""
+    from local_ai_control_center.adapters.documents import metadata_of
+
+    (tmp_path / "notes.md").write_text("<!-- page 1 -->\nText.", encoding="utf-8")
+    assert metadata_of(tmp_path / "notes.md") == DocumentMetadata()
+
+
+def test_what_is_not_a_pdf_is_never_opened_as_one(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Handed Markdown, the PDF library wrote `invalid pdf header` dozens of times in one
+    `resolve` before the failure was caught (ADR-101)."""
+    markdown = tmp_path / "paper.md"
+    markdown.write_text("<!-- page 1 -->\nText.", encoding="utf-8")
+    with caplog.at_level("DEBUG"):
+        assert embedded_metadata(markdown) == DocumentMetadata()
+    assert not [record for record in caplog.records if record.name.startswith("pypdf")]

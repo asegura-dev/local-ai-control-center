@@ -644,3 +644,9 @@ A question sent from Ask, the section changed while the engine worked, and the a
 [`ADR-100-the-window-opens-where-it-can-be-seen.md`](ADR-100-the-window-opens-where-it-can-be-seen.md)
 
 Windows placed each new window further down than the last, and on a 1140-pixel work area the second opening lost its bottom 156 pixels - the status bar and the theme picker - with nothing to say so. The window now asks for the work area and opens at its top, centred, fitted to it. Tested as arithmetic without a display; checked by opening it twice in a row.
+
+### 101 - one rule for what a converted file says about itself
+
+[`ADR-101-one-rule-for-what-a-converted-file-says-about-itself.md`](ADR-101-one-rule-for-what-a-converted-file-says-about-itself.md)
+
+A document's own DOI is in its PDF's metadata; the workspace works from the Markdown made of it. `references` knew to look beside a converted file for its PDF and `resolve` did not, so the same papers had DOIs for one command and none for the next, and the metadata reader opened Markdown as PDF and filled the screen with the library's complaints. One function answers for all three, by `ingest`'s own naming; only PDFs are opened.

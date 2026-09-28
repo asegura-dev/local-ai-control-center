@@ -428,7 +428,13 @@ def embedded_metadata(path: Path) -> DocumentMetadata:
 
     Returns an empty record rather than raising. "This file says nothing about itself" is an
     answer, and five of twenty-three real papers give it.
+
+    **Only a PDF is opened.** Handed Markdown, the PDF library wrote `invalid pdf header` and
+    `EOF marker not found` to the screen before the failure was caught - dozens of times in one
+    `resolve` (ADR-101).
     """
+    if path.suffix.lower() != ".pdf":
+        return DocumentMetadata()
     try:
         reader = PdfReader(path)
         info: Any = reader.metadata or {}
@@ -449,6 +455,21 @@ def embedded_metadata(path: Path) -> DocumentMetadata:
         doi = normalized_doi(_first(xmp, _DOI_FIELDS))
         date = _first(xmp, _DATE_FIELDS)[:10]
     return DocumentMetadata(title=title, authors=authors, doi=doi, date=date)
+
+
+def metadata_of(path: Path) -> DocumentMetadata:
+    """What a document says about itself - read from the PDF it came from, when it is not one.
+
+    A document's own DOI is in the PDF's metadata, and the workspace works from the Markdown
+    `ingest` made of it. `ingest` writes `name.md` beside `name.pdf`, so that is how the PDF is
+    found, and nothing else: a file written under another name has no PDF to find and says
+    nothing. `references` had this rule and `resolve` did not, which reported 23 papers with
+    no DOI of their own when their PDFs held 14 (ADR-101).
+    """
+    if path.suffix.lower() == ".pdf":
+        return embedded_metadata(path)
+    source = path.with_suffix(".pdf")
+    return embedded_metadata(source) if source.exists() else DocumentMetadata()
 
 
 def _first(xmp: object, fields: tuple[str, ...]) -> str:

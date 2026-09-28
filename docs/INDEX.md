@@ -22,7 +22,7 @@ what it contains. For the reading order and status, see [README.md](README.md).
 
 ## Reading paths
 
-A hundred records front to back is a history. These are the threads through them, for
+A hundred and one records front to back is a history. These are the threads through them, for
 someone who wants to understand one thing rather than all of them. Each record's full
 description is on [the annotated list](adr/README.md).
 
@@ -182,6 +182,7 @@ not to reach for an approximate algorithm to find them.
 | 098 | [a-model-that-thinks-is-told-whether-to](adr/ADR-098-a-model-that-thinks-is-told-whether-to.md) | Newer models reason unless told not to: **40 seconds and ~5,000 characters** for one sentence on qwen3.5:9b, half a second with `think: false`. A `thinking` setting, sent explicitly when written and not at all when unset - because whether the engine accepts `false` for a model that cannot reason is not yet measured. The audit counts the reasoning and never keeps it. Asked for none, two models took *knowledge distillation* in its everyday sense: the trade, not only the saving. |
 | 099 | [an-answer-that-arrives-while-you-are-elsewhere](adr/ADR-099-an-answer-that-arrives-while-you-are-elsewhere.md) | An answer that arrived while somebody was in another section was **lost**: the watch that kept it also drew it, and stopped when its widgets were destroyed - the audit had it, the screen never did. Keeping is separate from drawing now; the answer waits, says it arrived elsewhere, and a question in flight is still waiting when you come back. Driven against a stand-in engine through the same buttons a person presses; the check itself was wrong twice before it was right. |
 | 100 | [the-window-opens-where-it-can-be-seen](adr/ADR-100-the-window-opens-where-it-can-be-seen.md) | Left to Windows, each opening landed further down than the last - the second **156 pixels below the screen**, status bar and theme picker out of sight. The window asks the system for the work area, opens at its top, centred, and shrinks to fit a smaller screen. The arithmetic is a tested function of numbers; the call to the system lives with what the program reads about the machine. Where the system cannot say, it opens as before. |
+| 101 | [one-rule-for-what-a-converted-file-says-about-itself](adr/ADR-101-one-rule-for-what-a-converted-file-says-about-itself.md) | `resolve` on the Markdown the workspace works from reported **23 papers with no DOI of their own**; their PDFs held 14. `references` already read the PDF beside a converted file and `resolve` did not - ADR-090's shape again. One function now answers for all three commands, finding the PDF by `ingest`'s own naming and nothing else, and the metadata reader opens only PDFs, which ended dozens of `invalid pdf header` lines. |
 
 ## Guides (`docs/guides/`)
 

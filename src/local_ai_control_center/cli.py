@@ -32,8 +32,8 @@ from local_ai_control_center.adapters.dense import DenseRetriever, FusedRetrieve
 from local_ai_control_center.adapters.documents import (
     HiddenText,
     converter_for,
-    embedded_metadata,
     embedded_outline,
+    metadata_of,
 )
 from local_ai_control_center.adapters.embedding import OllamaEmbedder
 from local_ai_control_center.adapters.mock import MockProvider
@@ -916,12 +916,8 @@ def references(
             continue
         # What this document says about itself, so "do I have it?" is answered against a
         # fact the file states rather than against a filename (ADR-047).
-        own = (
-            embedded_metadata(path.with_suffix(".pdf"))
-            if path.with_suffix(".pdf").exists()
-            else None
-        )
-        if own is not None and own.doi:
+        own = metadata_of(path)
+        if own.doi:
             held.add(own.doi.lower())
 
         found = references_in(text)
@@ -1004,7 +1000,7 @@ def metadata(
             console.print(f"[red]{source} is not in the workspace.[/red]")
             raise typer.Exit(code=1)
 
-        found = embedded_metadata(path)
+        found = metadata_of(path)
         console.print(f"[bold]{source.name}[/bold]")
         if not found.says_anything:
             console.print("  [yellow]This file says nothing about itself.[/yellow]")
@@ -1076,7 +1072,7 @@ def resolve(
         if not path.exists():
             _show(f"[red]{source} is not in the workspace.[/red]")
             raise typer.Exit(code=1)
-        own = embedded_metadata(path).doi
+        own = metadata_of(path).doi
         stated = established_for(path)
         if own:
             wanted.setdefault(own.strip().lower(), source.name)

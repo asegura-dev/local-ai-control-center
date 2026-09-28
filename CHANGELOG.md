@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`resolve` said papers had no DOI that their PDFs held** (ADR-101). Run on the Markdown
+  the workspace works from, it reported 23 documents without a DOI of their own - their PDFs
+  held 14 - and filled the screen with `invalid pdf header`, because it opened each Markdown
+  file as a PDF. `references` already read the PDF beside a converted file; now one function
+  does, for `references`, `resolve` and `metadata`, and the metadata reader opens only PDFs.
 - **The window opened off the screen** (ADR-100). Left to Windows, each opening landed further
   down than the last - the second 156 pixels below a 1140-pixel work area, with the status bar
   and the theme picker out of sight. It now asks the system for the work area and opens at
