@@ -138,6 +138,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counted stray carriage returns, and there it had become an ordinary line break.
 
 ### Added
+- **`lacc bring <file>`: a draft of yours, copied in by name** (ADR-111). The thesis is written
+  outside the workspace, so `review` had never read it and `status` said *nothing of yours has
+  been read yet*. `bring` reads the one file named - never a folder or a pattern - after
+  showing its full path and where the copy goes, and asking; no is the default. It takes
+  Markdown, text, PDF and `.docx`, up to 20 MB. The copy lands in `drafts/`, named after the
+  file and the day, never replacing an earlier one, with a note beside it saying where it came
+  from and its digest; the original is never opened for writing. What it read and wrote is in
+  the trail. `status` counts brought drafts and names `bring` in the writing stage. It is the
+  first exception to the workspace boundary that reads, chosen by the user over a tray filled
+  by hand, and `PRINCIPLES.md` now names it beside the window's two.
 - **Where each thing lives, and what LACC is made of.** `src/README.md` names every module by
   layer - what each layer may import and the test that holds it, and where to start reading -
   and `tests/README.md` every test file, the guards on the code's own shape first. Both are

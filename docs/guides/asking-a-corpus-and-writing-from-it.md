@@ -186,7 +186,16 @@ write the sentence yourself.
 
 ## Reading your own draft against the corpus
 
-    lacc review chapter.md --against everything.md --into chapter.review.md
+A draft written elsewhere - an Obsidian vault, a school folder - is outside the workspace, and
+LACC reads nothing there. Bring a copy in first:
+
+    lacc bring "C:\...\Tesis\Escritura\03 Metodología.md"
+
+It shows the full path it would read and where the copy goes, and asks; no is the default.
+The copy lands in `drafts/`, named after the file and the day, and your file is never written
+to (ADR-111). Bring it again after you change it: each copy is kept, none replaced. Then:
+
+    lacc review "drafts/03 Metodología (2026-09-29).md" --against everything.md --into chapter.review.md
 
 The check turned around: paragraph by paragraph, what your corpus holds up, what it
 contradicts, and what it does not cover - *not covered* meaning nothing you collected holds

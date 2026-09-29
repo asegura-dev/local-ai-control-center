@@ -25,6 +25,7 @@ results only to new files."*
 | `lacc resolve --into` | The bibliography, as Markdown | `--into` |
 | `lacc bib --into` | The bibliography, as BibTeX | `--into`, which must end in `.bib` |
 | `lacc sections --take --into` | One numbered section of a document, and where it came from | `--into`, and `<into>.from.json` |
+| `lacc bring` | A copy of one file you named outside the workspace, and where it came from (ADR-111) | `drafts/<name> (<day>)<suffix>`, and `<copy>.brought.json` beside it |
 
 One exception, by the letter: coverage's numbers, `<into>.reaches.json`, are written with a
 plain write after the report. The report is refused if it exists, so the numbers are only ever
@@ -53,6 +54,10 @@ All of these are inside the workspace, resolved through its boundary like everyt
 | The virtual environment | `run.ps1`, through `uv` - not LACC itself | In `%USERPROFILE%\.venvs\lacc`, deliberately outside the repository and any synchronised folder (ADR-084) |
 
 Nothing else. No temporary files, no caches in the home folder, no registry keys.
+
+**And one read.** `lacc bring` reads the one file you name outside the workspace - after showing
+its full path and where the copy goes, and asking - and never writes to it (ADR-111). It is the
+only place LACC reads outside the workspace.
 
 ## What is never written
 

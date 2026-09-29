@@ -23,6 +23,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from local_ai_control_center.core.corpus import parse_corpus
+from local_ai_control_center.core.drafts import drafts_in
 from local_ai_control_center.core.kinds import kind_of
 from local_ai_control_center.core.references import references_in, without_truncations
 
@@ -78,6 +79,34 @@ class Work(BaseModel):
     @property
     def settled(self) -> int:
         return sum(1 for stage in self.stages if stage.settled)
+
+
+def _writing(brought: int, reviewed: int) -> Stage:
+    """Where writing stands: drafts brought in, and reviews of them (ADR-111).
+
+    Until drafts could be brought it said only that nothing had been read, which was true and
+    named no way forward. It names `bring` now, where the way forward starts.
+    """
+    done = ", ".join(
+        part
+        for part in (
+            f"{brought} drafts brought in" if brought else "",
+            f"{reviewed} reviewed" if reviewed else "",
+        )
+        if part
+    )
+    if not brought and not reviewed:
+        missing = "nothing of yours has been read yet - bring a draft in with lacc bring <file>"
+    elif not reviewed:
+        missing = "none of them reviewed against the corpus yet"
+    else:
+        missing = ""
+    return Stage(
+        name="Writing",
+        command="lacc bring <your draft>, then lacc review drafts/<copy> --against <corpus>",
+        done=done,
+        missing=missing,
+    )
 
 
 def stages_in(workspace: Path, context_file: str = "") -> Work:
@@ -211,11 +240,6 @@ def stages_in(workspace: Path, context_file: str = "") -> Work:
                     f"{len(whole) - resolved} DOIs unresolved" if resolved < len(whole) else ""
                 ),
             ),
-            Stage(
-                name="Writing",
-                command="lacc review <draft> --against <corpus> --into report.md",
-                done=f"{len(by_kind['review'])} drafts reviewed" if by_kind["review"] else "",
-                missing="" if by_kind["review"] else "nothing of yours has been read yet",
-            ),
+            _writing(len(drafts_in(workspace)), len(by_kind["review"])),
         ),
     )

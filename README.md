@@ -147,6 +147,9 @@ append-only, hash-chained audit log.
 - `--judge` adds a second opinion on whether each reading follows from the quotation
   under it, and shows passages that might support the ones it flags. This is a model
   judging a model - weaker than the quotation check, and reported as such.
+- `lacc bring <file>` copies one draft of yours into the workspace - the only command that
+  reads outside it, and only the file you name, after showing the path and asking. The copy
+  lands in `drafts/` with the day in its name, and your file is never written to.
 - `lacc review <draft> --against <corpus> --into <report>` reads **your** writing against
   **your** sources and says, paragraph by paragraph, what your corpus holds up, what it
   contradicts and what it does not cover - with *not covered* stated as not covered rather

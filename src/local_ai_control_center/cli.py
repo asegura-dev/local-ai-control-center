@@ -9,13 +9,14 @@ a skill, previews it, asks for confirmation (defaulting to no), and executes;
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import re
 import sys
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -61,6 +62,7 @@ from local_ai_control_center.core.declared import (
     FileSkill,
     load_declared_skills,
 )
+from local_ai_control_center.core.drafts import BROUGHT, DRAFTS
 from local_ai_control_center.core.grounding import (
     CheckedClaim,
     check_answer,
@@ -122,6 +124,7 @@ from local_ai_control_center.features.ask import (
 )
 from local_ai_control_center.features.bibliography import as_entry, bibliography
 from local_ai_control_center.features.bibtex import Held, bibtex, held_in
+from local_ai_control_center.features.bring import copy_name, noted, refusal
 from local_ai_control_center.features.commands import commands_of
 from local_ai_control_center.features.corpus import (
     assembled,
@@ -2979,6 +2982,85 @@ def _propose(
         "[dim]Nothing was chosen. A document prints its own DOI and the DOIs it cites, and "
         "no test separates them - which is why this asks you. Name one with --doi.[/dim]"
     )
+
+
+@app.command()
+def bring(
+    source: Annotated[Path, typer.Argument(help="One file of yours, outside the workspace.")],
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Copy one file you name into the workspace, so LACC can read it (ADR-111).
+
+    **The one command that reads outside the workspace, and only the file you name** - never a
+    folder, never a pattern. Before you say yes it reads nothing of the file but its size: the
+    preview shows the full path and where the copy goes, and no is the default. The copy lands
+    in `drafts/` with the day in its name and never replaces anything; your file is never
+    opened for writing. What was read and written is in the trail.
+    """
+    config, workspace = _load(config_path)
+    resolved = source.expanduser().resolve()
+    size = resolved.stat().st_size if resolved.is_file() else None
+    why = refusal(resolved, workspace.is_within(resolved), size)
+    if why:
+        _show(f"[red]{why}[/red]")
+        raise typer.Exit(code=1)
+
+    folder = workspace.resolve_within(Path(DRAFTS))
+    taken = {path.name for path in folder.iterdir()} if folder.is_dir() else set()
+    today = date.today()
+    name = copy_name(resolved, taken, today)
+    destination = workspace.resolve_within(Path(DRAFTS) / name)
+    shown = f"{size / 1024:,.0f} KB" if size and size >= 1024 else f"{size} bytes"
+    _show(f"[bold]Would read[/bold]  {resolved}")
+    _show(f"            outside the workspace, {shown}")
+    _show(f"[bold]Copy to[/bold]     {DRAFTS}/{name}")
+    _show("[dim]Your file is read and never opened for writing.[/dim]")
+    # Opened where it is about to ask, so a no is recorded too (ADR-107).
+    audit = AuditLog(workspace, config)
+    run_id = audit.opened("bring")
+    if not typer.confirm("Bring it?", default=False):
+        audit.record(run_id, "confirmation_declined", "Declined bring", {"action": "bring"})
+        _show("[yellow]Declined.[/yellow] Nothing of it was read.")
+        return
+
+    try:
+        content = resolved.read_bytes()
+    except OSError as error:
+        _show(f"[red]Cannot read {resolved}: {error}[/red]")
+        audit.record(
+            run_id, "run_failed", "Could not read it", {"action": "bring", "error": str(error)}
+        )
+        raise typer.Exit(code=1) from error
+    # The digest of what was read, not of a second reading: the file may change in between.
+    digest = hashlib.sha256(content).hexdigest()
+    audit.record(
+        run_id,
+        "files_read",
+        f"Read {resolved.name}",
+        {"action": "bring", "files": [{"path": str(resolved), "sha256": digest}]},
+    )
+    folder.mkdir(exist_ok=True)
+    try:
+        with destination.open("xb") as handle:
+            handle.write(content)
+    except OSError as error:
+        _show(f"[red]Cannot write {DRAFTS}/{name}: {error}[/red]")
+        audit.record(
+            run_id, "run_failed", "Could not copy it", {"action": "bring", "error": str(error)}
+        )
+        raise typer.Exit(code=1) from error
+    audit.wrote(run_id, "bring", destination)
+    beside = destination.with_name(destination.name + BROUGHT)
+    _write_or_exit(beside, noted(resolved, today, digest), (audit, run_id, "bring"))
+    audit.record(run_id, "run_finished", "Finished bring", {"action": "bring"})
+
+    _show(f"[green]Brought[/green] -> {DRAFTS}/{name}")
+    if resolved.suffix.lower() in {".md", ".txt"}:
+        _show(f'[dim]Review it: lacc review "{DRAFTS}/{name}" --against <corpus>[/dim]')
+    else:
+        _show(f'[dim]Convert it first: lacc ingest "{DRAFTS}/{name}"[/dim]')
 
 
 @app.command()

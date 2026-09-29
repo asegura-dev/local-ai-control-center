@@ -88,6 +88,7 @@ behaviour test caught were caught - or would have been - by one of these.
 | `test_coverage.py` | How far the nearest quotation is from a topic (ADR-088). |
 | `test_identity.py` | Which work a document is, and a DOI established for either of its files (ADR-087, ADR-103). |
 | `test_bibtex.py` | BibTeX written from what a registry said, and nothing else (ADR-102). |
+| `test_bring.py` | One named file brought into the workspace: refused for anything wider, shown before it is read, never replacing, recorded (ADR-111). |
 | `test_stages.py` | Where the work stands, stage by stage (ADR-080). |
 | `test_status.py` | What the bottom of the window says, and what it does not do to find out (ADR-077). |
 | `test_navigate.py` | Ordering a document's sections by what a question is about (ADR-079). |

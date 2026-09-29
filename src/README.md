@@ -53,6 +53,7 @@ record (ADR-008).
 | `budget.py` | How much of a context window a prompt may use, and how much is held back for the answer. |
 | `config.py` | The configuration: a validated contract for how LACC is allowed to run, and its YAML loader (ADR-002). |
 | `corpus.py` | Reading back a collected corpus, so several can be assembled into one. |
+| `drafts.py` | Where brought drafts live in a workspace, and how one is told from a file put there by hand (ADR-111). |
 | `declared.py` | Skills written down in a file rather than in code, and what a file may not decide (ADR-048). |
 | `fence.py` | The fence around a document in a prompt: what it removes, what it only notices (ADR-038). |
 | `grounding.py` | Checking that a quotation appears in the document it claims to come from (ADR-026). |
@@ -112,6 +113,7 @@ record (ADR-008).
 | `ask.py` | Turning selected passages into what a question is asked against (ADR-085). |
 | `bibliography.py` | A bibliography in Markdown from what a registry said (ADR-067). |
 | `bibtex.py` | A bibliography LaTeX can cite from, from the same answers (ADR-102). |
+| `bring.py` | Whether one named file may be brought into the workspace, and what its copy is called (ADR-111). |
 | `commands.py` | The commands, read from the application that registers them (ADR-072, ADR-103). |
 | `corpus.py` | Writing a corpus, and re-checking one written before (ADR-066). |
 | `coverage.py` | How far the nearest quotation is from each topic you name (ADR-088). |

@@ -23,7 +23,7 @@ What exists, by what it is for:
 |---|---|
 | reading a library | `ingest`, `sections` to take one part of a document, `references`, `metadata`, `identify`, `resolve`, `bib` |
 | checking what a model says | `run extract_claims`, `collect` and `corpus`, every quotation checked against its document; `--in-passes`; `ask` over a corpus, with `--judge` |
-| checking what you wrote | `review` - your draft against your sources |
+| checking what you wrote | `bring` - one draft of yours copied in, by name; `review` - that draft against your sources |
 | seeing the whole | `status`, stage by stage with what each is missing; `coverage`, how far each topic is from its nearest quotation |
 | a window on all of it | fourteen sections in three groups; four act, only when asked and each shown first |
 | the record | a hash-chained trail per workspace, `verify`, and the Audit section to read it |

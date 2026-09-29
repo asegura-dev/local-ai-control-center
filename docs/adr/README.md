@@ -704,3 +704,9 @@ A log read the trail's last digest once and remembered it, which is right for on
 [`ADR-110-prepare-does-not-hold-the-window.md`](ADR-110-prepare-does-not-hold-the-window.md)
 
 ADR-085 put the call to the engine on a worker because a long call on the window's thread makes Windows call the program crashed. Send has run that way since; Prepare had not, and with an embedding model it waited for the engine - seconds for a question, a minute for a corpus embedded the first time. It runs on a worker now, reading what it needs from the widgets before it starts, with a card that counts the seconds and says nothing goes to the model that answers. Only the latest press is drawn, and leaving the section drops the preview rather than keeping it as an answer is kept: a preview is cheap to make again, and the ranking is already in the trail. A Prepare left behind still finishes, since a request already made cannot be taken back.
+
+### 111 - a draft brought in, by name
+
+[`ADR-111-a-draft-brought-in-by-name.md`](ADR-111-a-draft-brought-in-by-name.md)
+
+`lacc review` reads a draft against the corpus, and had never read the thesis: it is written in a vault outside the workspace, and the boundary refused it, correctly. Of two ways across - a tray the person fills by hand, or a command that reads one named file - the person chose the command. `lacc bring` reads only the path it is given, after showing it and where the copy goes, and asking; the copy lands in `drafts/` with the day in its name and never replaces anything, and a note beside it says where it came from. It is recorded like any run. The exception is narrow by its shape - one file, named, shown, confirmed, recorded - and `PRINCIPLES.md` now names it beside the window's two, which it had not named either. A button in the window, and the tray for what CACC brings without a person naming it, are their own records.
