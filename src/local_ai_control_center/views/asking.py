@@ -12,9 +12,10 @@ With an embedding model, Prepare itself reaches the engine to rank, so a line be
 what it sends before it is pressed - the question alone; more needs a button of its own
 (ADR-106).
 
-**Nothing on the Tk thread waits.** The call runs on a worker that touches no widget: it puts
+**Nothing on the Tk thread waits.** Sending runs on a worker that touches no widget: it puts
 its result in a queue, and `_watch` - the one function here that writes to the screen after a
-send - reads it from inside `after`.
+send - reads it from inside `after`. Preparing does the same since ADR-110, read by
+`_await_preparing`: with an embedding model it waits for the engine too.
 
 **Cancel stops the waiting, and says so.** The request is already with the engine and keeps
 running there. Nothing here pretends otherwise.
@@ -285,19 +286,105 @@ def _prepare(
     state: State,
     agreed: int = 0,
 ) -> None:
-    """Rank the corpus and draw what would be sent. The prompt itself goes nowhere.
+    """Rank the corpus on a worker, and draw what would be sent once it is ready.
 
     A press of Prepare agrees to what the line beside it said - the question alone. When the
     ranking needs more, nothing is ranked: what it would send is drawn with a button of its
     own, and only that button agrees to it (ADR-106).
+
+    **Off the window's thread** (ADR-110). With an embedding model the ranking waits for the
+    engine - seconds for a question, a minute for a corpus embedded the first time - and a
+    window that waited with it stopped repainting. What is needed from the widgets is read
+    here, before the worker starts; the worker touches none.
     """
     if state.prepare_question is None:
         return
     corpus = Path(key).name
     for child in below.winfo_children():
         child.destroy()
-    thread = _thread_for(corpus)
-    prepared = state.prepare_question(box.get("1.0", "end"), corpus, thread.carried, agreed)
+    question = box.get("1.0", "end")
+    carried = _thread_for(corpus).carried
+    ask = state.prepare_question
+    turn = _PREPARING.get(corpus, 0) + 1
+    _PREPARING[corpus] = turn
+    results: queue.Queue[Prepared] = queue.Queue()
+
+    def work() -> None:
+        """The worker. It touches no widget, and nothing it does can raise into Tk."""
+        try:
+            results.put(ask(question, corpus, carried, agreed))
+        except Exception as error:  # noqa: BLE001 - a traceback here has nowhere to go
+            results.put(Prepared(question=question.strip(), corpus=corpus, refusal=str(error)))
+
+    card = paint.card(below, panel.skin, stripe=panel.skin.accent)
+    counting = paint.text(card, "Preparing... 0s", panel.skin.ink, 13, bold=True)
+    paint.text(
+        card,
+        "Ranking the corpus against your question. Nothing goes to the model that answers "
+        "until you press the button that appears after.",
+        panel.skin.faint,
+        10,
+    )
+    began = time.monotonic()
+    threading.Thread(target=work, daemon=True, name="lacc-preparing").start()
+    _await_preparing(_Preparing(turn, results, began, counting), box, key, below, panel, state)
+
+
+@dataclass
+class _Preparing:
+    """One press of Prepare, while its worker ranks."""
+
+    turn: int
+    results: queue.Queue[Prepared]
+    began: float
+    counting: ctk.CTkLabel
+
+
+_PREPARING: dict[str, int] = {}
+"""The latest press of Prepare for each corpus. Only its result is drawn (ADR-110)."""
+
+
+def _await_preparing(
+    preparing: _Preparing,
+    box: ctk.CTkTextbox,
+    key: str,
+    below: ctk.CTkFrame,
+    panel: Panel,
+    state: State,
+) -> None:
+    """Look for the prepared question from inside `after`, and draw it if it is still wanted.
+
+    Wanted means the latest press for its corpus, with its frame still on the screen. A change
+    of section destroys the frame; what the ranking sent is already in the trail, and a preview
+    is cheap to make again, so nothing is kept (ADR-110). Scheduled on the panel's frame, which
+    lives as long as the window, for the reason `_watch` is (ADR-099).
+    """
+    corpus = Path(key).name
+    if not _alive(below) or _PREPARING.get(corpus) != preparing.turn:
+        return
+    try:
+        prepared = preparing.results.get_nowait()
+    except queue.Empty:
+        if _alive(preparing.counting):
+            seconds = time.monotonic() - preparing.began
+            preparing.counting.configure(text=f"Preparing... {seconds:.0f}s")
+        panel.body.after(EVERY, lambda: _await_preparing(preparing, box, key, below, panel, state))
+        return
+    for child in below.winfo_children():
+        child.destroy()
+    _draw_prepared(prepared, box, key, below, panel, state)
+
+
+def _draw_prepared(
+    prepared: Prepared,
+    box: ctk.CTkTextbox,
+    key: str,
+    below: ctk.CTkFrame,
+    panel: Panel,
+    state: State,
+) -> None:
+    """What would be sent, what more ranking needs, or why nothing can be."""
+    thread = _thread_for(Path(key).name)
     if prepared.refusal:
         refused = paint.card(below, panel.skin, stripe=panel.skin.contradicted)
         paint.text(refused, prepared.refusal, panel.skin.ink, 12)

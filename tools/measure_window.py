@@ -298,6 +298,26 @@ def _shows(window: Window, words: str) -> bool:
     )
 
 
+def _has_button(window: Window, text: str) -> bool:
+    return any(
+        button.cget("text") == text for button in _descendants(window.panel_body, ctk.CTkButton)
+    )
+
+
+def _until(window: Window, check: Any, most: float = 10.0) -> bool:
+    """Let the window run until ``check()`` holds, or ``most`` seconds pass.
+
+    Prepare draws when its worker is done (ADR-110), so a preview is waited for rather than
+    expected at once - the way a person waits for it.
+    """
+    started = time.perf_counter()
+    while time.perf_counter() - started < most:
+        if check():
+            return True
+        _settle(window, 2)
+    return bool(check())
+
+
 def _ask_flow(window: Window) -> None:
     """Ask, driven against a stand-in engine: what survives a change of section (ADR-099)."""
     from local_ai_control_center.views import asking
@@ -326,6 +346,7 @@ def _ask_flow(window: Window) -> None:
         box.delete("1.0", "end")
         box.insert("1.0", question)
         _press(window, "Prepare")
+        _until(window, lambda: _has_button(window, "Send to the engine"))
         _press(window, "Send to the engine")
 
     def wait(seconds: float) -> None:
@@ -380,6 +401,7 @@ def _ask_flow(window: Window) -> None:
         f"{_shows(window, 'Asking the engine')}"
     )
     _press(window, "Prepare")
+    _until(window, lambda: _has_button(window, "Send to the engine"))
     refused = _press(window, "Send to the engine") and _shows(window, "already with the engine")
     print(f"     a second send while it waits is refused {refused}")
     wait(slow + 1)
@@ -399,6 +421,7 @@ def _ask_flow(window: Window) -> None:
     _press(window, "Start over")
     print(f"  Start over: thread empty {turns() == 0}")
     _agreeing_flow(window, open_corpus)
+    _preparing_flow(window, open_corpus, elsewhere)
 
 
 def _agreeing_flow(window: Window, open_corpus: Any) -> None:
@@ -430,17 +453,58 @@ def _agreeing_flow(window: Window, open_corpus: Any) -> None:
     box.delete("1.0", "end")
     box.insert("1.0", "fifth")
     _press(window, "Prepare")
-    card = _shows(window, "Ranking needs more than your question")
-    no_send = not any(
-        button.cget("text") == "Send to the engine"
-        for button in _descendants(window.panel_body, ctk.CTkButton)
-    )
+    card = _until(window, lambda: _shows(window, "Ranking needs more than your question"))
+    no_send = not _has_button(window, "Send to the engine")
     _press(window, "Send them and rank")
-    preview = _shows(window, "This is what would be sent")
+    preview = _until(window, lambda: _shows(window, "This is what would be sent"))
     print(
         f"  quotations never embedded: the line beside Prepare {line}, a card instead of a "
         f"preview {card}, no send button yet {no_send}; its own button ranks {preview}, "
         f"agreed to {agreements}"
+    )
+
+
+def _preparing_flow(window: Window, open_corpus: Any, elsewhere: Any) -> None:
+    """A slow Prepare, as ranking by meaning is: the window keeps drawing (ADR-110).
+
+    The stand-in takes two seconds to prepare. While it does, the seconds on the card should
+    move - which they cannot if the window's thread is the one waiting - and leaving mid-way
+    should draw nothing into the section left for.
+    """
+    prepare, send = _stand_in(1.0)
+
+    def slowly(question: str, corpus: str, carried: tuple[Any, ...], agreed: int = 0) -> Any:
+        time.sleep(2.0)
+        return prepare(question, corpus, carried, agreed)
+
+    window.prepare_question, window.send_question = slowly, send
+    open_corpus()
+    box = _descendants(window.panel_body, ctk.CTkTextbox)[0]
+    box.delete("1.0", "end")
+    box.insert("1.0", "sixth")
+    started = time.perf_counter()
+    _press(window, "Prepare")
+    pressed_for = time.perf_counter() - started
+    first = _until(window, lambda: _shows(window, "Preparing... 0s"), 1.0)
+    moved = _until(window, lambda: _shows(window, "Preparing... 1s"), 3.0)
+    arrived = _until(window, lambda: _shows(window, "This is what would be sent"), 5.0)
+    print(
+        f"  a two-second Prepare: the press returned in {pressed_for:.2f} s, the card counted "
+        f"{first}, the seconds moved {moved}, then the preview arrived {arrived}"
+    )
+
+    open_corpus()
+    box = _descendants(window.panel_body, ctk.CTkTextbox)[0]
+    box.insert("1.0", "seventh")
+    _press(window, "Prepare")
+    window._go(elsewhere)
+    _settle(window, 60)
+    drawn_elsewhere = _shows(window, "This is what would be sent")
+    open_corpus()
+    stale = _shows(window, "This is what would be sent")
+    print(
+        f"     left mid-way: nothing drawn into {elsewhere.name} {not drawn_elsewhere}, "
+        f"no stale preview on return {not stale}"
     )
 
 

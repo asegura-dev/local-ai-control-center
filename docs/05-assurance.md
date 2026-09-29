@@ -13,7 +13,7 @@ First taken 2026-09-18, against v1.5.0. **Re-taken 2026-09-27, against v2.10.0 a
 unreleased work, row by row against the source** - and five rows that had read *held* were
 false. Three were fixed the same day (ADR-105); the rest are marked below. On 28-sep ADR-106
 closed the gap about preparing a question, and the reading that closed it moved one more row
-- the window never freezing - to a gap; ADR-107 closed the one about four commands that left
+- the window never freezing - to a gap, which ADR-110 closed; ADR-107 closed the one about four commands that left
 no record, and ADR-108 the one about calls to embed. Planning the next change found one that
 no row had named - two writers could break the chain - and ADR-109 closed it the same day. A
 row here is true on the day it was checked and needs re-checking like any other measurement.
@@ -78,7 +78,7 @@ row here is true on the day it was checked and needs re-checking like any other 
 | A prompt too large is refused, not truncated | Estimated against the window and refused before sending, when the configuration names the window (ADR-019) | **held by test** |
 | A failed sidecar write does not fail the run | The record it describes has already succeeded (ADR-049) | **held** |
 | An answer that arrives while you are elsewhere is kept | The waiting lives in the panel's frame and the turn is recorded whichever section is on screen (ADR-099). Driven by `tools/measure_window.py`; Tk has no test here | **held** |
-| Asking an engine and walking the trail never freeze the window | Both run on workers that touch no widget (ADR-085, ADR-104). Other sections read on the window's own thread, and a large workspace makes them slow to open. **Prepare, with an embedding model, waits for the engine on the window's own thread**: 4.5 seconds measured for the question alone, and as long as embedding the whole corpus the first time (ADR-106) | **held for sending and for the trail; gap for Prepare with an embedding model** |
+| Asking an engine and walking the trail never freeze the window | Sending, preparing and walking the trail run on workers that touch no widget (ADR-085, ADR-104, ADR-110). Other sections read on the window's own thread, and a large workspace makes them slow to open. **Until ADR-110, Prepare waited for the engine on the window's own thread** - 4.5 seconds measured for the question alone with an embedding model, and as long as embedding the whole corpus the first time. Driven by `tools/measure_window.py`: a two-second Prepare returns the press in a quarter of a second and the seconds on its card move | **held** |
 
 ## Human in the loop
 
@@ -114,8 +114,8 @@ was set, so the question reached the engine before the preview that asked whethe
 Closed on 28-sep by ADR-106, which found it wider than named - the first question to a corpus
 sent every quotation in it, and `sections --about` sent every section's opening on every run,
 asking nothing. What ranking would send is now counted from the stored vectors, without
-sending, and agreed to first. Closing it left one gap in sight: Prepare waits for the engine
-on the window's own thread.
+sending, and agreed to first. Closing it left one gap in sight - Prepare waited for the engine
+on the window's own thread - and ADR-110 closed that the same day.
 
 Every one of these is the shape this page exists to catch: a sentence that was true when it was
 written, still reading *held* long after the code beside it had moved.

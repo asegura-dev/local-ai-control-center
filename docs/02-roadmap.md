@@ -30,10 +30,10 @@ What exists, by what it is for:
 
 **What is next** - direction, in the order the thesis this is used for needs it:
 
-1. **Close what ADR-105 named.** Preparing a question no longer sends anything before it
-   asks (ADR-106), and `review`, `resolve`, `identify` and `coverage` leave a record, as does
-   a no (ADR-107), and so does every call to embed (ADR-108). Left: Prepare waits for the
-   engine on the window's own thread.
+1. **Close what ADR-105 named - done on 28 September.** Preparing a question no longer sends
+   anything before it asks (ADR-106); `review`, `resolve`, `identify` and `coverage` leave a
+   record, as does a no (ADR-107), and so does every call to embed (ADR-108); two writers keep
+   one chain (ADR-109); and Prepare no longer holds the window (ADR-110).
 2. **Measure the newer models on the old question - begun.** On 28 September extraction was
    re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations
    are not in their document, against 38 of the 14B's 216, and the figure this project is

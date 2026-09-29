@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **Prepare froze the window** (ADR-110). Send has run on a worker since ADR-085; Prepare ranked
+  on the window's own thread, and with an embedding model that is waiting for the engine - 4.5
+  seconds for a question, as long as embedding the whole corpus the first time. It runs on a
+  worker now, with a card counting the seconds; only the latest press is drawn, and leaving the
+  section drops the preview, whose ranking is already in the trail. Driven in the real window:
+  a two-second Prepare returns the press in 0.26 s, the seconds move, and leaving mid-way draws
+  nothing into the next section.
 - **Two writers could break the trail's chain** (ADR-109). A log read the last record's digest
   once and remembered it, so when two wrote to one trail - the window's Send across its wait
   and a Prepare that ranked meanwhile (ADR-108), two corpora asked at once, a terminal beside

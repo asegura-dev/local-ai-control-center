@@ -165,4 +165,4 @@ corpus is ranked, every quotation in it - before the preview this record draws. 
 for the engine on the window's own thread, which the paragraph above says nothing here does.
 ADR-106 puts a line beside the button that says what pressing it sends, the question alone,
 and gives quotations never embedded a card and a button of their own. The wait on the Tk
-thread is still there, named in `docs/05-assurance.md`.
+thread went the same day: ADR-110 moved Prepare onto a worker, as this record put Send.
