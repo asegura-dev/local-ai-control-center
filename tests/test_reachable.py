@@ -296,8 +296,33 @@ the point: the argument for how it is recorded happens before it ships, not afte
 """
 
 
-def _engine_call_sites(trees: dict[pathlib.Path, ast.Module]) -> set[tuple[str, str]]:
-    """`(file, enclosing function)` for every `.complete(...)` in the source."""
+REACHES_THE_EMBEDDER = {
+    ("dense.py", "_ranked"): "the question: every ranking by meaning is a run of its own, "
+    "rank_by_meaning (ADR-108), except review's, recorded in review's run (ADR-107)",
+    ("dense.py", "vectors_for"): "quotations never embedded: counted by would_send before "
+    "they go, and recorded with the question or topics that sent them",
+    ("coverage.py", "reach_of"): "the topics: coverage records texts_embedded (ADR-107)",
+}
+"""Every place the source sends text to an embedding model, and what writes it down.
+
+The question, a corpus's quotations and a writer's topics go to these, and until ADR-107 and
+ADR-108 none of it was recorded - which is how four commands went unrecorded long enough to be
+named as a gap (ADR-105).
+"""
+
+REACHES_THE_REGISTRY = {
+    ("cli.py", "resolve"): "registry_asked, the DOIs counted as they leave (ADR-107)",
+    ("cli.py", "identify"): "registry_asked, as resolve records it",
+    ("cli.py", "_propose"): "registry_asked, as resolve records it",
+    ("crossref.py", "about"): "the remembering registry passes a DOI on and keeps it in `sent`, "
+    "which is what the three above record",
+}
+"""Every place the source asks a registry about a work - the one thing here that talks to a
+machine that is not the user's."""
+
+
+def _call_sites(trees: dict[pathlib.Path, ast.Module], attribute: str) -> set[tuple[str, str]]:
+    """`(file, enclosing function)` for every `.<attribute>(...)` in the source."""
     sites: set[tuple[str, str]] = set()
     for path, tree in trees.items():
         for node in ast.walk(tree):
@@ -307,21 +332,58 @@ def _engine_call_sites(trees: dict[pathlib.Path, ast.Module]) -> set[tuple[str, 
                 if (
                     isinstance(inner, ast.Call)
                     and isinstance(inner.func, ast.Attribute)
-                    and inner.func.attr == "complete"
+                    and inner.func.attr == attribute
                 ):
                     sites.add((path.name, node.name))
     return sites
+
+
+_EVERY_LIST = (
+    ("complete", REACHES_THE_ENGINE, "REACHES_THE_ENGINE", "call an engine"),
+    ("embed", REACHES_THE_EMBEDDER, "REACHES_THE_EMBEDDER", "send text to be embedded"),
+    ("about", REACHES_THE_REGISTRY, "REACHES_THE_REGISTRY", "ask a registry"),
+)
 
 
 def test_every_place_that_reaches_the_engine_is_accounted_for() -> None:
     """A call the user's words go into, and nothing says it happened, is not acceptable.
 
     This does not check that a site audits well - it cannot. It checks that nobody adds one
-    without saying how it is recorded, which is the step that was skipped.
+    without saying how it is recorded, which is the step that was skipped. Embeddings and
+    registry requests joined completions on 28-sep (ADR-108).
     """
-    unaccounted = sorted(_engine_call_sites(_sources()) - set(REACHES_THE_ENGINE))
-    assert not unaccounted, (
-        "These call an engine and REACHES_THE_ENGINE does not say what records them: "
-        + ", ".join(f"{where}:{what}()" for where, what in unaccounted)
-        + "."
+    trees = _sources()
+    for attribute, named, called, does in _EVERY_LIST:
+        unaccounted = sorted(_call_sites(trees, attribute) - set(named))
+        assert not unaccounted, (
+            f"These {does} and {called} does not say what records them: "
+            + ", ".join(f"{where}:{what}()" for where, what in unaccounted)
+            + "."
+        )
+
+
+def test_no_list_names_a_place_that_is_gone() -> None:
+    """An entry whose call moved would go on describing code that no longer exists.
+
+    The same failure as an exception list that outlives its function (ADR-086): the list reads
+    as a guarantee and guarantees nothing.
+    """
+    trees = _sources()
+    for attribute, named, called, _ in _EVERY_LIST:
+        gone = sorted(set(named) - _call_sites(trees, attribute))
+        assert not gone, f"{called} names places that no longer call .{attribute}(): {gone}"
+
+
+def test_the_site_finder_sees_a_new_place() -> None:
+    """Guards the guard: a function that embeds is found, one that does not is not."""
+    source = ast.parse(
+        "def sends(e, t):"
+        + chr(10)
+        + "    return e.embed((t,))"
+        + chr(10)
+        + "def keeps(t):"
+        + chr(10)
+        + "    return t"
+        + chr(10)
     )
+    assert _call_sites({pathlib.Path("new.py"): source}, "embed") == {("new.py", "sends")}

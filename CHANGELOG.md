@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **The ranking's calls to embed were recorded nowhere** (ADR-108). A ranking by meaning is now
+  a run of its own, `rank_by_meaning`, recorded the moment it reaches the engine - in `ask`,
+  `measure`, the window and `sections --about` - because it has its own agreement and is often
+  not followed by the question it was for: a Prepare nobody sent still sent the question. The
+  question is kept as a digest, its words only under `full`. `ask --judge` records the readings
+  it ranks to offer candidates. And every place that embeds a text or asks a registry is now
+  named in a test with what records it, as every place that completes a prompt already was: a
+  new place fails the suite, and so does a name whose place is gone.
 - **Four commands left no record, and a no left none either** (ADR-107). `review`, `resolve`,
   `identify` and `coverage` reach the engine or Crossref and recorded nothing; each now opens a
   run, says what it reached and what it wrote, and ends finished, declined or failed - so the

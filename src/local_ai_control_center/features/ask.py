@@ -68,6 +68,16 @@ def might_support(
 # --- a question prepared before it is sent (ADR-085) ----------------------------------------
 
 
+class Ranked(BaseModel):
+    """What a ranking by meaning sent to the engine, and whether it came back (ADR-108)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sent: Outgoing
+    failed: str = ""
+    """What the engine said when the ranking did not come back, or empty."""
+
+
 class Prepared(BaseModel):
     """What a question would send, worked out without sending the prompt.
 
@@ -117,6 +127,13 @@ class Prepared(BaseModel):
 
     Set only when nothing was ranked for that reason. Nothing has left the machine, and this
     is the preview: what would go, to which model, reaching where.
+    """
+
+    ranked: Ranked | None = None
+    """What the ranking sent to an engine, set whenever it reached one (ADR-108).
+
+    Whether it came back or not, so the terminal and the window record the same thing from
+    the same value rather than each working out afterwards whether a ranking happened.
     """
 
     @property
@@ -285,12 +302,15 @@ def prepare(
             awaiting=outgoing,
         )
     budget = (config.context_tokens - answer_reserve(config.context_tokens)) // 2
+    ranked = Ranked(sent=outgoing) if outgoing is not None else None
     try:
         selection = retriever.select(asked, passages, budget)
     except Exception as error:  # noqa: BLE001 - a ranking may fail for any reason
         # A ranking that cannot be made becomes a sentence on the screen. The alternative is
         # an exception raised on a worker thread, which a window reports by not repainting.
-        return Prepared(question=asked, corpus=corpus, refusal=str(error))
+        # What it tried to send is kept: it reached for the engine, and that is recorded.
+        failed = Ranked(sent=outgoing, failed=str(error)) if outgoing is not None else None
+        return Prepared(question=asked, corpus=corpus, refusal=str(error), ranked=failed)
 
     # What a thread already established goes in front of what the ranking chose for this
     # question, and the budget runs out on the new material rather than on what a previous
@@ -311,6 +331,7 @@ def prepare(
                 "The word ranking does not cross languages: a question in Spanish will not "
                 "find quotations in English unless an embedding model is configured."
             ),
+            ranked=ranked,
         )
     return Prepared(
         question=asked,
@@ -325,4 +346,5 @@ def prepare(
         model=config.model,
         reaches=reaches,
         tokens=estimate_tokens(material),
+        ranked=ranked,
     )

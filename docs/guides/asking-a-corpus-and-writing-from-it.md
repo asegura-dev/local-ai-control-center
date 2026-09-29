@@ -145,7 +145,8 @@ and the first time every quotation in the corpus too, so `ask`, `measure` and
 `sections --about` say what would go and ask `Rank by meaning? [y/N]`. No ranks by words, on
 your machine, and the line that reports the selection says *words*. In the window, the line
 under the question box says what *Prepare* sends - the question alone; quotations that were
-never embedded get a card that names them, and a button of their own.
+never embedded get a card that names them, and a button of their own. Every ranking that
+reaches the engine is in the trail, as a `rank_by_meaning` run the Audit section lists.
 
 It matters most across languages and as the corpus grows. At 1,129 citable quotations with a
 32k window the budget admits about 220 of them - a fifth - whatever the ranking says, so

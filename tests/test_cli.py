@@ -1877,3 +1877,127 @@ def test_coverage_records_what_it_embedded(tmp_path: Path, monkeypatch: pytest.M
     assert (embedded["topics"], embedded["quotations"], embedded["texts"]) == (2, 2, 4)
     assert len(engine.sent) == embedded["texts"], "what was recorded is what went"
     assert run[-1]["kind"] == "run_finished"
+
+
+# --- every embedding is recorded, the ranking's too (ADR-108) ------------------------------
+
+
+def _actions(tmp_path: Path) -> list[str]:
+    """What each run in the trail was, in the order the runs began."""
+    log = tmp_path / "ws" / "audit.jsonl"
+    if not log.exists():
+        return []
+    records = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]
+    return [record["detail"]["action"] for record in records if record["kind"] == "run_started"]
+
+
+def test_a_ranking_by_meaning_is_recorded_whatever_is_answered_after(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Yes to ranking and no to the question: the question still went to the engine."""
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    runner.invoke(app, ["ask", *_ASKING, "-c", str(config)], input="y\n" + "n\n")
+    assert _actions(tmp_path) == ["rank_by_meaning", "ask_corpus"]
+    ranking = _run_of(tmp_path, "rank_by_meaning")
+    embedded = _detail(ranking, "texts_embedded")
+    assert (embedded["questions"], embedded["quotations"]) == (1, 2)
+    assert embedded["texts"] == len(engine.sent), "what was recorded is what went"
+    assert "question" not in embedded, "the words are kept only under full"
+    assert ranking[-1]["kind"] == "run_finished"
+    assert _kinds_of(tmp_path, "ask_corpus")[-1] == "confirmation_declined"
+
+
+def test_ranking_by_words_records_no_ranking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No to meaning sent nothing, so there is nothing to record but the question's no."""
+    config, _ = _with_meaning(tmp_path, monkeypatch)
+    runner.invoke(app, ["ask", *_ASKING, "-c", str(config)], input="\n" + "n\n")
+    assert _actions(tmp_path) == ["ask_corpus"]
+
+
+def test_sections_by_meaning_is_recorded_as_a_ranking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    body = chr(10).join(["Lymph node staging with PSMA PET and nodal size on CT."] * 12)
+    (tmp_path / "ws" / "guide.md").write_text(
+        chr(10).join(["1. Screening", body, "2. Staging", body, "3. Treatment", body]),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app, ["sections", "guide.md", "--about", "nodal staging", "-c", str(config)], input="y\n"
+    )
+    assert result.exit_code == 0, result.stdout
+    ranking = _run_of(tmp_path, "rank_by_meaning")
+    assert ranking[0]["detail"]["for"] == "sections"
+    embedded = _detail(ranking, "texts_embedded")
+    assert (embedded["questions"], embedded["section_openings"]) == (1, 3)
+    assert embedded["texts"] == len(engine.sent)
+
+
+class _AnswersThenDoubts(Provider):
+    """An engine that answers from the corpus, and then doubts every reading it made."""
+
+    @property
+    def name(self) -> str:
+        return "doubts"
+
+    def complete(
+        self, prompt: str, temperature: float = 0.0, schema: dict[str, Any] | None = None
+    ) -> Completion:
+        if "THE READING:" in prompt:
+            return Completion(text='{"verdict": "neither", "why": "not settled"}', provider="d")
+        return Completion(
+            text="POINT: Most pelvic nodes are found."
+            + chr(10)
+            + "QUOTE: The sensitivity for pelvic lymph nodes was 82 per cent."
+            + chr(10)
+            + "SOURCE: paper.md"
+            + chr(10),
+            provider="d",
+        )
+
+
+def test_the_judges_candidates_record_what_they_embedded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A flagged reading is ranked against the passages to offer what might carry it, and by
+    meaning that sends the reading - recorded in the question's own run."""
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "local_ai_control_center.cli._build_provider",
+        lambda choice, config, skill="": _AnswersThenDoubts(),
+    )
+    result = runner.invoke(
+        app, ["ask", *_ASKING, "--judge", "-c", str(config)], input="y\n" + "y\n"
+    )
+    assert result.exit_code == 0, result.stdout
+    asked = _run_of(tmp_path, "ask_corpus")
+    embedded = _detail(asked, "texts_embedded")
+    assert embedded["readings"] == 1
+    assert "Most pelvic nodes are found." in engine.sent, "the reading went to be embedded"
+
+
+def test_a_prepare_in_the_window_is_recorded_though_nothing_is_ever_sent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What the window's Prepare runs, without Tk: the composition the section is handed."""
+    from local_ai_control_center.cli import _asking_for_the_window, _load
+
+    config_path, engine = _with_meaning(tmp_path, monkeypatch)
+    config, workspace = _load(config_path)
+    prepare_one, _ = _asking_for_the_window(config, workspace)
+
+    # A press agrees to the question alone; two quotations were never embedded.
+    waiting = prepare_one("pelvic lymph node sensitivity", "corpus.md", (), 0)
+    assert waiting.awaiting is not None
+    assert _actions(tmp_path) == [], "nothing went, nothing is recorded"
+    assert engine.sent == []
+
+    # The card's own button agrees to them: the ranking goes, and is a run at once.
+    made = prepare_one("pelvic lymph node sensitivity", "corpus.md", (), 2)
+    assert made.sendable
+    assert _actions(tmp_path) == ["rank_by_meaning"]
+    embedded = _detail(_run_of(tmp_path, "rank_by_meaning"), "texts_embedded")
+    assert embedded["texts"] == len(engine.sent) == 3

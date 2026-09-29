@@ -1644,7 +1644,7 @@ def measure(
     # is the model and not the selection.
     material: str | None = None
     if corpus_file is not None:
-        made, _ = _prepared_or_exit(requests[0], corpus_file, config, workspace)
+        made, _ = _prepared_or_exit(requests[0], corpus_file, config, workspace, audit)
         material = made.material
         plan = _plan_or_exit(resolved, (requests[0],), config)
     preview = preview_action(
@@ -1965,7 +1965,7 @@ def ask(
     audit = AuditLog(workspace, config)
     # The judge's candidates are ranked by whatever chose the passages: meaning declined for
     # the question is meaning declined for the readings too (ADR-106).
-    made, chosen_by = _prepared_or_exit(question, corpus_file, config, workspace, judge)
+    made, chosen_by = _prepared_or_exit(question, corpus_file, config, workspace, audit, judge)
 
     resolved: Skill = AskCorpusSkill()
     if using is not None:
@@ -2031,6 +2031,7 @@ def ask(
         provider if judge else None,
         made.chosen,
         chosen_by,
+        resolve_engine_host(config.engine_host, config.network_access),
     )
     console.print(
         f"[dim]{made.set_aside} of {made.considered} passages were not sent. An "
@@ -2058,7 +2059,12 @@ def _retriever_for(config: Config, corpus: Path | None) -> Retriever:
 
 
 def _prepared_or_exit(
-    question: str, corpus_file: Path, config: Config, workspace: Workspace, judge: bool = False
+    question: str,
+    corpus_file: Path,
+    config: Config,
+    workspace: Workspace,
+    audit: AuditLog,
+    judge: bool = False,
 ) -> tuple[Prepared, Retriever]:
     """Rank a corpus against a question, say what was chosen, or exit saying why not.
 
@@ -2070,7 +2076,8 @@ def _prepared_or_exit(
     **Ranking by meaning asks first, and no is the default** (ADR-106). It sends the question,
     and every quotation never embedded, before any preview could exist. No still ranks - by
     words, on this machine - and the line below says so. Returned with the retriever that
-    chose, so whatever ranks next ranks the same way.
+    chose, so whatever ranks next ranks the same way. A ranking that reached the engine is
+    recorded as a run of its own the moment it has, whatever is answered after (ADR-108).
     """
     try:
         resolved = workspace.resolve_within(corpus_file)
@@ -2092,6 +2099,15 @@ def _prepared_or_exit(
         else:
             retriever = WordRetriever()
             made = prepare(question, corpus_file.name, text, config, retriever)
+    if made.ranked is not None:
+        audit.ranked(
+            AskCorpusSkill().name,
+            made.ranked.sent.model,
+            resolve_engine_host(config.engine_host, config.network_access),
+            {"questions": 1, "quotations": made.ranked.sent.unembedded},
+            made.question,
+            made.ranked.failed,
+        )
     if made.refusal:
         # Includes a ranking that could not be made: refused rather than quietly falling back
         # to words, because a selection made by a different method is a different answer and
@@ -2113,6 +2129,7 @@ def _judge_the_readings(
     run_id: str,
     passages: tuple[Passage, ...] = (),
     retriever: Retriever | None = None,
+    reaches: str = "",
 ) -> None:
     """Ask whether each verified quotation supports the reading made of it (ADR-053).
 
@@ -2180,6 +2197,7 @@ def _judge_the_readings(
             f"[yellow]{len(flagged)} of {len(real)} readings are worth reading before you "
             f"cite them.[/yellow]"
         )
+        sending = retriever.would_send(passages) if retriever is not None else None
         for claim, verdict in flagged:
             console.print(f"  [yellow]?[/yellow] {claim.claim.claim[:95]}")
             console.print(f"    [dim]{verdict.verdict}: {verdict.detail[:110]}[/dim]")
@@ -2195,6 +2213,12 @@ def _judge_the_readings(
                 )
                 console.print(f"    [dim]could support it: {candidate.text[:95]}[/dim]")
                 console.print(f"    [dim]                  [{where}][/dim]")
+        if sending is not None:
+            # Ranked by meaning: each flagged reading went to be embedded to find what might
+            # carry it, inside the run somebody agreed to (ADR-108).
+            audit.embedded(
+                run_id, plan.action.name, sending.model, reaches, {"readings": len(flagged)}
+            )
     if undecided:
         console.print(f"[dim]{undecided} could not be judged, and that is not approval.[/dim]")
 
@@ -2208,6 +2232,7 @@ def _check_against_what_was_sent(
     provider: Provider | None = None,
     passages: tuple[Passage, ...] = (),
     retriever: Retriever | None = None,
+    reaches: str = "",
 ) -> None:
     """Check the answer's quotations against the passages it was given, not the documents.
 
@@ -2243,7 +2268,9 @@ def _check_against_what_was_sent(
             f"[green]All {len(checked)} quotations are in the passages that were sent.[/green]"
         )
         if provider is not None:
-            _judge_the_readings(checked, provider, plan, audit, run_id, passages, retriever)
+            _judge_the_readings(
+                checked, provider, plan, audit, run_id, passages, retriever, reaches
+            )
         return
     console.print(
         f"[red]{len(invented)} of {len(checked)} quotations are not in what was sent.[/red] "
@@ -2253,7 +2280,7 @@ def _check_against_what_was_sent(
     for claim in invented:
         console.print(f"  [red]x[/red] {claim.claim.quote[:100]}")
     if provider is not None:
-        _judge_the_readings(checked, provider, plan, audit, run_id, passages, retriever)
+        _judge_the_readings(checked, provider, plan, audit, run_id, passages, retriever, reaches)
 
 
 @app.command()
@@ -2562,7 +2589,19 @@ def _asking_for_the_window(
         except (ValueError, OSError) as error:
             return Prepared(question=question.strip(), corpus=corpus, refusal=str(error))
         retriever = _retriever_for(config, path)
-        return prepare(question, corpus, text, config, retriever, carried, agreed)
+        made = prepare(question, corpus, text, config, retriever, carried, agreed)
+        if made.ranked is not None:
+            # A run of its own, recorded now: a Prepare is often followed by no Send at all,
+            # and the question went to the engine all the same (ADR-108).
+            AuditLog(workspace, config).ranked(
+                skill.name,
+                made.ranked.sent.model,
+                resolve_engine_host(config.engine_host, config.network_access),
+                {"questions": 1, "quotations": made.ranked.sent.unembedded},
+                made.question,
+                made.ranked.failed,
+            )
+        return made
 
     def send_one(prepared: Prepared) -> Asked:
         """Send a question that was previewed. **This never raises**, by contract.
@@ -3004,7 +3043,25 @@ def sections(
                 )
                 if not typer.confirm("Rank by meaning?", default=False):
                     retriever = WordRetriever()
-            found = ranked(text, about, retriever)
+                    outgoing = None
+            failed = ""
+            try:
+                found = ranked(text, about, retriever)
+            except EmbeddingError as error:
+                failed = str(error)
+            if outgoing is not None:
+                # A run of its own, as every ranking by meaning is (ADR-108).
+                AuditLog(workspace, config).ranked(
+                    "sections",
+                    outgoing.model,
+                    resolve_engine_host(config.engine_host, config.network_access),
+                    {"questions": 1, "section_openings": outgoing.unembedded},
+                    about,
+                    failed,
+                )
+            if failed:
+                _show(f"[red]{failed}[/red]")
+                raise typer.Exit(code=1)
             _show(f"[bold]{len(found)} sections[/bold] in {source.name}, most about it first")
             for section in found[:12]:
                 _show(f"  [dim]{section.line:>6}[/dim]  {section.number}  {section.title}")

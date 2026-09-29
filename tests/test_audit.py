@@ -382,3 +382,49 @@ def test_a_file_written_is_recorded_by_where_it_is_and_its_digest(tmp_path: Path
         "path": "reports/coverage.md",
         "sha256": digest_of_file(written),
     }
+
+
+# --- a ranking by meaning (ADR-108) ---------------------------------------------------------
+
+
+def test_a_ranking_by_meaning_is_a_run_of_its_own(tmp_path: Path) -> None:
+    """Its own agreement, and often no question after it: so its own run, closed at once."""
+    log = _log(tmp_path)
+    log.ranked(
+        "ask_corpus",
+        "ollama:bge-m3",
+        "http://desk:11434",
+        {"questions": 1, "quotations": 2},
+        "which model found the lesions",
+    )
+    records = _lines(log.path)
+    assert [record["kind"] for record in records] == [
+        "run_started",
+        "texts_embedded",
+        "run_finished",
+    ]
+    assert records[0]["detail"] == {"action": "rank_by_meaning", "for": "ask_corpus"}
+    embedded = records[1]["detail"]
+    assert isinstance(embedded, dict)
+    assert (embedded["questions"], embedded["quotations"], embedded["texts"]) == (1, 2, 3)
+    assert embedded["question_sha256"] == digest_of("which model found the lesions")
+    assert "question" not in embedded, "the words are kept only under full"
+
+
+def test_a_ranking_that_did_not_come_back_is_a_failed_run(tmp_path: Path) -> None:
+    log = _log(tmp_path)
+    log.ranked(
+        "sections",
+        "ollama:bge-m3",
+        "http://desk:11434",
+        {"questions": 1, "section_openings": 3},
+        "nodal staging",
+        failed="Cannot reach http://desk:11434 to embed",
+    )
+    assert [record["kind"] for record in _lines(log.path)] == ["run_started", "run_failed"]
+
+
+def test_a_count_cannot_take_the_key_of_the_question_itself(tmp_path: Path) -> None:
+    """A count named `question` would be overwritten by the words, and dropped with them."""
+    with pytest.raises(ValueError, match="question"):
+        _log(tmp_path).embedded("r", "ask_corpus", "m", "h", {"question": 1}, "which model")

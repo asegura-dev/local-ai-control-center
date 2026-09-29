@@ -24,7 +24,7 @@ behaviour test caught were caught - or would have been - by one of these.
 | File | What it is |
 |---|---|
 | `test_layering.py` | The layers are true, not merely described: what each may import, and that a view decides nothing (ADR-066, ADR-075). |
-| `test_reachable.py` | A setting the program declares is one it can reach, and nothing public exists that only a test reaches (ADR-055). |
+| `test_reachable.py` | A setting the program declares is one it can reach, and nothing public exists that only a test reaches (ADR-055). And every place that completes a prompt, embeds a text or asks a registry is named with what records it - a new place, or a name whose place is gone, fails (ADR-059, ADR-108). |
 | `test_bindings.py` | A binding in the window never replaces one it did not make (ADR-096). |
 | `test_the_launcher_name.py` | The launcher's name is never split in two (ADR-097). |
 | `test_scripts.py` | The launchers are what their recorded digests say they are (ADR-071). |

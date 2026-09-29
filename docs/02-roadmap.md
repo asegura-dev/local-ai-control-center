@@ -32,8 +32,8 @@ What exists, by what it is for:
 
 1. **Close what ADR-105 named.** Preparing a question no longer sends anything before it
    asks (ADR-106), and `review`, `resolve`, `identify` and `coverage` leave a record, as does
-   a no (ADR-107). Left: the ranking's own calls to embed are not recorded, and Prepare waits
-   for the engine on the window's own thread.
+   a no (ADR-107), and so does every call to embed (ADR-108). Left: Prepare waits for the
+   engine on the window's own thread.
 2. **Measure the newer models on the old question - begun.** On 28 September extraction was
    re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations
    are not in their document, against 38 of the 14B's 216, and the figure this project is

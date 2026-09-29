@@ -279,6 +279,36 @@ def test_one_quotation_is_counted_in_the_singular() -> None:
     assert "your question and 1 quotation never embedded before to m" in sentence
 
 
+class _MeaningGoesAway(_Meaning):
+    """A ranking that reaches for the engine and finds nothing there."""
+
+    def select(self, question: str, passages: tuple[Passage, ...], budget_tokens: int) -> Selection:
+        raise RuntimeError("Cannot reach http://desk:11434 to embed")
+
+
+def test_what_a_ranking_sent_comes_back_with_the_prepared_question() -> None:
+    """So the terminal and the window record the same thing from the same value (ADR-108)."""
+    made = prepare("pelvic lymph node", "corpus.md", CORPUS, _config(), _Meaning(2), agreed=2)
+    assert made.ranked is not None
+    assert made.ranked.sent == Outgoing(model="ollama:bge-m3", unembedded=2)
+    assert made.ranked.failed == ""
+
+
+def test_a_ranking_that_did_not_come_back_still_says_what_it_reached_for() -> None:
+    made = prepare("lymph node", "corpus.md", CORPUS, _config(), _MeaningGoesAway(0), agreed=0)
+    assert made.refusal
+    assert made.ranked is not None
+    assert "Cannot reach" in made.ranked.failed
+
+
+def test_nothing_ranked_is_nothing_to_record() -> None:
+    """Waiting for agreement, or ranking by words: nothing left the machine."""
+    waiting = prepare("pelvic lymph node", "corpus.md", CORPUS, _config(), _Meaning(0))
+    by_words = prepare("pelvic lymph node", "corpus.md", CORPUS, _config(), WordRetriever())
+    assert waiting.ranked is None
+    assert by_words.ranked is None
+
+
 def test_the_line_beside_prepare_names_what_pressing_it_sends() -> None:
     """The preview of what Prepare sends, drawn before it is pressed."""
     config = _config(embedding_model="bge-m3", network_access=True, engine_host="http://desk:11434")

@@ -30,7 +30,9 @@ later, exactly what a model was asked and what it said.
   Skills, questions, conversions and measurements are there - and since ADR-107 `review`,
   `resolve`, `identify` and `coverage` too, each saying what it reached and what it wrote. A
   registry request says how many DOIs went and whether an address went with them; the DOIs
-  themselves are listed only under `audit_level: full`, and the address never.
+  themselves are listed only under `audit_level: full`, and the address never. A ranking by
+  meaning is a run of its own, `rank_by_meaning`, just before the question it was for - or
+  alone, when the question was prepared and never sent (ADR-108).
 - How a run ended is what its own records say:
 
   | Shown | Means |

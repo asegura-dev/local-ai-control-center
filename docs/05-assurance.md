@@ -14,8 +14,8 @@ unreleased work, row by row against the source** - and five rows that had read *
 false. Three were fixed the same day (ADR-105); the rest are marked below. On 28-sep ADR-106
 closed the gap about preparing a question, and the reading that closed it moved one more row
 - the window never freezing - to a gap; ADR-107 closed the one about four commands that left
-no record. A row here is true on the day it was checked and needs
-re-checking like any other measurement.
+no record, and ADR-108 the one about calls to embed. A row here is true on the day it was
+checked and needs re-checking like any other measurement.
 
 ## Cybersecurity
 
@@ -45,7 +45,7 @@ re-checking like any other measurement.
 | Promise | What holds it | Verdict |
 |---|---|---|
 | Every meaningful execution is audited | Skill runs, conversions and questions are: `run_started`, `run_refused`, `files_read`, `provider_called`, `run_finished`. **`review`, `resolve`, `identify` and `coverage` were not until ADR-107**: each now opens a run, records what it reached (`registry_asked`, `texts_embedded`, `readings_judged`) and what it wrote (`file_written`), and ends finished, declined or failed. A no in `ask` and `measure` is recorded too. `measure` still records nothing when its preview is refused | **held by test** |
-| Every call that completes a prompt is accounted for | `REACHES_THE_ENGINE` names every `.complete(` call, and a fourth fails the suite. **Embedding calls are outside it.** `review` and `coverage` record theirs (ADR-107); the ranking in `ask`, `measure`, the window and `sections --about` does not yet, and no test names every place that embeds | **held by test for completions; gap for the ranking's embeddings** |
+| Every call that completes a prompt, embeds a text or asks a registry is accounted for | `REACHES_THE_ENGINE`, `REACHES_THE_EMBEDDER` and `REACHES_THE_REGISTRY` name every `.complete(`, `.embed(` and `.about(` call and what records it; a new one fails the suite, and so does a name whose call is gone (ADR-059, ADR-108). A ranking by meaning is a run of its own, `rank_by_meaning`, recorded the moment it reaches the engine - in `ask`, `measure`, the window and `sections --about` - and `ask --judge` records the readings it ranks. **Until ADR-108 the ranking's calls were recorded nowhere** | **held by test** |
 | Content only under `audit_level: full` | The filter drops `prompt`, `completion`, `question` and `dois` at any other level; a question keeps its digest, and a list of DOIs its count. **Until ADR-105, every question to a corpus was kept word for word under the default level** - nothing had told the filter it was content. Trails written before keep what they kept | **held by test** |
 | A refusal is recorded, not only a success | `run_refused` carries the missing capabilities and the out-of-bounds paths. The first is asserted; the second only through the outcome | **held by test, the paths held** |
 | The trail cannot be altered unnoticed | Hash chain, checked by `lacc verify` and by the window's Audit section as it reads (ADR-023, ADR-043, ADR-104) | **held by test** |

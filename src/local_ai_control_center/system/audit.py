@@ -190,16 +190,70 @@ class AuditLog:
         )
 
     def embedded(
-        self, run_id: str, action: str, model: str, reaches: str, sent: dict[str, int]
+        self,
+        run_id: str,
+        action: str,
+        model: str,
+        reaches: str,
+        sent: dict[str, int],
+        question: str = "",
     ) -> None:
-        """Record what went to an embedding model: which model, where, how many of what."""
+        """Record what went to an embedding model: which model, where, how many of what.
+
+        A question that went with them is content: its digest always, its words under `full`
+        alone, the rule every question follows (ADR-105). Counts are plural - `questions`,
+        `quotations` - so none can share a key with the question itself, which the filter
+        would drop along with it.
+        """
+        clash = {"question", "question_sha256"} & set(sent)
+        if clash:
+            raise ValueError(f"{sorted(clash)} name the question itself, not a count of texts")
         total = sum(sent.values())
+        detail: dict[str, Any] = {
+            "action": action,
+            "model": model,
+            "reaches": reaches,
+            "texts": total,
+            **sent,
+        }
+        if question:
+            detail["question"] = question
+            detail["question_sha256"] = digest_of(question)
+        self.record(run_id, "texts_embedded", f"Embedded {total} texts with {model}", detail)
+
+    def ranked(
+        self,
+        before: str,
+        model: str,
+        reaches: str,
+        sent: dict[str, int],
+        question: str,
+        failed: str = "",
+    ) -> None:
+        """Record a ranking by meaning as a run of its own, and close it (ADR-108).
+
+        Its own run because it had its own agreement, and because the question it was for may
+        never be sent: a Prepare nobody followed with Send is still a question that went to the
+        engine. ``before`` is what it ranked for.
+        """
+        run_id = new_run_id()
+        action = "rank_by_meaning"
         self.record(
             run_id,
-            "texts_embedded",
-            f"Embedded {total} texts with {model}",
-            {"action": action, "model": model, "reaches": reaches, "texts": total, **sent},
+            "run_started",
+            f"Starting {action} for {before}",
+            {"action": action, "for": before},
         )
+        if failed:
+            self.record(
+                run_id,
+                "run_failed",
+                "The embedding model did not answer",
+                {"action": action, "error": failed},
+            )
+            return
+        self.embedded(run_id, action, model, reaches, sent, question)
+        self.record(run_id, "run_finished", f"Finished {action}", {"action": action})
 
     def record(
         self,
