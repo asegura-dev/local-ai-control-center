@@ -10,7 +10,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Sequence
+import os
+import sys
+import threading
+import time
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -20,6 +25,37 @@ from pydantic import BaseModel, ConfigDict, Field
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.run import new_run_id
 from local_ai_control_center.core.workspace import Workspace
+
+if sys.platform == "win32":
+    import msvcrt
+
+    def _lock(descriptor: int) -> bool:
+        """Try once to take the lock file's first byte. True when it was taken."""
+        try:
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+
+    def _unlock(descriptor: int) -> None:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+
+else:
+    import fcntl
+
+    def _lock(descriptor: int) -> bool:
+        """Try once to take the lock file. True when it was taken."""
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return False
+        return True
+
+    def _unlock(descriptor: int) -> None:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+
 
 EventKind = Literal[
     "run_started",
@@ -136,7 +172,6 @@ class AuditLog:
         self._path = workspace.resolve_within(filename)
         self._root = workspace.root
         self._config = config
-        self._previous: str | None = None
 
     @property
     def path(self) -> Path:
@@ -268,25 +303,30 @@ class AuditLog:
         allows continuing. Raises :class:`AuditWriteError` when the policy is to
         abort.
         """
-        event = AuditEvent(
+        pending = AuditEvent(
             timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             run_id=run_id,
             kind=kind,
             message=message,
             detail=self._filter_detail(detail or {}),
-        ).chained(self._head_digest())
+        )
         try:
-            with self._path.open("a", encoding="utf-8") as handle:
-                handle.write(event.model_dump_json() + "\n")
+            # The head is read in the same turn as the append, never remembered: a log that
+            # remembered it chained to its own last record while another log - the window's
+            # Prepare, a terminal - had written since, and broke the chain (ADR-109).
+            with _turn(self._path, writing=True):
+                previous = _last_digest(self._path)
+                event = pending.chained(previous)
+                with self._path.open("a", encoding="utf-8") as handle:
+                    handle.write(event.model_dump_json() + "\n")
+                self._anchor(previous, event.digest)
         except OSError as error:
             if self._config.audit_failure_policy == "abort":
                 raise AuditWriteError(f"Could not write audit record: {error}") from error
             return None
-        self._previous = event.digest
-        self._anchor(event.digest)
         return event
 
-    def _anchor(self, head: str) -> None:
+    def _anchor(self, previous: str, head: str) -> None:
         """Record how long the trail is now, beside it.
 
         Best effort and deliberately not fatal: the record itself is already written, and
@@ -296,26 +336,29 @@ class AuditLog:
         Beside the trail rather than outside the workspace, because nothing outside the
         workspace is touched. That places it under the same permissions as the trail, which
         is why this guards against loss and not against a person (ADR-049).
+
+        **Counted from itself when it describes the record just before**, which it always
+        does once writers take turns: one more than it said. It recounted the whole trail on
+        every record - 164 of the 199 milliseconds a record took on the thesis's trail of
+        8.6 MB - and still recounts when it is missing or says something else (ADR-109).
         """
+        beside = self._path.with_suffix(ANCHOR_SUFFIX)
         try:
-            lines = sum(1 for line in self._path.read_text(encoding="utf-8").splitlines() if line)
-            self._path.with_suffix(ANCHOR_SUFFIX).write_text(
-                json.dumps({"records": lines, "head": head}) + chr(10), encoding="utf-8"
+            said = json.loads(beside.read_text(encoding="utf-8"))
+            known = int(said["records"]) if said.get("head") == previous else None
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            known = None
+        try:
+            if known is None:
+                text = self._path.read_text(encoding="utf-8")
+                records = sum(1 for line in text.splitlines() if line)
+            else:
+                records = known + 1
+            beside.write_text(
+                json.dumps({"records": records, "head": head}) + chr(10), encoding="utf-8"
             )
         except OSError:
             return
-
-    def _head_digest(self) -> str:
-        """The digest the next record links to: the last one written, or genesis.
-
-        Read from the file the first time, so a chain survives LACC being closed and
-        reopened; kept in memory afterwards. A trail that started a fresh chain on every
-        launch would be a chain in name only.
-        """
-        if self._previous is not None:
-            return self._previous
-        self._previous = _last_digest(self._path)
-        return self._previous
 
     def _filter_detail(self, detail: dict[str, Any]) -> dict[str, Any]:
         """Drop content fields unless the configured level is ``full``.
@@ -328,19 +371,103 @@ class AuditLog:
         return {key: value for key, value in detail.items() if key not in _CONTENT_KEYS}
 
 
+_FIRST_TAIL = 64 * 1024
+"""Bytes read from the end of the trail first, when looking for its last record."""
+
+
 def _last_digest(path: Path) -> str:
-    """The digest of the last record in ``path``, or genesis when there is none."""
+    """The digest of the last readable record in ``path``, or genesis when there is none.
+
+    Read from the end, because this runs before every record and the thesis's trail is
+    megabytes long. A record under `full` can be a hundred kilobytes, so the read widens until
+    it holds a whole line; the first line of a read that starts mid-file may be cut, and is
+    never taken for a record.
+    """
     try:
-        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
+        with path.open("rb") as handle:
+            size = handle.seek(0, os.SEEK_END)
+            span = _FIRST_TAIL
+            while True:
+                start = max(0, size - span)
+                handle.seek(start)
+                lines = handle.read(size - start).split(b"\n")
+                for line in reversed(lines if start == 0 else lines[1:]):
+                    if not line.strip():
+                        continue
+                    try:
+                        recorded = AuditEvent.model_validate_json(line)
+                    except ValueError:
+                        continue
+                    return recorded.digest or GENESIS_DIGEST
+                if start == 0:
+                    return GENESIS_DIGEST
+                span *= 4
     except OSError:
         return GENESIS_DIGEST
-    for line in reversed(lines):
+
+
+LOCK_SUFFIX = ".lock"
+"""The file beside the trail that writers take turns at: `audit.lock` next to `audit.jsonl`."""
+
+_WAIT_SECONDS = 10.0
+"""How long a writer waits for its turn before its record fails like any failed write."""
+
+_TURNS: dict[str, threading.Lock] = {}
+_TURNS_GUARD = threading.Lock()
+
+
+def _turn_among_threads(path: Path) -> threading.Lock:
+    """The lock this program's own threads take turns at, one per trail."""
+    with _TURNS_GUARD:
+        return _TURNS.setdefault(str(path), threading.Lock())
+
+
+def _take(path: Path, writing: bool) -> int | None:
+    """Take this trail's turn among programs, and give the lock's descriptor.
+
+    ``None`` when a reader could not have it: there is no lock file - nobody has written here
+    since writers began taking turns, and a reader must not create one - or another program
+    kept it past the wait. A writer that cannot have it raises, as any failed write does.
+    """
+    flags = os.O_RDWR | (os.O_CREAT if writing else 0)
+    try:
+        descriptor = os.open(path.with_suffix(LOCK_SUFFIX), flags)
+    except OSError:
+        if writing:
+            raise
+        return None
+    deadline = time.monotonic() + _WAIT_SECONDS
+    while not _lock(descriptor):
+        if time.monotonic() > deadline:
+            os.close(descriptor)
+            if writing:
+                raise OSError(
+                    f"{path.name} was held by another writer for {_WAIT_SECONDS:.0f} seconds"
+                )
+            return None
+        time.sleep(0.01)
+    return descriptor
+
+
+@contextmanager
+def _turn(path: Path, writing: bool) -> Iterator[None]:
+    """This trail's turn: first among this program's threads, then among programs (ADR-109).
+
+    A writer reads the head and appends inside it, so no two writers chain to the same record.
+    A reader takes it too, so it never reads a record half written - which would look exactly
+    like a trail that cannot be read past that point - and reads anyway when it cannot have it:
+    a `verify` that gave up would be a `verify` that cannot answer.
+    """
+    with _turn_among_threads(path):
+        descriptor = _take(path, writing)
         try:
-            recorded = AuditEvent.model_validate_json(line)
-        except ValueError:
-            continue
-        return recorded.digest or GENESIS_DIGEST
-    return GENESIS_DIGEST
+            yield
+        finally:
+            if descriptor is not None:
+                try:
+                    _unlock(descriptor)
+                finally:
+                    os.close(descriptor)
 
 
 class ChainCheck(BaseModel):
@@ -401,7 +528,8 @@ def walk(path: Path) -> Walked:
     it reported before: the first unreadable line or the first break, whichever comes first.
     """
     try:
-        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
+        with _turn(path, writing=False):
+            lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
     except OSError:
         return Walked(
             chain=ChainCheck(intact=False, records=0, unreadable_at=1), exists=path.exists()
@@ -507,18 +635,21 @@ def check_anchor(path: Path) -> AnchorCheck:
     alarm about this project's own history.
     """
     anchor = path.with_suffix(ANCHOR_SUFFIX)
-    try:
-        remembered = json.loads(anchor.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return AnchorCheck()
-    try:
-        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
-    except OSError:
-        lines = []
+    # The anchor and the trail read in one turn, so a record written between the two reads
+    # cannot make them disagree (ADR-109).
+    with _turn(path, writing=False):
+        try:
+            remembered = json.loads(anchor.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return AnchorCheck()
+        try:
+            lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
+        except OSError:
+            lines = []
+        actual_head = _last_digest(path)
 
     expected = int(remembered.get("records", 0))
     head = str(remembered.get("head", ""))
-    actual_head = _last_digest(path)
     return AnchorCheck(
         present=True,
         agrees=len(lines) == expected and actual_head == head,

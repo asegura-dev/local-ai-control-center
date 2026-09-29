@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
+import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -11,12 +16,15 @@ from pydantic import ValidationError
 
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.workspace import Workspace
+from local_ai_control_center.system import audit
 from local_ai_control_center.system.audit import (
     AUDIT_FILENAME,
     GENESIS_DIGEST,
+    LOCK_SUFFIX,
     AuditLog,
     AuditWriteError,
     ChainCheck,
+    check_anchor,
     digest_of,
     digest_of_file,
     walk,
@@ -428,3 +436,117 @@ def test_a_count_cannot_take_the_key_of_the_question_itself(tmp_path: Path) -> N
     """A count named `question` would be overwritten by the words, and dropped with them."""
     with pytest.raises(ValueError, match="question"):
         _log(tmp_path).embedded("r", "ask_corpus", "m", "h", {"question": 1}, "which model")
+
+
+# --- one chain, however many writers (ADR-109) ---------------------------------------------
+
+
+def test_two_logs_on_one_trail_keep_one_chain(tmp_path: Path) -> None:
+    """The window's Send records across its wait; a Prepare records its ranking meanwhile.
+
+    Before ADR-109 the second record from Send chained to its own last record rather than to
+    the ranking's, and the chain broke at the fourth record.
+    """
+    send = _log(tmp_path)
+    send.record("send", "run_started", "Starting ask_corpus")
+    prepare = _log(tmp_path)
+    prepare.record("rank", "run_started", "Starting rank_by_meaning")
+    prepare.record("rank", "run_finished", "Finished rank_by_meaning")
+    send.record("send", "provider_called", "Called the engine")
+    chain = walk(send.path).chain
+    assert chain.intact, f"broken at record {chain.broken_at}"
+    assert chain.records == 4
+
+
+def test_four_threads_keep_one_chain(tmp_path: Path) -> None:
+    logs = [_log(tmp_path) for _ in range(4)]
+
+    def write(log: AuditLog, name: str) -> None:
+        for number in range(25):
+            log.record(name, "run_started", f"{name} {number}")
+
+    threads = [
+        threading.Thread(target=write, args=(log, f"thread-{index}"))
+        for index, log in enumerate(logs)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    chain = walk(logs[0].path).chain
+    assert chain.intact, f"broken at record {chain.broken_at}"
+    assert chain.records == 100
+
+
+_ANOTHER_PROGRAM = """
+import time
+from pathlib import Path
+from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.workspace import Workspace
+from local_ai_control_center.system.audit import AuditLog
+root = Path({root!r})
+log = AuditLog(Workspace.ensure(root), Config(workspace_root=root))
+Path({ready!r}).write_text("ready", encoding="utf-8")
+while not Path({go!r}).exists():
+    time.sleep(0.01)
+for number in range(40):
+    log.record("there", "run_started", f"there {{number}}")
+"""
+
+
+def test_a_second_program_keeps_the_same_chain(tmp_path: Path) -> None:
+    """A terminal and the window on one workspace: another process, one trail."""
+    ready, go = tmp_path / "ready", tmp_path / "go"
+    script = _ANOTHER_PROGRAM.format(root=str(tmp_path), ready=str(ready), go=str(go))
+    child = subprocess.Popen([sys.executable, "-c", script])
+    deadline = time.monotonic() + 60
+    while not ready.exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    go.write_text("go", encoding="utf-8")
+    log = _log(tmp_path)
+    for number in range(40):
+        log.record("here", "run_started", f"here {number}")
+    assert child.wait(timeout=60) == 0
+    chain = walk(log.path).chain
+    assert chain.intact, f"broken at record {chain.broken_at}"
+    assert chain.records == 80
+
+
+def test_the_head_is_found_past_a_record_longer_than_the_first_read(tmp_path: Path) -> None:
+    """The head is read from the end of the trail; a record under `full` can be a hundred
+    kilobytes, so the read has to widen until it holds a whole line."""
+    log = _log(tmp_path, audit_level="full")
+    log.record("big", "provider_called", "called", {"prompt": "p" * 300_000})
+    log.record("next", "run_finished", "finished")
+    assert walk(log.path).chain.intact
+
+
+def test_writers_take_their_turn_at_a_lock_beside_the_trail(tmp_path: Path) -> None:
+    log = _log(tmp_path)
+    log.record("r", "run_started", "started")
+    assert log.path.with_suffix(LOCK_SUFFIX).exists()
+
+
+def test_a_reader_never_creates_the_lock(tmp_path: Path) -> None:
+    """A reader that created a file would be a reader that writes."""
+    Workspace.ensure(tmp_path)
+    trail = tmp_path / AUDIT_FILENAME
+    walk(trail)
+    check_anchor(trail)
+    assert not trail.with_suffix(LOCK_SUFFIX).exists()
+
+
+def test_a_writer_that_cannot_have_its_turn_fails_like_any_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another program holding the turn past the wait: the record fails under the policy."""
+    monkeypatch.setattr(audit, "_WAIT_SECONDS", 0.3)
+    log = _log(tmp_path, audit_failure_policy="abort")
+    held = audit._take(log.path, writing=True)
+    assert held is not None
+    try:
+        with pytest.raises(AuditWriteError, match="another writer"):
+            log.record("r", "run_started", "started")
+    finally:
+        audit._unlock(held)
+        os.close(held)

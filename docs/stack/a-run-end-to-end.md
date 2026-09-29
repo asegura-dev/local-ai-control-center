@@ -63,7 +63,8 @@ of a few pages (`run_in_passes`, ADR-045). Whole:
    `revision_written` or `revision_declined` (ADR-025, ADR-039).
 
 Every event is appended to `audit.jsonl`, chained to the one before it, and the anchor beside
-it is updated (`system/audit.py`).
+it is updated (`system/audit.py`) - reading the head and appending in one turn that every
+writer takes, so the window and a terminal writing at once still leave one chain (ADR-109).
 
 ## 3. After: what you are told (`cli.py`)
 

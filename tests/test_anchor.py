@@ -97,6 +97,32 @@ def test_something_appended_behind_lacc_is_noticed(tmp_path: Path) -> None:
     assert found.found_records > found.expected_records
 
 
+def test_an_anchor_that_describes_another_head_is_counted_again(tmp_path: Path) -> None:
+    """It counts from itself only when its head is the record just chained to; a stale one
+    is corrected by counting the trail, never added to (ADR-109)."""
+    audit = _trail(tmp_path, records=3)
+    anchor = audit.path.with_suffix(ANCHOR_SUFFIX)
+    anchor.write_text(json.dumps({"records": 99, "head": "0" * 64}) + NL, encoding="utf-8")
+    audit.record("run-later", "run_finished", "one more", {})
+    found = check_anchor(audit.path)
+    assert found.agrees
+    assert found.expected_records == 4
+
+
+def test_something_appended_behind_lacc_stays_noticed_after_lacc_writes_again(
+    tmp_path: Path,
+) -> None:
+    """Recounting the whole trail on every record took the foreign line into the count, and
+    the next record LACC wrote made the anchor agree with it. Counting from itself does not."""
+    audit = _trail(tmp_path, records=3)
+    with audit.path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"kind": "run_started", "message": "not from LACC"}) + NL)
+    audit.record("run-later", "run_finished", "one more", {})
+    found = check_anchor(audit.path)
+    assert not found.agrees
+    assert found.found_records == found.expected_records + 1
+
+
 def test_an_anchor_that_cannot_be_written_does_not_fail_the_run(tmp_path: Path) -> None:
     """The record is already written; failing for the note about it trades the wrong way."""
     workspace = Workspace.ensure(tmp_path)

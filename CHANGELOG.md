@@ -25,6 +25,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **Two writers could break the trail's chain** (ADR-109). A log read the last record's digest
+  once and remembered it, so when two wrote to one trail - the window's Send across its wait
+  and a Prepare that ranked meanwhile (ADR-108), two corpora asked at once, a terminal beside
+  the window - the second chained to a record that was no longer last, and `verify` would have
+  called it tampering. Shown by a test before the fix, broken at the fourth record. Each record
+  now reads the head from the end of the trail in the same turn as it appends; threads take
+  turns at a lock and programs at `audit.lock`, a new empty file beside the trail. Readers take
+  the same turn, so none reads a record half written, and never create the lock. The thesis's
+  trail was intact: 2,092 records, and the anchor agrees. **A record costs 16 ms, not 199**:
+  measured on a copy of that trail, 164 ms of every record were the anchor recounting 8.6 MB,
+  and it now counts from itself - which also stops it forgiving a line appended behind LACC's
+  back once LACC writes again.
 - **The ranking's calls to embed were recorded nowhere** (ADR-108). A ranking by meaning is now
   a run of its own, `rank_by_meaning`, recorded the moment it reaches the engine - in `ask`,
   `measure`, the window and `sections --about` - because it has its own agreement and is often

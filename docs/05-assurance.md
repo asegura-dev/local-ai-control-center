@@ -14,8 +14,9 @@ unreleased work, row by row against the source** - and five rows that had read *
 false. Three were fixed the same day (ADR-105); the rest are marked below. On 28-sep ADR-106
 closed the gap about preparing a question, and the reading that closed it moved one more row
 - the window never freezing - to a gap; ADR-107 closed the one about four commands that left
-no record, and ADR-108 the one about calls to embed. A row here is true on the day it was
-checked and needs re-checking like any other measurement.
+no record, and ADR-108 the one about calls to embed. Planning the next change found one that
+no row had named - two writers could break the chain - and ADR-109 closed it the same day. A
+row here is true on the day it was checked and needs re-checking like any other measurement.
 
 ## Cybersecurity
 
@@ -26,7 +27,7 @@ checked and needs re-checking like any other measurement.
 | A command reads and writes only inside the workspace | Every read in the cycle - three routes - resolves through `workspace.resolve_within`, and every result is written inside it. **Two exceptions, deliberate and both in the window, both shown before they happen**: Configuration rewrites a configuration file, and Workspaces creates a new configuration and a folder for it wherever it is asked to (ADR-093, ADR-094). This row read "nothing outside the workspace is touched" until 27-sep | **held, with two exceptions** |
 | `..`, symlinks and absolute paths are refused | `resolve_within` resolves the path - following links - and refuses what lands outside; `..`, absolute paths and Windows reserved device names are each tested (ADR-017). A link is refused by the same resolution and **no test tries one** | **held by test, links held** |
 | Results go only to new files | Every result a command writes goes through `write_new_file`, which opens with `"x"`. One exception by the letter: coverage's `.reaches.json`, written plainly beside a report that was itself refused if present. What LACC rewrites is its own - the registry's answers, the vectors, the notes of an established DOI, the audit's anchor, the window's preferences - and the configuration, from Configuration only (ADR-039, ADR-094). Every place is in `docs/stack/files-on-disk.md` | **held** |
-| Every place LACC writes is listed | `docs/stack/files-on-disk.md`, read on 27-sep from every write in the source: twelve places. This row read "writing happens in three places only", which had not been true since the registry's answers were first kept | **held** |
+| Every place LACC writes is listed | `docs/stack/files-on-disk.md`, read on 27-sep from every write in the source: twelve places, and a thirteenth since ADR-109 - the lock beside the trail. This row read "writing happens in three places only", which had not been true since the registry's answers were first kept | **held** |
 | Only hosts the configuration names are reached | `ollama_host()` refuses any non-loopback host; a remote engine needs `network_access` **and** an address written in the YAML | **held by test** |
 | An environment variable can never widen reach | `OLLAMA_HOST` is honoured only when it resolves to loopback, and refused otherwise | **held** |
 | A `.env` cannot override a variable already set | The loader writes only where the name is absent from the environment | **held** |
@@ -49,8 +50,9 @@ checked and needs re-checking like any other measurement.
 | Content only under `audit_level: full` | The filter drops `prompt`, `completion`, `question` and `dois` at any other level; a question keeps its digest, and a list of DOIs its count. **Until ADR-105, every question to a corpus was kept word for word under the default level** - nothing had told the filter it was content. Trails written before keep what they kept | **held by test** |
 | A refusal is recorded, not only a success | `run_refused` carries the missing capabilities and the out-of-bounds paths. The first is asserted; the second only through the outcome | **held by test, the paths held** |
 | The trail cannot be altered unnoticed | Hash chain, checked by `lacc verify` and by the window's Audit section as it reads (ADR-023, ADR-043, ADR-104) | **held by test** |
+| Two writers keep one chain | Each record reads the head in the same turn as it appends, never from memory, and writers take turns - threads at a lock, programs at `audit.lock` beside the trail; readers take the same turn, so none reads a record half written. **Until ADR-109 a log remembered the head**, and the window's Send and a Prepare that ranked meanwhile would have broken the chain - shown by a test before the fix, at the fourth record. Tested with two logs interleaved, four threads, and a second process | **held by test** |
 | What was done can be read, and not changed | The Audit section lists the latest 300 runs of the workspace's trail - the heading gives the total - and every record of each; the trail is append-only and the section has no control that writes (ADR-104). No test checks that a section cannot write: views are checked only for what they import | **held; the reading by test** |
-| Records removed from the end are noticed | The anchor beside the trail (ADR-049), tested. A notification carries the trail's length and head when an anchor exists, which is not tested | **held by test, the notification held** |
+| Records removed from the end are noticed | The anchor beside the trail (ADR-049), tested. A notification carries the trail's length and head when an anchor exists, which is not tested. Since ADR-109 the anchor counts from itself, so a line appended behind LACC's back stays noticed after LACC writes again - recounting had taken it into the count | **held by test, the notification held** |
 | Which file was read is recoverable | `files_read` carries the path **and the SHA-256 of its contents** | **held** |
 | Which reading got which verdict is recoverable | `readings_judged` carries a row per reading: the digests of the quotation, the claim, and what was asked | **held** |
 | Reasoning is counted, never kept | `provider_called` records how many characters an engine spent reasoning and never the reasoning; an unset `thinking` sends nothing (ADR-098) | **held by test** |
@@ -104,8 +106,8 @@ read *held* and were not:
 - **"Nothing outside the workspace is touched"** had stopped being true when the window began
   to write configurations and make workspaces (ADR-093, ADR-094). Those were decided, and shown
   before they happen; the row was what had not followed. Restated above.
-- **"Writing happens in three places only"** - it is twelve, listed in
-  `docs/stack/files-on-disk.md`.
+- **"Writing happens in three places only"** - it was twelve, listed in
+  `docs/stack/files-on-disk.md`; thirteen since ADR-109.
 
 And one found by the same reading: **preparing a question embedded it** when `embedding_model`
 was set, so the question reached the engine before the preview that asked whether to send it.

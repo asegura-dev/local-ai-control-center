@@ -36,6 +36,7 @@ written beside a new report - but a stray `.reaches.json` of the same name would
 |---|---|---|
 | `audit.jsonl` | The trail: one record per event, each chained to the one before (ADR-006, ADR-023) | Appended to, never rewritten |
 | `audit.anchor` | How long the trail is and how it ends (ADR-049) | After every record |
+| `audit.lock` | Nothing. Writers take turns at it, so two - the window's threads, a terminal beside the window - never chain to the same record (ADR-109) | Created by the first record written; never removed, and never created by a reader |
 | `<bibliography>.registry.json`, `identified.registry.json` | Every answer the registry gave, so no DOI is asked twice (ADR-067) | After `resolve` or `identify` asks |
 | `<corpus>.vectors` | The embeddings of a corpus's passages, beside it (ADR-061) | When passages without one are embedded |
 | `<document>.doi.json` | The DOI a person established for a document (ADR-087) | When you confirm one with `identify --doi` |
