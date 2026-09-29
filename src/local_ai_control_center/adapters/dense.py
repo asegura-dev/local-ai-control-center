@@ -19,7 +19,7 @@ from pathlib import Path
 from local_ai_control_center.adapters.vectors import key_for, remember, remembered
 from local_ai_control_center.core.budget import estimate_tokens
 from local_ai_control_center.ports.embedder import Embedder
-from local_ai_control_center.ports.retriever import Passage, Retriever, Selection
+from local_ai_control_center.ports.retriever import Outgoing, Passage, Retriever, Selection
 
 _FUSION_CONSTANT = 60
 """The `k` of Reciprocal Rank Fusion, from the paper that published it.
@@ -68,6 +68,15 @@ class DenseRetriever(Retriever):
         scored.sort(key=lambda pair: (-pair[0], pair[1]))
         return [index for _, index in scored]
 
+    def would_send(self, passages: tuple[Passage, ...]) -> Outgoing:
+        """The question, and every passage with no stored vector - counted, not sent.
+
+        Counted by the same function that decides what `vectors_for` embeds, so what a
+        preview announces and what a ranking then sends cannot differ (ADR-106).
+        """
+        _, _, missing = self._unstored(passages)
+        return Outgoing(model=self._embedder.name, unembedded=len(missing))
+
     def vectors_for(self, passages: tuple[Passage, ...]) -> list[tuple[float, ...]]:
         """The unit vector of every passage, embedding only what is not already known.
 
@@ -76,11 +85,7 @@ class DenseRetriever(Retriever):
         a second copy of "compute what is missing, reuse the rest, rewrite the whole cache"
         is a second thing to keep true (ADR-088).
         """
-        known = remembered(self._cache, self._embedder.name) if self._cache else {}
-        keys = [key_for(passage.text) for passage in passages]
-        missing = tuple(
-            passage.text for passage, key in zip(passages, keys, strict=True) if key not in known
-        )
+        known, keys, missing = self._unstored(passages)
         if missing:
             fresh = self._embedder.embed(missing)
             for text, vector in zip(missing, fresh, strict=True):
@@ -90,6 +95,17 @@ class DenseRetriever(Retriever):
                 # and writing only the additions would lose the rest.
                 remember(self._cache, self._embedder.name, known)
         return [known[key] for key in keys]
+
+    def _unstored(
+        self, passages: tuple[Passage, ...]
+    ) -> tuple[dict[str, tuple[float, ...]], list[str], tuple[str, ...]]:
+        """What is stored already, the key of every passage, and the texts not stored yet."""
+        known = remembered(self._cache, self._embedder.name) if self._cache else {}
+        keys = [key_for(passage.text) for passage in passages]
+        missing = tuple(
+            passage.text for passage, key in zip(passages, keys, strict=True) if key not in known
+        )
+        return known, keys, missing
 
 
 class FusedRetriever(Retriever):
@@ -104,6 +120,20 @@ class FusedRetriever(Retriever):
     def name(self) -> str:
         """Name both, because what a fusion chose is not explained by either alone."""
         return f"{self._first.name} + {self._second.name}, fused by rank"
+
+    def would_send(self, passages: tuple[Passage, ...]) -> Outgoing | None:
+        """What either half would send. Only one of them reaches an engine in practice."""
+        sending = [
+            outgoing
+            for outgoing in (self._first.would_send(passages), self._second.would_send(passages))
+            if outgoing is not None
+        ]
+        if len(sending) < 2:
+            return sending[0] if sending else None
+        return Outgoing(
+            model=" and ".join(outgoing.model for outgoing in sending),
+            unembedded=sum(outgoing.unembedded for outgoing in sending),
+        )
 
     def select(self, question: str, passages: tuple[Passage, ...], budget_tokens: int) -> Selection:
         """Rank by both, sum the inverse positions, and fill the budget from the top.

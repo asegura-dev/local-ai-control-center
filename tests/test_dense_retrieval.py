@@ -204,3 +204,37 @@ def test_an_empty_corpus_is_not_an_error() -> None:
     selection = DenseRetriever(_Bench(_TABLE)).select(_ASKED, (), 10_000)
     assert selection.chosen == ()
     assert selection.considered == 0
+
+
+# --- what would be sent, known before it is (ADR-106) -------------------------------------
+
+
+def test_what_meaning_would_send_is_counted_without_sending_it(tmp_path: Path) -> None:
+    """A preview is drawn from this, so counting must cost no call to the engine."""
+    cache = tmp_path / ("corpus.md" + SUFFIX)
+    DenseRetriever(_Bench(_TABLE), cache).select(_ASKED, _PASSAGES[:1], 10_000)
+
+    bench = _Bench(_TABLE)
+    outgoing = DenseRetriever(bench, cache).would_send(_PASSAGES)
+    assert bench.asked == [], "counting sent nothing"
+    assert outgoing.model == "bench"
+    assert outgoing.unembedded == 1, "one passage is stored and the other is not"
+
+
+def test_what_is_announced_is_what_is_then_sent(tmp_path: Path) -> None:
+    """Counted by the function that decides what is embedded, so the two cannot drift."""
+    bench = _Bench(_TABLE)
+    retriever = DenseRetriever(bench, tmp_path / ("corpus.md" + SUFFIX))
+    announced = retriever.would_send(_PASSAGES).unembedded
+    retriever.select(_ASKED, _PASSAGES, 10_000)
+    sent = [text for batch in bench.asked for text in batch if text != _ASKED]
+    assert len(sent) == announced == 2
+
+
+def test_words_send_nothing_and_a_fusion_sends_what_its_meaning_half_does() -> None:
+    assert WordRetriever().would_send(_PASSAGES) is None
+    fused = FusedRetriever(WordRetriever(), DenseRetriever(_Bench(_TABLE)))
+    outgoing = fused.would_send(_PASSAGES)
+    assert outgoing is not None
+    assert outgoing.model == "bench"
+    assert outgoing.unembedded == 2, "with no store at all, every passage would go"

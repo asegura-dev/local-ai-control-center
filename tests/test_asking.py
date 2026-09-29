@@ -19,9 +19,16 @@ from local_ai_control_center.core.grounding import CheckedClaim, Claim
 from local_ai_control_center.core.skill import AskCorpusSkill
 from local_ai_control_center.core.workspace import Workspace
 from local_ai_control_center.cycle import answer_prepared
-from local_ai_control_center.features.ask import Asked, Prepared, prepare, readings_from
+from local_ai_control_center.features.ask import (
+    Asked,
+    Prepared,
+    before_preparing,
+    prepare,
+    ranking_would_send,
+    readings_from,
+)
 from local_ai_control_center.ports.provider import Completion, Provider, ProviderError
-from local_ai_control_center.ports.retriever import Passage, Retriever, Selection
+from local_ai_control_center.ports.retriever import Outgoing, Passage, Retriever, Selection
 from local_ai_control_center.system.audit import AUDIT_FILENAME, AuditLog
 
 CORPUS = """# Collected quotations
@@ -103,6 +110,28 @@ class _Broken(Retriever):
 
     def select(self, question: str, passages: tuple[Passage, ...], budget_tokens: int) -> Selection:
         raise RuntimeError("bge-m3 is not pulled on that host.")
+
+    def would_send(self, passages: tuple[Passage, ...]) -> None:
+        return None
+
+
+class _Meaning(Retriever):
+    """A ranking that reaches an engine, and remembers every question it was made to rank."""
+
+    def __init__(self, unembedded: int) -> None:
+        self.unembedded = unembedded
+        self.ranked: list[str] = []
+
+    @property
+    def name(self) -> str:
+        return "meaning (a stand-in)"
+
+    def would_send(self, passages: tuple[Passage, ...]) -> Outgoing:
+        return Outgoing(model="ollama:bge-m3", unembedded=self.unembedded)
+
+    def select(self, question: str, passages: tuple[Passage, ...], budget_tokens: int) -> Selection:
+        self.ranked.append(question)
+        return WordRetriever().select(question, passages, budget_tokens)
 
 
 class _Refuses(Provider):
@@ -191,6 +220,75 @@ def test_the_preview_names_the_host_it_would_reach_when_the_network_is_on() -> N
     config = _config(network_access=True, engine_host="http://desk:11434")
     made = prepare("pelvic lymph node", "corpus.md", CORPUS, config, WordRetriever())
     assert "desk" in made.reaches
+
+
+# --- what a ranking may send, before it sends anything (ADR-106) ----------------------------
+
+
+def test_a_ranking_that_reaches_the_engine_waits_for_somebody_to_agree() -> None:
+    """The question used to be embedded before the preview that asked whether to send it."""
+    meaning = _Meaning(unembedded=0)
+    config = _config(network_access=True, engine_host="http://desk:11434")
+    made = prepare("pelvic lymph node", "corpus.md", CORPUS, config, meaning)
+    assert meaning.ranked == [], "nothing was ranked, so nothing was sent"
+    assert not made.sendable
+    assert made.awaiting is not None
+    assert "your question" in made.asks
+    assert "ollama:bge-m3" in made.asks
+    assert "desk" in made.asks
+
+
+def test_agreeing_to_the_question_alone_ranks_when_nothing_else_would_go() -> None:
+    meaning = _Meaning(unembedded=0)
+    made = prepare("pelvic lymph node", "corpus.md", CORPUS, _config(), meaning, agreed=0)
+    assert meaning.ranked == ["pelvic lymph node"]
+    assert made.sendable
+    assert made.awaiting is None
+
+
+def test_the_question_alone_does_not_cover_quotations_never_embedded() -> None:
+    """A press of Prepare agrees to the question. A corpus's worth of quotations is more."""
+    meaning = _Meaning(unembedded=3)
+    made = prepare("pelvic lymph node", "corpus.md", CORPUS, _config(), meaning, agreed=0)
+    assert meaning.ranked == []
+    assert made.awaiting is not None
+    assert made.awaiting.unembedded == 3
+    assert "your question and 3 quotations never embedded before" in made.asks
+
+
+def test_agreement_covers_what_was_shown_and_not_more() -> None:
+    """Two were shown and the corpus grew to three before the press: three are asked about."""
+    meaning = _Meaning(unembedded=3)
+    shown_fewer = prepare("pelvic lymph node", "corpus.md", CORPUS, _config(), meaning, agreed=2)
+    assert meaning.ranked == []
+    assert shown_fewer.awaiting is not None
+    shown_all = prepare("pelvic lymph node", "corpus.md", CORPUS, _config(), meaning, agreed=3)
+    assert shown_all.sendable
+
+
+def test_ranking_by_words_needs_no_agreement() -> None:
+    """It never leaves this machine, so there is nothing to agree to."""
+    made = prepare("pelvic lymph node", "corpus.md", CORPUS, _config(), WordRetriever())
+    assert made.awaiting is None
+    assert made.asks == ""
+    assert made.sendable
+
+
+def test_one_quotation_is_counted_in_the_singular() -> None:
+    sentence = ranking_would_send(Outgoing(model="m", unembedded=1), "this machine only")
+    assert "your question and 1 quotation never embedded before to m" in sentence
+
+
+def test_the_line_beside_prepare_names_what_pressing_it_sends() -> None:
+    """The preview of what Prepare sends, drawn before it is pressed."""
+    config = _config(embedding_model="bge-m3", network_access=True, engine_host="http://desk:11434")
+    line = before_preparing(config)
+    assert "your question" in line
+    assert "bge-m3" in line
+    assert "desk" in line
+    words_only = before_preparing(_config())
+    assert "on this machine" in words_only
+    assert "bge-m3" not in words_only
 
 
 # --- what comes back ------------------------------------------------------------------------

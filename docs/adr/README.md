@@ -260,7 +260,7 @@ A context file the user writes, used only by skills that declare it. The load-be
 
 [`ADR-042-what-unverified-was-actually-counting.md`](ADR-042-what-unverified-was-actually-counting.md)
 
-A check has three outcomes and LACC reported two, so quotations that were in the document were tallied as failures. Separates whether a quotation is real from whether LACC could place it. **Its corpus figures were wrong and are corrected in the ADR (48 of 237 absent, not zero).** Separates whether a quotation is real from whether LACC could place it, and locates passages running across a page break. The fourth time in one session that a limit of this project was reported as the model's dishonesty.
+A check has three outcomes and LACC reported two, so quotations that were in the document were tallied as failures. Separates whether a quotation is real from whether LACC could place it. **Its corpus figures were wrong and are corrected in the ADR (48 of 237 absent, not zero)** - and corrected again on 28 September: 42 with today's checker, six of the 48 being line breaks a model wrote as `\n`. Separates whether a quotation is real from whether LACC could place it, and locates passages running across a page break. The fourth time in one session that a limit of this project was reported as the model's dishonesty.
 
 ### 043 - what the chain does not catch
 
@@ -544,7 +544,7 @@ Forty DOIs resolved to nothing and none was a work that does not exist: three we
 
 [`ADR-085-a-window-that-runs-one-thing.md`](ADR-085-a-window-that-runs-one-thing.md)
 
-Reverses the first sentence of ADR-069, which said the window reads and runs nothing. One command runs from it now - `ask`, against a corpus already there - because it is the only action this program takes that leaves the workspace exactly as it found it. **The preview is not a dialog, it is what produces the button**: the control that sends is created by the drawing of what would be sent, so there is no path from typing to an engine call that skips it. The call runs on a worker thread that touches no widget and the window polls a queue with `after`; cancelling stops the window waiting and says plainly that the engine was not told. First real run: 214 of 777 passages, an answer in 28 seconds, 2 of 2 quotations found in what was sent - and the waiting text's "about forty seconds" was a figure written from memory, now replaced with the measured one.
+Reverses the first sentence of ADR-069, which said the window reads and runs nothing. One command runs from it now - `ask`, against a corpus already there - because it is the only action this program takes that leaves the workspace exactly as it found it. **The preview is not a dialog, it is what produces the button**: the control that sends is created by the drawing of what would be sent, so there is no path from typing to an engine call that skips it. The call runs on a worker thread that touches no widget and the window polls a queue with `after`; cancelling stops the window waiting and says plainly that the engine was not told. First real run: 214 of 777 passages, an answer in 28 seconds, 2 of 2 quotations found in what was sent - and the waiting text's "about forty seconds" was a figure written from memory, now replaced with the measured one. Corrected by ADR-106: with an embedding model, Prepare itself sent the question to be ranked, before any preview.
 
 
 ### 086 - a variable is not a call
@@ -673,4 +673,10 @@ The program says everything significant it does is audited, and the only way to 
 
 [`ADR-105-three-promises-the-code-had-stopped-keeping.md`](ADR-105-three-promises-the-code-had-stopped-keeping.md)
 
-Bringing the documentation up to date meant checking each promise in the assurance chapter against the code, and three were broken: the default audit level kept every question word for word, `review` defaulted to yes, and `coverage` sent to be embedded before asking. Each is fixed, each with a test that fails on the old behaviour. Two larger gaps are named in the record and in the chapter rather than hidden: embedding a question before its preview, and four commands that leave no record.
+Bringing the documentation up to date meant checking each promise in the assurance chapter against the code, and three were broken: the default audit level kept every question word for word, `review` defaulted to yes, and `coverage` sent to be embedded before asking. Each is fixed, each with a test that fails on the old behaviour. Two larger gaps are named in the record and in the chapter rather than hidden: embedding a question before its preview, and four commands that leave no record. The first is closed by ADR-106.
+
+### 106 - ranking by meaning asks before it reaches the engine
+
+[`ADR-106-ranking-by-meaning-asks-before-it-reaches-the-engine.md`](ADR-106-ranking-by-meaning-asks-before-it-reaches-the-engine.md)
+
+The preview of a question cannot be drawn without ranking the corpus, and ranking by meaning reaches the engine - so the question went there before anything asked, and the gap was wider than ADR-105 named: the first question to a corpus sent every quotation in it, and `sections --about` sent every section's opening on every run. What ranking would send is now known before it is sent, counted from the vectors already stored, and a retriever must say it: the method is abstract. The terminal asks `Rank by meaning? [y/N]`, and no ranks by words on this machine; the window says what Prepare sends beside the button, the question alone, and quotations never embedded need a button of their own. Agreement covers what was shown and not more. Prepare still waits for the engine on the window's own thread, and the assurance chapter says so.

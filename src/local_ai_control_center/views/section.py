@@ -72,12 +72,17 @@ class State:
     which it is, the way `status` is, rather than a reader of text guessing (ADR-090).
     """
 
-    prepare_question: Callable[[str, str, tuple[Passage, ...]], Prepared] | None = None
+    prepare_question: Callable[[str, str, tuple[Passage, ...], int], Prepared] | None = None
     """Rank a corpus against a question and report what would be sent. Sends no prompt.
 
     The third argument is what a thread has already established - passages whose quotations
-    were checked in earlier turns. Empty for a question asked on its own (ADR-091).
+    were checked in earlier turns. Empty for a question asked on its own (ADR-091). The fourth
+    is what the ranking may send: how many quotations never embedded may go with the question,
+    which is none for a press of Prepare (ADR-106).
     """
+
+    before_preparing: str = ""
+    """What pressing Prepare sends, drawn beside it before it is pressed (ADR-106)."""
 
     ask_engine: Callable[[str], EngineSeen] | None = None
     """Ask one host what it holds and whether it answers. Reaches the network when called.

@@ -120,6 +120,7 @@ class Window(ctk.CTk):
         send_question: Callable[[Prepared], Asked] | None = None,
         context_file: str = "",
         read_trail: Callable[[], Trail] | None = None,
+        before_preparing: str = "",
     ) -> None:
         super().__init__()
         self._pending: str | None = None
@@ -137,6 +138,7 @@ class Window(ctk.CTk):
         self.send_question = send_question
         self.context_file = context_file
         self.read_trail = read_trail
+        self.before_preparing = before_preparing
         self.engine = EngineSeen()
         self.preferences = preferences
         self.saved = saved
@@ -228,6 +230,7 @@ class Window(ctk.CTk):
             context_file=self.context_file,
             ask_engine=self.ask_engine,
             read_trail=self.read_trail,
+            before_preparing=self.before_preparing,
         )
 
     # --- the three columns -----------------------------------------------------------------
@@ -626,6 +629,7 @@ def show(
     send_question: Callable[[Prepared], Asked] | None = None,
     context_file: str = "",
     read_trail: Callable[[], Trail] | None = None,
+    before_preparing: str = "",
 ) -> None:
     """Open the window and hand control to Tk until it closes.
 
@@ -647,4 +651,5 @@ def show(
         send_question,
         context_file,
         read_trail,
+        before_preparing,
     ).mainloop()

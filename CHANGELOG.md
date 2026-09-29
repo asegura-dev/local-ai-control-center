@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **Ranking by meaning sent before it asked** (ADR-106). With `embedding_model` set, preparing
+  a question embedded it before the preview that asks whether to send it - and the first
+  question to a corpus embedded every quotation in it; `sections --about` sent every section's
+  opening on every run and asked nothing. What a ranking would send is now counted from the
+  stored vectors, without sending. `ask`, `measure` and `sections --about` ask
+  `Rank by meaning? [y/N]`, and no ranks by words, on this machine; `review` says it in the
+  question it already asks. In the window a line beside Prepare names what it sends, the
+  question alone, and quotations never embedded get a card and a button of their own. The
+  roadmap still gave the cited figure as 48 of 237; it says 42 now, and that the newer models
+  have been measured once.
 - **The guides and two messages said what the program no longer is.** The example configuration
   documented fourteen of eighteen settings while the first-time guide said it documented every
   one; it documents all of them now, and a test fails when a setting arrives without its line.

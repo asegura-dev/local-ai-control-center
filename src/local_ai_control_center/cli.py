@@ -114,8 +114,11 @@ from local_ai_control_center.features.appearance import (
 from local_ai_control_center.features.ask import (
     Asked,
     Prepared,
+    before_preparing,
     might_support,
     prepare,
+    ranking_would_send,
+    reaching,
 )
 from local_ai_control_center.features.bibliography import as_entry, bibliography
 from local_ai_control_center.features.bibtex import Held, bibtex, held_in
@@ -143,7 +146,7 @@ from local_ai_control_center.features.identity import (
     printed_dois,
 )
 from local_ai_control_center.features.measure import spread
-from local_ai_control_center.features.navigate import ranked
+from local_ai_control_center.features.navigate import ranked, sections_would_send
 from local_ai_control_center.features.prompts import prompts_of
 from local_ai_control_center.features.review import (
     FINDINGS_SUFFIX,
@@ -1590,7 +1593,7 @@ def measure(
     # is the model and not the selection.
     material: str | None = None
     if corpus_file is not None:
-        made = _prepared_or_exit(requests[0], corpus_file, config, workspace)
+        made, _ = _prepared_or_exit(requests[0], corpus_file, config, workspace)
         material = made.material
         plan = _plan_or_exit(resolved, (requests[0],), config)
     preview = preview_action(
@@ -1901,8 +1904,9 @@ def ask(
     """
     config, workspace = _load(config_path)
     audit = AuditLog(workspace, config)
-    made = _prepared_or_exit(question, corpus_file, config, workspace)
-    chosen_by = _retriever_for(config, workspace.resolve_within(corpus_file))
+    # The judge's candidates are ranked by whatever chose the passages: meaning declined for
+    # the question is meaning declined for the readings too (ADR-106).
+    made, chosen_by = _prepared_or_exit(question, corpus_file, config, workspace, judge)
 
     resolved: Skill = AskCorpusSkill()
     if using is not None:
@@ -1986,14 +1990,19 @@ def _retriever_for(config: Config, corpus: Path | None) -> Retriever:
 
 
 def _prepared_or_exit(
-    question: str, corpus_file: Path, config: Config, workspace: Workspace
-) -> Prepared:
+    question: str, corpus_file: Path, config: Config, workspace: Workspace, judge: bool = False
+) -> tuple[Prepared, Retriever]:
     """Rank a corpus against a question, say what was chosen, or exit saying why not.
 
-    **The one path `ask`, `measure` and the window all take.** Three copies of this decision
-    existed - two here and one in the slice - and the rule that should have caught it did
-    not, because one of them mentioned a variable named `corpus` and that is also the name
-    of a command that prints (ADR-086).
+    **The one path `ask` and `measure` take**, and the window reaches the same `prepare`.
+    Three copies of this decision existed - two here and one in the slice - and the rule that
+    should have caught it did not, because one of them mentioned a variable named `corpus`
+    and that is also the name of a command that prints (ADR-086).
+
+    **Ranking by meaning asks first, and no is the default** (ADR-106). It sends the question,
+    and every quotation never embedded, before any preview could exist. No still ranks - by
+    words, on this machine - and the line below says so. Returned with the retriever that
+    chose, so whatever ranks next ranks the same way.
     """
     try:
         resolved = workspace.resolve_within(corpus_file)
@@ -2001,7 +2010,20 @@ def _prepared_or_exit(
     except (ValueError, OSError) as error:
         console.print(f"[red]Cannot read {corpus_file}: {error}[/red]")
         raise typer.Exit(code=1) from error
-    made = prepare(question, corpus_file.name, text, config, _retriever_for(config, resolved))
+    retriever = _retriever_for(config, resolved)
+    made = prepare(question, corpus_file.name, text, config, retriever)
+    if made.awaiting is not None:
+        console.print(made.asks)
+        if judge:
+            console.print(
+                "[dim]With --judge, each reading of the answer is ranked the same way.[/dim]"
+            )
+        if typer.confirm("Rank by meaning?", default=False):
+            agreed = made.awaiting.unembedded
+            made = prepare(question, corpus_file.name, text, config, retriever, agreed=agreed)
+        else:
+            retriever = WordRetriever()
+            made = prepare(question, corpus_file.name, text, config, retriever)
     if made.refusal:
         # Includes a ranking that could not be made: refused rather than quietly falling back
         # to words, because a selection made by a different method is a different answer and
@@ -2012,7 +2034,7 @@ def _prepared_or_exit(
         f"[green]{made.selected} passages selected[/green] of {made.considered}; "
         f"{made.set_aside} set aside. [dim]{made.how}[/dim]"
     )
-    return made
+    return made, retriever
 
 
 def _judge_the_readings(
@@ -2306,6 +2328,11 @@ def review(
         f"[bold]{len(blocks)} paragraphs[/bold] against [bold]{len(passages)} quotations[/bold]: "
         f"about {judgements} judgements, a few seconds each."
     )
+    outgoing = retriever.would_send(passages)
+    if outgoing is not None:
+        # Said before the question it already asks: finding what each paragraph rests on
+        # sends the paragraph, and every quotation never embedded, to be embedded (ADR-106).
+        _show(ranking_would_send(outgoing, reaching(config), sends="each paragraph"))
     # No is the default, as everywhere else an engine is reached. It said yes, and Enter
     # sent a whole draft for judging (ADR-105).
     if not typer.confirm("Read it?", default=False):
@@ -2389,19 +2416,27 @@ def _asking_for_the_window(
     """
     skill = AskCorpusSkill()
 
-    def prepare_one(question: str, corpus: str, carried: tuple[Passage, ...] = ()) -> Prepared:
+    def prepare_one(
+        question: str,
+        corpus: str,
+        carried: tuple[Passage, ...] = (),
+        agreed: int | None = None,
+    ) -> Prepared:
         """Rank a corpus against a question. The prompt is not sent.
 
         ``carried`` is what a thread has already established, and goes in front of what the
         ranking chooses - never the model's own prose, which re-entering a prompt is how an
-        invention would come to verify (ADR-091).
+        invention would come to verify (ADR-091). ``agreed`` is what the ranking may send:
+        the section passes the question alone for a press of Prepare, and more only for the
+        button that named more (ADR-106).
         """
         try:
             path = workspace.resolve_within(Path(corpus))
             text = path.read_text(encoding="utf-8", errors="replace")
         except (ValueError, OSError) as error:
             return Prepared(question=question.strip(), corpus=corpus, refusal=str(error))
-        return prepare(question, corpus, text, config, _retriever_for(config, path), carried)
+        retriever = _retriever_for(config, path)
+        return prepare(question, corpus, text, config, retriever, carried, agreed)
 
     def send_one(prepared: Prepared) -> Asked:
         """Send a question that was previewed. **This never raises**, by contract.
@@ -2484,6 +2519,7 @@ def window(
         *_asking_for_the_window(config, workspace),
         config.context_file or "",
         _trail_for_the_window(config, workspace),
+        before_preparing=before_preparing(config),
     )
 
 
@@ -2763,8 +2799,20 @@ def sections(
     if take is None:
         if about:
             # Ranked, and **all** of them: which to read is the reader's decision, and a
-            # list that showed only the top would be making it for them (ADR-079).
-            found = ranked(text, about, _retriever_for(config, None))
+            # list that showed only the top would be making it for them (ADR-079). By
+            # meaning only once asked: it sends the question and every section's opening,
+            # every time. Declining ranks by words, on this machine (ADR-106).
+            retriever = _retriever_for(config, None)
+            outgoing = sections_would_send(text, retriever)
+            if outgoing is not None:
+                _show(
+                    ranking_would_send(
+                        outgoing, reaching(config), one="section opening", many="section openings"
+                    )
+                )
+                if not typer.confirm("Rank by meaning?", default=False):
+                    retriever = WordRetriever()
+            found = ranked(text, about, retriever)
             _show(f"[bold]{len(found)} sections[/bold] in {source.name}, most about it first")
             for section in found[:12]:
                 _show(f"  [dim]{section.line:>6}[/dim]  {section.number}  {section.title}")

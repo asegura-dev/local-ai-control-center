@@ -66,7 +66,8 @@ answer and a shapeless one, and it is the cheapest thing on this page:
 Three named parts came back as three named parts. A question that names nothing lets the
 model decide what you meant.
 
-**Ask in the language you think in.** With `embedding_model` set, a question in Spanish
+**Ask in the language you think in.** With `embedding_model` set - and ranking by meaning
+agreed to, which it asks - a question in Spanish
 against an English corpus reached eight relevant passages of the first eight; ranking by
 words reached about three, with a ten-year survival figure among them. The answer still comes
 back in whatever `output_language` says, which for a thesis in English is English.
@@ -138,6 +139,13 @@ Off by default: without it nothing changes. With it, the first question against 
 spends about 48 seconds embedding it and writes the vectors to a file beside it; every
 question after that is about three seconds. The vectors are a cache - delete the file and it
 rebuilds.
+
+**It asks before it sends** (ADR-106). Ranking by meaning sends your question to the engine,
+and the first time every quotation in the corpus too, so `ask`, `measure` and
+`sections --about` say what would go and ask `Rank by meaning? [y/N]`. No ranks by words, on
+your machine, and the line that reports the selection says *words*. In the window, the line
+under the question box says what *Prepare* sends - the question alone; quotations that were
+never embedded get a card that names them, and a button of their own.
 
 It matters most across languages and as the corpus grows. At 1,129 citable quotations with a
 32k window the budget admits about 220 of them - a fifth - whatever the ranking says, so

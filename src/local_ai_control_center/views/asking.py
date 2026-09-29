@@ -8,6 +8,9 @@ dismissed:
 **The preview is not a dialog, it is what produces the button.** `Prepare` draws what would
 go; the control that sends is created by that drawing, so there is no path from typing to an
 engine call that skips it. That is `_confirm`'s guarantee in the only grammar a window has.
+With an embedding model, Prepare itself reaches the engine to rank, so a line beside it says
+what it sends before it is pressed - the question alone; more needs a button of its own
+(ADR-106).
 
 **Nothing on the Tk thread waits.** The call runs on a worker that touches no widget: it puts
 its result in a queue, and `_watch` - the one function here that writes to the screen after a
@@ -176,15 +179,14 @@ def _open_corpus(key: str, panel: Panel, state: State, draft: str = "") -> None:
     if draft:
         box.insert("1.0", draft)
     _BOXES[corpus] = box
-    said = (
-        "Ranked by the words you use, and also by meaning - across languages - when an "
-        "embedding model is configured. The preview says which."
-    )
+    # What pressing Prepare sends, before it is pressed: this line is the preview and the press
+    # is the agreement - to the question alone (ADR-106).
+    said = state.before_preparing
     if carried:
         said += (
             f"   {len(carried)} passages established earlier go with every question in this thread."
         )
-    paint.text(body, said, panel.skin.faint, 10)
+    paint.text(body, said.strip(), panel.skin.dim, 11)
 
     below = ctk.CTkFrame(panel.body, fg_color="transparent")
     below.pack(fill="both", expand=True)
@@ -276,19 +278,33 @@ def _draw_thread(thread: Thread, below: ctk.CTkFrame, panel: Panel) -> None:
 
 
 def _prepare(
-    box: ctk.CTkTextbox, key: str, below: ctk.CTkFrame, panel: Panel, state: State
+    box: ctk.CTkTextbox,
+    key: str,
+    below: ctk.CTkFrame,
+    panel: Panel,
+    state: State,
+    agreed: int = 0,
 ) -> None:
-    """Rank the corpus and draw what would be sent. The prompt itself goes nowhere."""
+    """Rank the corpus and draw what would be sent. The prompt itself goes nowhere.
+
+    A press of Prepare agrees to what the line beside it said - the question alone. When the
+    ranking needs more, nothing is ranked: what it would send is drawn with a button of its
+    own, and only that button agrees to it (ADR-106).
+    """
     if state.prepare_question is None:
         return
     corpus = Path(key).name
     for child in below.winfo_children():
         child.destroy()
     thread = _thread_for(corpus)
-    prepared = state.prepare_question(box.get("1.0", "end"), corpus, thread.carried)
+    prepared = state.prepare_question(box.get("1.0", "end"), corpus, thread.carried, agreed)
     if prepared.refusal:
         refused = paint.card(below, panel.skin, stripe=panel.skin.contradicted)
         paint.text(refused, prepared.refusal, panel.skin.ink, 12)
+        _draw_thread(thread, below, panel)
+        return
+    if prepared.awaiting is not None:
+        _draw_awaiting(prepared, prepared.awaiting.unembedded, box, key, below, panel, state)
         _draw_thread(thread, below, panel)
         return
 
@@ -332,6 +348,40 @@ def _prepare(
         command=lambda: _send(prepared, key, below, panel, state),
     ).pack(anchor="w", pady=(10, 0))
     _draw_thread(thread, below, panel)
+
+
+def _draw_awaiting(
+    prepared: Prepared,
+    unembedded: int,
+    box: ctk.CTkTextbox,
+    key: str,
+    below: ctk.CTkFrame,
+    panel: Panel,
+    state: State,
+) -> None:
+    """What the ranking would send beyond the question, and the one button that agrees to it."""
+    card = paint.card(below, panel.skin, stripe=panel.skin.accent)
+    paint.text(card, "Ranking needs more than your question", panel.skin.ink, 13, bold=True)
+    paint.text(card, prepared.asks, panel.skin.dim, 12)
+    paint.text(
+        card,
+        "Nothing has been sent. Once embedded they are stored beside the corpus, so this is "
+        "asked again only when the corpus gains quotations.",
+        panel.skin.faint,
+        10,
+    )
+    ctk.CTkButton(
+        card,
+        text="Send them and rank",
+        width=170,
+        height=32,
+        corner_radius=8,
+        fg_color=panel.skin.accent,
+        hover_color=panel.skin.accent,
+        text_color=panel.skin.ink,
+        font=ctk.CTkFont(size=12, weight="bold"),
+        command=lambda: _prepare(box, key, below, panel, state, unembedded),
+    ).pack(anchor="w", pady=(10, 0))
 
 
 def _send(prepared: Prepared, key: str, below: ctk.CTkFrame, panel: Panel, state: State) -> None:

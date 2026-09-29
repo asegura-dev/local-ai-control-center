@@ -2,9 +2,26 @@
 
 from __future__ import annotations
 
+from local_ai_control_center.adapters.dense import DenseRetriever, FusedRetriever
 from local_ai_control_center.adapters.words import WordRetriever
 from local_ai_control_center.core.sections import summaries_in
-from local_ai_control_center.features.navigate import ranked
+from local_ai_control_center.features.navigate import ranked, sections_would_send
+from local_ai_control_center.ports.embedder import Embedder
+
+
+class _Recording(Embedder):
+    """An embedding engine that answers anything and remembers what it was sent."""
+
+    def __init__(self) -> None:
+        self.asked: list[tuple[str, ...]] = []
+
+    @property
+    def name(self) -> str:
+        return "recording"
+
+    def embed(self, texts: tuple[str, ...]) -> tuple[tuple[float, ...], ...]:
+        self.asked.append(texts)
+        return tuple((1.0, 0.0) for _ in texts)
 
 
 def _guideline() -> str:
@@ -68,3 +85,15 @@ def test_every_section_is_returned_not_just_the_best() -> None:
 
 def test_a_document_that_numbers_nothing_ranks_nothing() -> None:
     assert ranked("Just prose, with no numbering at all.", "a question", WordRetriever()) == ()
+
+
+def test_ranking_sections_by_meaning_says_what_it_would_send_first() -> None:
+    """`sections --about` sent every opening, every run, and asked nothing (ADR-106)."""
+    engine = _Recording()
+    meaning = FusedRetriever(WordRetriever(), DenseRetriever(engine))
+    outgoing = sections_would_send(_guideline(), meaning)
+    assert engine.asked == [], "counting sent nothing"
+    assert outgoing is not None
+    assert outgoing.unembedded == len(summaries_in(_guideline())), "no store: every opening"
+    assert sections_would_send(_guideline(), WordRetriever()) is None
+    assert sections_would_send("Just prose.", meaning) is None

@@ -257,7 +257,7 @@ def _stand_in(delay: float) -> tuple[Any, Any]:
     """A prepare and a send that reach nothing: the send answers after ``delay`` seconds."""
     from local_ai_control_center.features.ask import Asked, Prepared, Reading
 
-    def prepare(question: str, corpus: str, carried: tuple[Any, ...]) -> Prepared:
+    def prepare(question: str, corpus: str, carried: tuple[Any, ...], agreed: int = 0) -> Prepared:
         return Prepared(
             question=question.strip() or "a question",
             corpus=corpus,
@@ -398,6 +398,50 @@ def _ask_flow(window: Window) -> None:
 
     _press(window, "Start over")
     print(f"  Start over: thread empty {turns() == 0}")
+    _agreeing_flow(window, open_corpus)
+
+
+def _agreeing_flow(window: Window, open_corpus: Any) -> None:
+    """Prepare with quotations never embedded: nothing ranked until their own button (ADR-106).
+
+    The stand-in asks for five quotations with no stored vector until it is told five may go,
+    which is what the real `prepare` does with an embedding model and a corpus that grew.
+    """
+    from local_ai_control_center.features.ask import Prepared
+    from local_ai_control_center.ports.retriever import Outgoing
+
+    prepare, send = _stand_in(1.0)
+    agreements: list[int] = []
+
+    def asking_first(
+        question: str, corpus: str, carried: tuple[Any, ...], agreed: int = 0
+    ) -> Prepared:
+        agreements.append(agreed)
+        if agreed < 5:
+            waiting = Outgoing(model="a stand-in embedder", unembedded=5)
+            return Prepared(question=question, corpus=corpus, reaches="nothing", awaiting=waiting)
+        return prepare(question, corpus, carried, agreed)
+
+    window.prepare_question, window.send_question = asking_first, send
+    window.before_preparing = "Prepare sends your question to a stand-in embedder."
+    open_corpus()
+    line = _shows(window, "Prepare sends your question")
+    box = _descendants(window.panel_body, ctk.CTkTextbox)[0]
+    box.delete("1.0", "end")
+    box.insert("1.0", "fifth")
+    _press(window, "Prepare")
+    card = _shows(window, "Ranking needs more than your question")
+    no_send = not any(
+        button.cget("text") == "Send to the engine"
+        for button in _descendants(window.panel_body, ctk.CTkButton)
+    )
+    _press(window, "Send them and rank")
+    preview = _shows(window, "This is what would be sent")
+    print(
+        f"  quotations never embedded: the line beside Prepare {line}, a card instead of a "
+        f"preview {card}, no send button yet {no_send}; its own button ranks {preview}, "
+        f"agreed to {agreements}"
+    )
 
 
 def _listed_after(window: Window, section: Any, most: float = 30.0) -> float:

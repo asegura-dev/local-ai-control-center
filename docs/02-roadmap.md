@@ -30,11 +30,14 @@ What exists, by what it is for:
 
 **What is next** - direction, in the order the thesis this is used for needs it:
 
-1. **Close what ADR-105 named.** `review`, `resolve`, `identify` and `coverage` leave no
-   record; and preparing a question embeds it before the preview that asks whether to send.
-2. **Measure the newer models on the old question.** With a second graphics card, a 32B at
-   a full window - and extraction re-run with the newer models against the figure this
-   project is cited by, 48 quotations of 237 not in their document.
+1. **Close what ADR-105 named.** Preparing a question no longer sends anything before it
+   asks (ADR-106). Left: `review`, `resolve`, `identify` and `coverage` leave no record, and
+   neither does a call to embed; and Prepare waits for the engine on the window's own thread.
+2. **Measure the newer models on the old question - begun.** On 28 September extraction was
+   re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations
+   are not in their document, against 38 of the 14B's 216, and the figure this project is
+   cited by is 42 of 237 today, not 48 (chapter 04). Still to do: a second run of each, and the
+   27B and a 32B at a full window once the second card is in.
 3. **Projects over one library**, one per paper, and a window section for writing, whose
    guardrails come from the blind rating of what the models changed in real paragraphs.
 4. **What fits the machine**: the models a pair of cards can hold, pulled from the window,

@@ -79,6 +79,10 @@ class WordRetriever(Retriever):
         """Identify this retriever in a record."""
         return "words"
 
+    def would_send(self, passages: tuple[Passage, ...]) -> None:
+        """Nothing: words are counted here, on this machine."""
+        return None
+
     def select(self, question: str, passages: tuple[Passage, ...], budget_tokens: int) -> Selection:
         """Choose the passages whose words best match the question, up to the budget.
 

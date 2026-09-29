@@ -58,6 +58,23 @@ class Selection(BaseModel):
         return self.set_aside == 0
 
 
+class Outgoing(BaseModel):
+    """What choosing would send to an engine, known before anything is sent (ADR-106).
+
+    Choosing by words stays on this machine and has none. Choosing by meaning sends the
+    question to an embedding model, and with it every passage that has no stored vector yet -
+    on a corpus's first question, the whole corpus.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    model: str
+    """The embedding model, named the way the embedder names itself."""
+
+    unembedded: int = 0
+    """Passages with no stored vector, which would go with the question."""
+
+
 class Retriever(ABC):
     """Anything that can pick passages for a question.
 
@@ -77,4 +94,13 @@ class Retriever(ABC):
         The budget is in tokens because that is what runs out. An implementation that
         returned a fixed number of passages would overflow a window on long quotations and
         waste one on short ones.
+        """
+
+    @abstractmethod
+    def would_send(self, passages: tuple[Passage, ...]) -> Outgoing | None:
+        """What choosing among ``passages`` would send to an engine, without sending it.
+
+        ``None`` when choosing stays on this machine. Abstract rather than defaulting to
+        ``None``, because a default would let a retriever that reaches an engine say it does
+        not by leaving this out - and a preview is drawn from what this returns (ADR-106).
         """

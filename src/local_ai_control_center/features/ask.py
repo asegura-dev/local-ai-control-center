@@ -16,7 +16,7 @@ from local_ai_control_center.core.budget import answer_reserve, estimate_tokens
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.corpus import parse_corpus
 from local_ai_control_center.core.grounding import CheckedClaim
-from local_ai_control_center.ports.retriever import Passage, Retriever
+from local_ai_control_center.ports.retriever import Outgoing, Passage, Retriever
 
 
 def rendered(passages: tuple[Passage, ...]) -> str:
@@ -112,10 +112,22 @@ class Prepared(BaseModel):
     refusal: str = ""
     """Why this cannot be sent, in a sentence, or empty."""
 
+    awaiting: Outgoing | None = None
+    """What ranking would send to an engine, waiting for somebody to agree to it (ADR-106).
+
+    Set only when nothing was ranked for that reason. Nothing has left the machine, and this
+    is the preview: what would go, to which model, reaching where.
+    """
+
     @property
     def sendable(self) -> bool:
         """Whether there is anything to send. The button is drawn only when this is true."""
         return not self.refusal and self.selected > 0
+
+    @property
+    def asks(self) -> str:
+        """The sentence somebody agrees to before the ranking sends anything, or empty."""
+        return ranking_would_send(self.awaiting, self.reaches) if self.awaiting else ""
 
 
 class Reading(BaseModel):
@@ -171,6 +183,47 @@ def readings_from(checked: tuple[CheckedClaim, ...]) -> tuple[Reading, ...]:
     )
 
 
+def reaching(config: Config) -> str:
+    """Where a call to the configured engine goes, in the words a preview uses."""
+    return config.engine_host if config.network_access else "this machine only"
+
+
+def ranking_would_send(
+    outgoing: Outgoing,
+    reaches: str,
+    sends: str = "your question",
+    one: str = "quotation never embedded before",
+    many: str = "quotations never embedded before",
+) -> str:
+    """What ranking by meaning would send, as the sentence somebody agrees to (ADR-106).
+
+    One wording for the terminal and the window, so the two cannot describe the same sending
+    two ways. ``sends`` is what goes every time; ``one`` and ``many`` name the passages that
+    go with it, when some have no stored vector.
+    """
+    count = outgoing.unembedded
+    more = f" and {count} {one if count == 1 else many}" if count else ""
+    return f"Ranking by meaning sends {sends}{more} to {outgoing.model}, reaching {reaches}."
+
+
+def before_preparing(config: Config) -> str:
+    """What pressing Prepare sends, said beside it before it is pressed (ADR-106).
+
+    The line is the preview and the press is the agreement - to the question alone. Anything
+    beyond it is shown after the press, and sent only by a second one.
+    """
+    if not config.embedding_model:
+        return (
+            "Prepare ranks the corpus by the words you use, on this machine: nothing leaves it "
+            "until you press the button that appears after."
+        )
+    return (
+        f"Prepare sends your question to {config.embedding_model}, reaching "
+        f"{reaching(config)}, to rank the corpus by meaning as well as by words. The prompt "
+        "goes only with the button that appears after."
+    )
+
+
 def prepare(
     question: str,
     corpus: str,
@@ -178,14 +231,17 @@ def prepare(
     config: Config,
     retriever: Retriever,
     carried: tuple[Passage, ...] = (),
+    agreed: int | None = None,
 ) -> Prepared:
     """Read a corpus, rank it against a question, and report what would be sent.
 
-    **The prompt is not sent here.** What this does cost, when an embedding model is
-    configured, is embedding the question itself - one small call to the host already named,
-    with the material staying on this machine. That is said in the preview rather than left
-    for somebody to discover, because a window that reached the network without saying so
-    would break the only rule this project has about reaching anywhere.
+    **The prompt is not sent here, and the ranking sends only what was agreed.** Ranking by
+    meaning embeds the question and every quotation with no stored vector yet - on a corpus's
+    first question, all of them. ``agreed`` is how far somebody has allowed that: ``None``
+    for nothing, ``0`` for the question alone, a number for the question and up to that many
+    quotations. When the ranking would send more, nothing is ranked, and the result says what
+    it would send and waits (ADR-106). Ranking by words needs no agreement: it never leaves
+    this machine.
     """
     asked = question.strip()
     if not asked:
@@ -214,6 +270,20 @@ def prepare(
     passages = tuple(
         Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
     )
+    reaches = reaching(config)
+    outgoing = retriever.would_send(passages)
+    if outgoing is not None and (agreed is None or outgoing.unembedded > agreed):
+        # Nothing is ranked, so nothing is sent. What the ranking would send is the preview
+        # somebody agrees to first - and agreeing to fewer quotations than there now are is
+        # not agreeing to these (ADR-106).
+        return Prepared(
+            question=asked,
+            corpus=corpus,
+            considered=len(passages),
+            model=config.model,
+            reaches=reaches,
+            awaiting=outgoing,
+        )
     budget = (config.context_tokens - answer_reserve(config.context_tokens)) // 2
     try:
         selection = retriever.select(asked, passages, budget)
@@ -228,7 +298,6 @@ def prepare(
     kept = {passage.text.strip() for passage in carried}
     chosen = (*carried, *(p for p in selection.chosen if p.text.strip() not in kept))
     material = rendered(chosen)
-    reaches = config.engine_host if config.network_access else "this machine only"
     if not selection.chosen:
         return Prepared(
             question=asked,

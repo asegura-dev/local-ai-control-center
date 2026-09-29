@@ -18,6 +18,7 @@ from typer.testing import CliRunner
 
 from local_ai_control_center.cli import app
 from local_ai_control_center.features.ask import might_support
+from local_ai_control_center.ports.embedder import Embedder
 from local_ai_control_center.ports.notifier import Delivery, Notification, Notifier
 
 runner = CliRunner()
@@ -1542,3 +1543,114 @@ def test_coverage_asks_before_it_sends_anything_to_be_embedded(tmp_path: Path) -
     assert "Send them? [y/N]" in said
     assert "Nothing was sent" in said
     assert not any(path.suffix == ".vectors" for path in (tmp_path / "ws").iterdir())
+
+
+# --- ranking by meaning asks before it reaches the engine (ADR-106) ------------------------
+
+
+class _Embeds(Embedder):
+    """An embedding engine that answers anything and remembers everything it was sent."""
+
+    def __init__(self) -> None:
+        self.sent: list[str] = []
+
+    @property
+    def name(self) -> str:
+        return "ollama:bge-m3"
+
+    def embed(self, texts: tuple[str, ...]) -> tuple[tuple[float, ...], ...]:
+        self.sent.extend(texts)
+        return tuple((float(len(text) % 5 + 1), 1.0) for text in texts)
+
+
+def _with_meaning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, _Embeds]:
+    """The small corpus with an embedding model named, and the engine behind it replaced."""
+    config = _corpus_file(tmp_path)
+    config.write_text(
+        config.read_text(encoding="utf-8") + "embedding_model: bge-m3" + chr(10), encoding="utf-8"
+    )
+    engine = _Embeds()
+    monkeypatch.setattr("local_ai_control_center.cli.OllamaEmbedder", lambda model, host: engine)
+    return config, engine
+
+
+_ASKING = ["pelvic lymph node sensitivity", "--from", "corpus.md", "--provider", "mock"]
+
+
+def test_ask_asks_before_ranking_by_meaning_and_no_ranks_by_words(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The question reached the engine before the preview that asked whether to send it."""
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    result = runner.invoke(app, ["ask", *_ASKING, "-c", str(config)], input="\n" + "n\n")
+    said = " ".join(result.stdout.split())
+    assert result.exit_code == 0, said
+    assert "your question and 2 quotations never embedded before" in said
+    assert "Rank by meaning? [y/N]" in said
+    assert engine.sent == [], "declined: nothing went to be embedded"
+    assert "set aside. words" in said, "the selection says how it was made"
+    assert "Declined" in said
+
+
+def test_agreeing_to_rank_by_meaning_sends_what_it_said_and_nothing_more(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    result = runner.invoke(app, ["ask", *_ASKING, "-c", str(config)], input="y\n" + "n\n")
+    said = " ".join(result.stdout.split())
+    assert result.exit_code == 0, said
+    assert len(engine.sent) == 3, "the question and the two quotations it named"
+    assert "pelvic lymph node sensitivity" in engine.sent
+    assert "meaning (ollama:bge-m3)" in said
+
+
+def test_measure_asks_before_ranking_by_meaning_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One preview and one confirmation covering all the runs - after the ranking had sent."""
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    result = runner.invoke(
+        app, ["measure", "ask_corpus", *_ASKING, "-c", str(config)], input="\n" + "n\n"
+    )
+    said = " ".join(result.stdout.split())
+    assert "Rank by meaning? [y/N]" in said
+    assert engine.sent == []
+
+
+def test_sections_about_asks_before_it_sends_every_opening(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """It sent the question and every section's opening, every run, and asked nothing."""
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    # Twelve lines each: a first-level section shorter than ten is read as a list in the prose.
+    body = chr(10).join(["Lymph node staging with PSMA PET and nodal size on CT."] * 12)
+    (tmp_path / "ws" / "guide.md").write_text(
+        chr(10).join(["1. Screening", body, "2. Staging", body, "3. Treatment", body]),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app, ["sections", "guide.md", "--about", "nodal staging", "-c", str(config)], input="\n"
+    )
+    said = " ".join(result.stdout.split())
+    assert result.exit_code == 0, said
+    assert "your question and 3 section openings" in said
+    assert "Rank by meaning? [y/N]" in said
+    assert engine.sent == []
+    assert "most about it first" in said
+
+
+def test_review_says_what_it_embeds_before_it_asks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    (tmp_path / "ws" / "draft.md").write_text(
+        "The sensitivity for pelvic lymph nodes was high in this cohort." + chr(10),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app, ["review", "draft.md", "--against", "corpus.md", "-c", str(config)], input="\n"
+    )
+    said = " ".join(result.stdout.split())
+    assert result.exit_code == 1
+    assert "sends each paragraph and 2 quotations never embedded before" in said
+    assert engine.sent == []

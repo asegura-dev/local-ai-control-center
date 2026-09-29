@@ -156,3 +156,13 @@ exists to protect.
 rule. The honest version is that the window reads, except for one command that writes nothing,
 behind a preview, on a thread, with a cancel that admits its limits - and that sentence has to
 be defended every time somebody proposes a second exception.
+
+## Correction (28 September, ADR-106)
+
+**`[Prepare] -> nothing has been sent` was true only without an embedding model.** With one,
+Prepare ranks by meaning, and that sends the question to the engine - and, the first time a
+corpus is ranked, every quotation in it - before the preview this record draws. It also waits
+for the engine on the window's own thread, which the paragraph above says nothing here does.
+ADR-106 puts a line beside the button that says what pressing it sends, the question alone,
+and gives quotations never embedded a card and a button of their own. The wait on the Tk
+thread is still there, named in `docs/05-assurance.md`.

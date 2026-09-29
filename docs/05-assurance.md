@@ -11,8 +11,10 @@ says which part is which.
 
 First taken 2026-09-18, against v1.5.0. **Re-taken 2026-09-27, against v2.10.0 and the
 unreleased work, row by row against the source** - and five rows that had read *held* were
-false. Three were fixed the same day (ADR-105); the rest are marked below. A row here is true
-on the day it was checked and needs re-checking like any other measurement.
+false. Three were fixed the same day (ADR-105); the rest are marked below. On 28-sep ADR-106
+closed the gap about preparing a question, and the reading that closed it moved one more row
+- the window never freezing - to a gap. A row here is true on the day it was checked and needs
+re-checking like any other measurement.
 
 ## Cybersecurity
 
@@ -73,13 +75,13 @@ on the day it was checked and needs re-checking like any other measurement.
 | A prompt too large is refused, not truncated | Estimated against the window and refused before sending, when the configuration names the window (ADR-019) | **held by test** |
 | A failed sidecar write does not fail the run | The record it describes has already succeeded (ADR-049) | **held** |
 | An answer that arrives while you are elsewhere is kept | The waiting lives in the panel's frame and the turn is recorded whichever section is on screen (ADR-099). Driven by `tools/measure_window.py`; Tk has no test here | **held** |
-| Asking an engine and walking the trail never freeze the window | Both run on workers that touch no widget (ADR-085, ADR-104). Other sections read on the window's own thread, and a large workspace makes them slow to open | **held** |
+| Asking an engine and walking the trail never freeze the window | Both run on workers that touch no widget (ADR-085, ADR-104). Other sections read on the window's own thread, and a large workspace makes them slow to open. **Prepare, with an embedding model, waits for the engine on the window's own thread**: 4.5 seconds measured for the question alone, and as long as embedding the whole corpus the first time (ADR-106) | **held for sending and for the trail; gap for Prepare with an embedding model** |
 
 ## Human in the loop
 
 | Promise | What holds it | Verdict |
 |---|---|---|
-| What reaches an engine or the network asks first, and no is the default | Every confirmation in the CLI defaults to no - `run`, `collect`, `ingest`, `ask`, `measure`, `resolve`, `identify`, `review`, `coverage`. `review` defaulted to yes and `coverage` did not ask at all until ADR-105. **Preparing a question embeds it before the preview that asks whether to send** - named in ADR-105, not closed | **held by test for `run`, `review`, `coverage`; gap for preparing** |
+| What reaches an engine or the network asks first, and no is the default | Every confirmation in the CLI defaults to no - `run`, `collect`, `ingest`, `ask`, `measure`, `resolve`, `identify`, `review`, `coverage`. `review` defaulted to yes and `coverage` did not ask at all until ADR-105. **Ranking by meaning asks too** (ADR-106): `ask`, `measure` and `sections --about` say what would go to be embedded - the question, and every quotation or section never embedded - and ask `Rank by meaning? [y/N]`, where no ranks by words; `review` says it in the question it already asks. In the window a line beside Prepare names what it sends, the question alone, and quotations never embedded need a button of their own. Until ADR-106 the ranking sent before anything asked | **held by test**; the window's line and card driven by `tools/measure_window.py` |
 | The window cannot lift a ceiling | Configuration shows `network_access` and `workspace_in_repository` and does not edit them (ADR-094) | **held by test** |
 | A git working tree is refused as a workspace, from the window too | Refused when a configuration is loaded unless `workspace_in_repository` says otherwise, and refused by Workspaces before it makes one (ADR-093) | **held by test** |
 | Repetition cannot multiply an effect | `measure` refuses any skill declaring `write_files` | **held by test** |
@@ -103,10 +105,13 @@ read *held* and were not:
 - **"Writing happens in three places only"** - it is twelve, listed in
   `docs/stack/files-on-disk.md`.
 
-And one found by the same reading, open: **preparing a question embeds it** when
-`embedding_model` is set, so the question reaches the engine before the preview that asks
-whether to send it. The preview cannot be drawn without the ranking; closing it changes what a
-preview is, and that is a record of its own.
+And one found by the same reading: **preparing a question embedded it** when `embedding_model`
+was set, so the question reached the engine before the preview that asked whether to send it.
+Closed on 28-sep by ADR-106, which found it wider than named - the first question to a corpus
+sent every quotation in it, and `sections --about` sent every section's opening on every run,
+asking nothing. What ranking would send is now counted from the stored vectors, without
+sending, and agreed to first. Closing it left one gap in sight: Prepare waits for the engine
+on the window's own thread.
 
 Every one of these is the shape this page exists to catch: a sentence that was true when it was
 written, still reading *held* long after the code beside it had moved.

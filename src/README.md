@@ -78,7 +78,7 @@ record (ADR-008).
 | `notifier.py` | Anything that says a run finished, to a machine the user named. |
 | `provider.py` | Anything that completes a prompt: the engine's contract (ADR-005). |
 | `registry.py` | Anything that says what a work is, given its DOI (ADR-067). |
-| `retriever.py` | Anything that chooses which passages go into a prompt (ADR-050). |
+| `retriever.py` | Anything that chooses which passages go into a prompt (ADR-050), and says what choosing would send to an engine before it sends it (ADR-106). |
 
 ## `adapters/` - one implementation per file
 
