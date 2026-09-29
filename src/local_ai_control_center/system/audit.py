@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -17,6 +18,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from local_ai_control_center.core.config import Config
+from local_ai_control_center.core.run import new_run_id
 from local_ai_control_center.core.workspace import Workspace
 
 EventKind = Literal[
@@ -47,8 +49,15 @@ EventKind = Literal[
     "readings_judged",
     "notification_sent",
     "notification_failed",
+    "registry_asked",
+    "texts_embedded",
+    "file_written",
+    "run_failed",
 ]
-"""The closed set of events recorded today. It grows as real events appear."""
+"""The closed set of events recorded today. It grows as real events appear.
+
+The last four arrived with ADR-107, when `review`, `resolve`, `identify` and `coverage` began
+to record what they reach and what they write."""
 
 GENESIS_DIGEST = "0" * 64
 """What the first record folds in, since there is no record before it."""
@@ -125,6 +134,7 @@ class AuditLog:
         contained like anything else LACC touches.
         """
         self._path = workspace.resolve_within(filename)
+        self._root = workspace.root
         self._config = config
         self._previous: str | None = None
 
@@ -132,6 +142,64 @@ class AuditLog:
     def path(self) -> Path:
         """The resolved path of the log file."""
         return self._path
+
+    def opened(self, action: str) -> str:
+        """Open a run for a command that does not go through the cycle, and give its id.
+
+        The same first record every run has, `run_started` naming the action, so the Audit
+        section reads these runs the way it reads the rest (ADR-107).
+        """
+        run_id = new_run_id()
+        self.record(run_id, "run_started", f"Starting {action}", {"action": action})
+        return run_id
+
+    def wrote(self, run_id: str, action: str, written: Path) -> None:
+        """Record a file a command left: where it is in the workspace, and its digest."""
+        try:
+            where = written.relative_to(self._root).as_posix()
+        except ValueError:
+            where = written.as_posix()
+        self.record(
+            run_id,
+            "file_written",
+            f"Wrote {written.name}",
+            {"action": action, "path": where, "sha256": digest_of_file(written)},
+        )
+
+    def asked(
+        self, run_id: str, action: str, registry: str, sent: Sequence[str], identified: bool
+    ) -> None:
+        """Record what went to a registry, when anything did.
+
+        The DOIs under `dois`, which only `full` keeps; the registry and how many went, always.
+        Whether a contact address went with them, and never the address (ADR-107).
+        """
+        if not sent:
+            return
+        self.record(
+            run_id,
+            "registry_asked",
+            f"Asked {registry} about {len(sent)} DOIs",
+            {
+                "action": action,
+                "registry": registry,
+                "asked": len(sent),
+                "identified": identified,
+                "dois": list(sent),
+            },
+        )
+
+    def embedded(
+        self, run_id: str, action: str, model: str, reaches: str, sent: dict[str, int]
+    ) -> None:
+        """Record what went to an embedding model: which model, where, how many of what."""
+        total = sum(sent.values())
+        self.record(
+            run_id,
+            "texts_embedded",
+            f"Embedded {total} texts with {model}",
+            {"action": action, "model": model, "reaches": reaches, "texts": total, **sent},
+        )
 
     def record(
         self,
@@ -334,12 +402,16 @@ def walk(path: Path) -> Walked:
     return Walked(chain=chain, events=tuple(events), vouched=tuple(vouched))
 
 
-_CONTENT_KEYS = frozenset({"prompt", "completion", "question"})
+_CONTENT_KEYS = frozenset({"prompt", "completion", "question", "dois"})
 """Detail keys treated as user content, omitted unless the level is ``full``.
 
 `question` joined on 27-sep: a question to a corpus was kept word for word under the default
 level, because nothing had told the filter it was content (ADR-105). Its digest is recorded
 beside it, which says which question without saying what it was.
+
+`dois` joined on 28-sep, by the choice of the person whose trail it is: a DOI is public, and
+the list of them sent to a registry is a bibliography, which says what somebody is reading.
+The count is always kept (ADR-107).
 """
 
 

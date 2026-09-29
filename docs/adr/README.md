@@ -673,10 +673,16 @@ The program says everything significant it does is audited, and the only way to 
 
 [`ADR-105-three-promises-the-code-had-stopped-keeping.md`](ADR-105-three-promises-the-code-had-stopped-keeping.md)
 
-Bringing the documentation up to date meant checking each promise in the assurance chapter against the code, and three were broken: the default audit level kept every question word for word, `review` defaulted to yes, and `coverage` sent to be embedded before asking. Each is fixed, each with a test that fails on the old behaviour. Two larger gaps are named in the record and in the chapter rather than hidden: embedding a question before its preview, and four commands that leave no record. The first is closed by ADR-106.
+Bringing the documentation up to date meant checking each promise in the assurance chapter against the code, and three were broken: the default audit level kept every question word for word, `review` defaulted to yes, and `coverage` sent to be embedded before asking. Each is fixed, each with a test that fails on the old behaviour. Two larger gaps are named in the record and in the chapter rather than hidden: embedding a question before its preview, and four commands that leave no record. The first is closed by ADR-106, the second by ADR-107.
 
 ### 106 - ranking by meaning asks before it reaches the engine
 
 [`ADR-106-ranking-by-meaning-asks-before-it-reaches-the-engine.md`](ADR-106-ranking-by-meaning-asks-before-it-reaches-the-engine.md)
 
 The preview of a question cannot be drawn without ranking the corpus, and ranking by meaning reaches the engine - so the question went there before anything asked, and the gap was wider than ADR-105 named: the first question to a corpus sent every quotation in it, and `sections --about` sent every section's opening on every run. What ranking would send is now known before it is sent, counted from the vectors already stored, and a retriever must say it: the method is abstract. The terminal asks `Rank by meaning? [y/N]`, and no ranks by words on this machine; the window says what Prepare sends beside the button, the question alone, and quotations never embedded need a button of their own. Agreement covers what was shown and not more. Prepare still waits for the engine on the window's own thread, and the assurance chapter says so.
+
+### 107 - what reaches an engine or a registry leaves a record
+
+[`ADR-107-what-reaches-an-engine-or-a-registry-leaves-a-record.md`](ADR-107-what-reaches-an-engine-or-a-registry-leaves-a-record.md)
+
+Four commands reached the engine or Crossref and left nothing in the trail, so a day of reviewing and resolving was missing from the Audit section while `verify` said the trail held. Each now records a run in the shape every other run has - opened where it is about to ask or act, ending finished, declined or failed - with what it reached and what it wrote. The user chose three things: a contact address is recorded as sent and never as the address; the DOIs are counted always and listed only under `full`, because the list is a bibliography; and a no is recorded, in `ask` and `measure` too, as a declined `run` always was. The DOIs are counted as they leave, so a retry with a cut DOI is counted. The ranking's own calls to embed are left for the next record.

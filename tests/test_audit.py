@@ -323,3 +323,62 @@ def test_a_question_is_content_and_is_kept_only_under_full(tmp_path: Path) -> No
     assert "question" not in kept_standard.detail
     assert kept_standard.detail["question_sha256"] == "abc"
     assert kept_full.detail["question"] == "what does the corpus say?"
+
+
+# --- the commands outside the cycle (ADR-107) ----------------------------------------------
+
+
+def test_the_dois_sent_are_counted_always_and_listed_only_under_full(tmp_path: Path) -> None:
+    """A DOI is public; the list of them is a bibliography - the choice made on 28-sep."""
+    sent = ("10.1000/one", "10.1000/two")
+    standard = _log(tmp_path / "s")
+    full = _log(tmp_path / "f", audit_level="full")
+    standard.asked("r", "resolve", "https://api.crossref.org", sent, identified=False)
+    full.asked("r", "resolve", "https://api.crossref.org", sent, identified=False)
+    kept_standard = _lines(standard.path)[0]["detail"]
+    kept_full = _lines(full.path)[0]["detail"]
+    assert isinstance(kept_standard, dict) and isinstance(kept_full, dict)
+    assert kept_standard["asked"] == 2
+    assert "dois" not in kept_standard
+    assert kept_full["dois"] == list(sent)
+
+
+def test_a_contact_address_is_recorded_as_sent_and_never_written(tmp_path: Path) -> None:
+    """The method is not handed the address at all: only whether one went."""
+    log = _log(tmp_path, audit_level="full")
+    log.asked("r", "resolve", "https://api.crossref.org", ("10.1000/one",), identified=True)
+    detail = _lines(log.path)[0]["detail"]
+    assert isinstance(detail, dict)
+    assert detail["identified"] is True
+    assert "@" not in log.path.read_text(encoding="utf-8")
+
+
+def test_nothing_sent_to_a_registry_records_nothing(tmp_path: Path) -> None:
+    """Every answer came from what was kept: nothing left, so there is nothing to say."""
+    log = _log(tmp_path)
+    log.asked("r", "resolve", "https://api.crossref.org", (), identified=False)
+    assert not log.path.exists()
+
+
+def test_a_run_outside_the_cycle_opens_the_way_every_run_does(tmp_path: Path) -> None:
+    log = _log(tmp_path)
+    run = log.opened("review")
+    first = _lines(log.path)[0]
+    assert first["run_id"] == run
+    assert first["kind"] == "run_started"
+    assert first["detail"] == {"action": "review"}
+
+
+def test_a_file_written_is_recorded_by_where_it_is_and_its_digest(tmp_path: Path) -> None:
+    log = _log(tmp_path)
+    # Beside the log, which is resolved through the workspace the way a command's file is.
+    written = log.path.parent / "reports" / "coverage.md"
+    written.parent.mkdir()
+    written.write_text("a report", encoding="utf-8")
+    log.wrote("r", "coverage", written)
+    detail = _lines(log.path)[0]["detail"]
+    assert detail == {
+        "action": "coverage",
+        "path": "reports/coverage.md",
+        "sha256": digest_of_file(written),
+    }

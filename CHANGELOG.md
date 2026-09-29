@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **Four commands left no record, and a no left none either** (ADR-107). `review`, `resolve`,
+  `identify` and `coverage` reach the engine or Crossref and recorded nothing; each now opens a
+  run, says what it reached and what it wrote, and ends finished, declined or failed - so the
+  Audit section shows them. A registry request records how many DOIs went and whether a contact
+  address went with them: the DOIs are listed only under `audit_level: full` and the address
+  never, by the user's choice. DOIs are counted as they leave, retries included. `review`
+  records its judgements by digest, as `ask --judge` does; `review` and `coverage` record what
+  they embedded. A declined `ask` or `measure` is recorded, as a declined `run` always was.
 - **Ranking by meaning sent before it asked** (ADR-106). With `embedding_model` set, preparing
   a question embedded it before the preview that asks whether to send it - and the first
   question to a corpus embedded every quotation in it; `sections --about` sent every section's

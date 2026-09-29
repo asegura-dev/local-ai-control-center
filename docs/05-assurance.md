@@ -13,7 +13,8 @@ First taken 2026-09-18, against v1.5.0. **Re-taken 2026-09-27, against v2.10.0 a
 unreleased work, row by row against the source** - and five rows that had read *held* were
 false. Three were fixed the same day (ADR-105); the rest are marked below. On 28-sep ADR-106
 closed the gap about preparing a question, and the reading that closed it moved one more row
-- the window never freezing - to a gap. A row here is true on the day it was checked and needs
+- the window never freezing - to a gap; ADR-107 closed the one about four commands that left
+no record. A row here is true on the day it was checked and needs
 re-checking like any other measurement.
 
 ## Cybersecurity
@@ -35,7 +36,7 @@ re-checking like any other measurement.
 | Text a reader cannot see is reported, with how much of the document it is | Detection of invisible render modes, off-page positions and unreadable sizes (ADR-040), reported as a count of the fragments read - which the report did not receive until ADR-103 | **held by test** |
 | A registry is reached only with two switches on | `registry_url` is empty by default and `network_access` is the ceiling; neither implies the other. `resolve` refuses each case by name, `identify` both with one message (ADR-067). **No test runs either refusal** | **held** |
 | Only a DOI leaves, never a document | The request is a URL with a public identifier; no corpus, quotation, question or filename is sent | **held** |
-| No contact address is sent unless written | `registry_mailto` is empty by default and is never filled in: it is the user's personal data (ADR-067) | **held** |
+| No contact address is sent unless written | `registry_mailto` is empty by default and is never filled in: it is the user's personal data (ADR-067). When one is written, the trail records that it went and never the address (ADR-107) | **held; the trail's half held by test** |
 | A registry answer cannot carry a payload | No abstract is read at all, control characters are removed, every field is bounded, and none of it enters a prompt | **held by test** |
 | A registry's text cannot reach LaTeX as an instruction | `lacc bib` writes every LaTeX special character as a character - braces as commands, because BibTeX counts escaped ones - and keeps comments free of `@` (ADR-102) | **held by test** |
 
@@ -43,9 +44,9 @@ re-checking like any other measurement.
 
 | Promise | What holds it | Verdict |
 |---|---|---|
-| Every meaningful execution is audited | Skill runs, conversions and questions are: `run_started`, `run_refused`, `files_read`, `provider_called`, `run_finished`. **`review`, `resolve`, `identify` and `coverage` are not**: two reach the engine and two reach the network, and nothing records that they ran. Named in ADR-105, not closed | **gap** |
-| Every call that completes a prompt is accounted for | `REACHES_THE_ENGINE` names every `.complete(` call, and a fourth fails the suite. **Embedding calls are outside it**: the question, quotations and topics sent to `/api/embed` are neither counted nor recorded | **held by test for completions; gap for embeddings** |
-| Content only under `audit_level: full` | The filter drops `prompt`, `completion` and `question` at any other level; a question keeps its digest. **Until ADR-105, every question to a corpus was kept word for word under the default level** - nothing had told the filter it was content. Trails written before keep what they kept | **held by test** |
+| Every meaningful execution is audited | Skill runs, conversions and questions are: `run_started`, `run_refused`, `files_read`, `provider_called`, `run_finished`. **`review`, `resolve`, `identify` and `coverage` were not until ADR-107**: each now opens a run, records what it reached (`registry_asked`, `texts_embedded`, `readings_judged`) and what it wrote (`file_written`), and ends finished, declined or failed. A no in `ask` and `measure` is recorded too. `measure` still records nothing when its preview is refused | **held by test** |
+| Every call that completes a prompt is accounted for | `REACHES_THE_ENGINE` names every `.complete(` call, and a fourth fails the suite. **Embedding calls are outside it.** `review` and `coverage` record theirs (ADR-107); the ranking in `ask`, `measure`, the window and `sections --about` does not yet, and no test names every place that embeds | **held by test for completions; gap for the ranking's embeddings** |
+| Content only under `audit_level: full` | The filter drops `prompt`, `completion`, `question` and `dois` at any other level; a question keeps its digest, and a list of DOIs its count. **Until ADR-105, every question to a corpus was kept word for word under the default level** - nothing had told the filter it was content. Trails written before keep what they kept | **held by test** |
 | A refusal is recorded, not only a success | `run_refused` carries the missing capabilities and the out-of-bounds paths. The first is asserted; the second only through the outcome | **held by test, the paths held** |
 | The trail cannot be altered unnoticed | Hash chain, checked by `lacc verify` and by the window's Audit section as it reads (ADR-023, ADR-043, ADR-104) | **held by test** |
 | What was done can be read, and not changed | The Audit section lists the latest 300 runs of the workspace's trail - the heading gives the total - and every record of each; the trail is append-only and the section has no control that writes (ADR-104). No test checks that a section cannot write: views are checked only for what they import | **held; the reading by test** |
@@ -98,7 +99,8 @@ read *held* and were not:
 - **The default audit level kept every question word for word.** Fixed in ADR-105.
 - **`review` asked with yes as the default, and `coverage` sent before it asked.** Fixed in
   ADR-105.
-- **Four commands leave no record** - `review`, `resolve`, `identify`, `coverage`. Open.
+- **Four commands left no record** - `review`, `resolve`, `identify`, `coverage`. Closed on 28-sep
+  by ADR-107, which also records a no in `ask` and `measure`.
 - **"Nothing outside the workspace is touched"** had stopped being true when the window began
   to write configurations and make workspaces (ADR-093, ADR-094). Those were decided, and shown
   before they happen; the row was what had not followed. Restated above.

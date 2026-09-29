@@ -330,7 +330,9 @@ def _ending(kinds: set[str]) -> tuple[str, Tone]:
         return "refused: the prompt did not fit", "warn"
     if "confirmation_declined" in kinds:
         return "declined", "plain"
-    if kinds & {"read_failed", "ingestion_failed"}:
+    # `run_failed` is how the commands outside the cycle end badly: a registry or an
+    # embedding model that could not be reached (ADR-107).
+    if kinds & {"read_failed", "ingestion_failed", "run_failed"}:
         return "failed", "bad"
     if "run_finished" in kinds:
         return "finished", "good"

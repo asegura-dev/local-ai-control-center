@@ -74,6 +74,7 @@ def test_how_a_run_ended_is_read_from_what_it_recorded(tmp_path: Path) -> None:
     _a_run(log, "too-big", "prompt_too_large")
     _a_run(log, "no", "confirmation_declined")
     _a_run(log, "broke", "read_failed")
+    _a_run(log, "unreachable", "run_failed")
     _a_run(log, "cut-short")
     log.record("ping", "notification_sent", "Test notification via ntfy", {"transport": "ntfy"})
     ended = {run.key: (run.ending, run.tone) for run in _read(log).runs}
@@ -82,10 +83,25 @@ def test_how_a_run_ended_is_read_from_what_it_recorded(tmp_path: Path) -> None:
         "too-big": ("refused: the prompt did not fit", "warn"),
         "no": ("declined", "plain"),
         "broke": ("failed", "bad"),
+        "unreachable": ("failed", "bad"),
         "cut-short": ("no end recorded", "warn"),
         "ping": ("notification sent", "plain"),
     }
     assert next(run for run in _read(log).runs if run.key == "ping").what == "notification"
+
+
+def test_a_command_outside_the_cycle_reads_as_a_run_like_any_other(tmp_path: Path) -> None:
+    """`resolve` opened its run with the first record every run has, and the Audit section
+    names it and reads its end with nothing learned but `run_failed` (ADR-107)."""
+    log = _log(tmp_path, "standard")
+    run = log.opened("resolve")
+    log.asked(run, "resolve", "https://api.crossref.org", ("10.1000/one", "10.1000/two"), False)
+    log.record(run, "run_finished", "Finished resolve", {"action": "resolve", "resolved": 2})
+    read = _read(log).runs[0]
+    assert (read.what, read.ending) == ("resolve", "finished")
+    facts = dict(read.steps[1].facts)
+    assert facts["asked"] == "2"
+    assert "dois" not in facts, "the list is a bibliography, kept only under full"
 
 
 def test_what_was_sent_and_said_is_cut_and_counted(tmp_path: Path) -> None:

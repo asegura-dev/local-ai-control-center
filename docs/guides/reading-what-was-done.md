@@ -27,6 +27,10 @@ later, exactly what a model was asked and what it said.
   sentences `lacc verify` prints.
 - The list beside it is the trail's **runs**, newest first, under the day they happened: the
   time, what ran, and how it ended. The latest 300 are listed; the heading gives the total.
+  Skills, questions, conversions and measurements are there - and since ADR-107 `review`,
+  `resolve`, `identify` and `coverage` too, each saying what it reached and what it wrote. A
+  registry request says how many DOIs went and whether an address went with them; the DOIs
+  themselves are listed only under `audit_level: full`, and the address never.
 - How a run ended is what its own records say:
 
   | Shown | Means |
@@ -34,8 +38,8 @@ later, exactly what a model was asked and what it said.
   | finished | it recorded its end |
   | refused | a permission it needed was not granted, or a path was outside the workspace |
   | refused: the prompt did not fit | nothing was sent: it was larger than the window |
-  | declined | you said no at the confirmation |
-  | failed | a file could not be read or converted |
+  | declined | you said no at the confirmation - in `ask` and `measure` too, since ADR-107 |
+  | failed | a file could not be read or converted, or a registry or an embedding model could not be reached |
   | no end recorded | it started and never recorded an end - a crash, or a window closed mid-run |
   | notification sent / failed | a run that only notified |
 

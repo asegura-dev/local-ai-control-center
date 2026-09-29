@@ -169,6 +169,7 @@ from local_ai_control_center.system.audit import (
     AuditLog,
     check_anchor,
     digest_of,
+    digest_of_file,
     walk,
 )
 from local_ai_control_center.system.profiler import SystemProfile, profile_system
@@ -695,19 +696,36 @@ def _warn_no_context_ceiling() -> None:
     )
 
 
-def _write_or_exit(destination: Path, text: str) -> None:
+def _write_or_exit(
+    destination: Path, text: str, record: tuple[AuditLog, str, str] | None = None
+) -> None:
     """Write a file LACC produced, and translate the one refusal it can meet.
 
     `write_new_file` refuses a path that already exists, which is the rule that keeps LACC
     from replacing something of yours. Three commands called it without catching that, so
     the refusal reached the terminal as a traceback - a deliberate, correct decision
     presented as a crash. Found by running `resolve` twice (ADR-087).
+
+    ``record`` names the run the file belongs to - the log, the run and its action. The file
+    is then recorded as written, or the run as failed when the refusal ends it, so a run that
+    stops here does not stop without an end (ADR-107).
     """
     try:
         write_new_file(destination, text)
     except ConversionError as error:
         _show(f"[red]{error}[/red]")
+        if record is not None:
+            audit, run_id, action = record
+            audit.record(
+                run_id,
+                "run_failed",
+                f"Did not write {destination.name}",
+                {"action": action, "error": str(error)},
+            )
         raise typer.Exit(code=1) from error
+    if record is not None:
+        audit, run_id, action = record
+        audit.wrote(run_id, action, destination)
 
 
 def _build_provider(choice: ProviderChoice, config: Config, skill: str = "") -> Provider:
@@ -1127,6 +1145,10 @@ def resolve(
     _show(
         f"[bold]{len(wanted)} DOIs[/bold], of which {len(wanted) - len(fresh)} are already known."
     )
+    # Opened where it is about to ask or act, so a no is recorded too (ADR-107).
+    audit = AuditLog(workspace, config)
+    run_id = audit.opened("resolve")
+    identified = bool(config.registry_mailto)
     if fresh:
         _show(
             f"[yellow]{len(fresh)} would be sent to {config.registry_url}.[/yellow] "
@@ -1136,6 +1158,7 @@ def resolve(
             _show(f"Identifying you as [bold]{config.registry_mailto}[/bold], as configured.")
         if not typer.confirm("Send them?", default=False):
             _show("Nothing was sent.")
+            audit.record(run_id, "confirmation_declined", "Declined resolve", {"action": "resolve"})
             raise typer.Exit(code=1)
 
     resolved: list[Work] = []
@@ -1148,6 +1171,16 @@ def resolve(
             _show(f"[red]{error}[/red]")
             _show("Nothing was written. What had been answered is kept, so a retry asks less.")
             registry.write()
+            audit.asked(run_id, "resolve", config.registry_url, registry.sent, identified)
+            audit.wrote(run_id, "resolve", remembered)
+            # Without the message: it can name the DOI that failed, and the list of DOIs is
+            # kept only under `full` (ADR-107).
+            audit.record(
+                run_id,
+                "run_failed",
+                "The registry could not be reached",
+                {"action": "resolve", "registry": config.registry_url},
+            )
             raise typer.Exit(code=1) from error
         if answer is None:
             # The registry does not hold it. Where the string shows evidence of having
@@ -1166,8 +1199,26 @@ def resolve(
         else:
             unknown.append(doi)
     registry.write()
+    audit.asked(run_id, "resolve", config.registry_url, registry.sent, identified)
+    audit.wrote(run_id, "resolve", remembered)
 
-    _write_or_exit(destination, bibliography(resolved, unknown, silent, config.registry_url))
+    _write_or_exit(
+        destination,
+        bibliography(resolved, unknown, silent, config.registry_url),
+        (audit, run_id, "resolve"),
+    )
+    audit.record(
+        run_id,
+        "run_finished",
+        "Finished resolve",
+        {
+            "action": "resolve",
+            "resolved": len(resolved),
+            "unknown": len(unknown),
+            "silent": len(silent),
+            "repaired": repaired,
+        },
+    )
     _show(f"[green]{len(resolved)} of {len(wanted)} resolved[/green] -> {into}")
     if repaired:
         _show(
@@ -1605,6 +1656,14 @@ def measure(
     # The confirmation is for the repetition, not for one action with a multiplier hidden
     # behind it: the person is told how many times before being asked.
     if not typer.confirm(f"Run this {runs} times, plus one warm-up?", default=False):
+        # Recorded, as a declined `run` is (ADR-107).
+        declined = audit.opened(resolved.name)
+        audit.record(
+            declined,
+            "confirmation_declined",
+            f"Declined {resolved.name}",
+            {"action": resolved.name},
+        )
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 
@@ -1917,6 +1976,15 @@ def ask(
     )
     _say_which_model(config, resolved.name)
     if not _confirm(preview):
+        # A no is part of what happened, recorded the way `run` has always recorded one: a
+        # question prepared and not sent left nothing before this (ADR-107).
+        declined = audit.opened(resolved.name)
+        audit.record(
+            declined,
+            "confirmation_declined",
+            f"Declined {resolved.name}",
+            {"action": resolved.name},
+        )
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 
@@ -2285,9 +2353,10 @@ def review(
     Every other check here verifies text a model produced. This turns that around and asks,
     of each paragraph in your draft: is there anything in my own corpus that holds this up?
 
-    **It reads and reports. It writes nothing and changes nothing** - revising is a separate
-    act with a separate risk, and a tool that told you a sentence was unsupported and then
-    rewrote it would just give you a fluent unsupported sentence.
+    **It reads and reports, and never changes your draft** - with `--into` the report is a new
+    file beside it. Revising is a separate act with a separate risk, and a tool that told you a
+    sentence was unsupported and then rewrote it would just give you a fluent unsupported
+    sentence.
 
     **Uncovered is not false.** A paragraph can be true and well argued while resting on a
     paper that is not in your corpus, which on a bibliography of two dozen papers is the
@@ -2333,30 +2402,87 @@ def review(
         # Said before the question it already asks: finding what each paragraph rests on
         # sends the paragraph, and every quotation never embedded, to be embedded (ADR-106).
         _show(ranking_would_send(outgoing, reaching(config), sends="each paragraph"))
+    # Opened where it is about to ask, so a no is recorded too (ADR-107).
+    audit = AuditLog(workspace, config)
+    run_id = audit.opened("review")
     # No is the default, as everywhere else an engine is reached. It said yes, and Enter
     # sent a whole draft for judging (ADR-105).
     if not typer.confirm("Read it?", default=False):
+        audit.record(run_id, "confirmation_declined", "Declined review", {"action": "review"})
         raise typer.Exit(code=1)
 
     provider = _build_provider(ProviderChoice.ollama, config)
     judge = AskingJudge(provider)
     findings: list[Finding] = []
+    # Every judgement by digest, and the judge's reasons for `full` alone - the record
+    # `ask --judge` keeps, for the calls this makes (ADR-059, ADR-107).
+    rows: list[dict[str, object]] = []
+    reasons: list[dict[str, str]] = []
     # A budget large enough for everything: the ranking is what is wanted here, not a
     # selection, and a quotation dropped for space would be support the writer never sees.
     # Computed once - the corpus does not change between paragraphs.
     whole = sum(estimate_tokens(passage.text) for passage in passages) + len(passages)
-    with console.status(f"Reading {len(blocks)} paragraphs..."):
-        for block in blocks:
-            nearest = retriever.select(block.text, passages, whole).chosen
-            judged = [
-                (p.source, p.text, judge.judge(block.text, p.text))
-                for p in nearest[:CANDIDATES_PER_PARAGRAPH]
-            ]
-            findings.append(concluded(block, judged))
+    try:
+        with console.status(f"Reading {len(blocks)} paragraphs..."):
+            for block in blocks:
+                nearest = retriever.select(block.text, passages, whole).chosen
+                judged = [
+                    (p.source, p.text, judge.judge(block.text, p.text))
+                    for p in nearest[:CANDIDATES_PER_PARAGRAPH]
+                ]
+                for _, quoted, verdict in judged:
+                    rows.append(
+                        {
+                            "line": block.line,
+                            "quote_sha256": digest_of(quoted),
+                            "asked_sha256": digest_of(verdict.asked),
+                            "verdict": verdict.verdict,
+                        }
+                    )
+                    reasons.append({"verdict": verdict.verdict, "why": verdict.detail})
+                findings.append(concluded(block, judged))
+    except EmbeddingError as error:
+        # The judge turns an engine that went away into an undecided verdict; the ranking
+        # cannot, and a run that stopped here would otherwise have no end (ADR-107).
+        _show(f"[red]{error}[/red]")
+        audit.record(
+            run_id, "run_failed", "Could not rank", {"action": "review", "error": str(error)}
+        )
+        raise typer.Exit(code=1) from error
 
     against_it = [f for f in findings if f.verdict == "contradicted"]
     uncovered = [f for f in findings if f.verdict == "nothing"]
     held = len(findings) - len(against_it) - len(uncovered)
+    if outgoing is not None:
+        host = resolve_engine_host(config.engine_host, config.network_access)
+        audit.embedded(
+            run_id,
+            "review",
+            outgoing.model,
+            host,
+            {"paragraphs": len(blocks), "quotations": outgoing.unembedded},
+        )
+    audit.record(
+        run_id,
+        "readings_judged",
+        f"Judged {len(blocks)} paragraphs of {draft.name}",
+        {
+            "action": "review",
+            "judge": judge.name,
+            "draft": draft.name,
+            "draft_sha256": digest_of_file(written),
+            "corpus": against.name,
+            "corpus_sha256": digest_of_file(corpus_file),
+            "paragraphs": len(blocks),
+            "judged": len(rows),
+            "contradicted": len(against_it),
+            "held": held,
+            "not_covered": len(uncovered),
+            "undecided": sum(1 for row in rows if row["verdict"] == "undecided"),
+            "judged_readings": rows,
+            "completion": reasons,
+        },
+    )
     if against_it:
         _show(f"[red]{len(against_it)} paragraphs your corpus contradicts.[/red] Read these first.")
         for finding in against_it:
@@ -2369,15 +2495,15 @@ def review(
     written_report = report(findings, draft.name, against.name, 0)
     if into:
         destination = workspace.resolve_within(into)
-        _write_or_exit(destination, written_report)
+        _write_or_exit(destination, written_report, (audit, run_id, "review"))
         # The same findings as data, beside the report, so the window can paint them over
         # the draft without re-running an engine (ADR-069).
         reviewed = Reviewed(draft=draft.name, corpus=against.name, findings=tuple(findings))
-        write_new_file(
-            destination.with_suffix(FINDINGS_SUFFIX),
-            reviewed.model_dump_json(indent=2),
-        )
+        beside = destination.with_suffix(FINDINGS_SUFFIX)
+        write_new_file(beside, reviewed.model_dump_json(indent=2))
+        audit.wrote(run_id, "review", beside)
         _show(f"-> {into}")
+    audit.record(run_id, "run_finished", "Finished review", {"action": "review"})
 
 
 def _engine_at(config: Config, host: str) -> EngineSeen:
@@ -2591,22 +2717,40 @@ def coverage(
     host = resolve_engine_host(config.engine_host, config.network_access)
     embedder = OllamaEmbedder(config.embedding_model, host)
     cache = corpus_path.with_suffix(corpus_path.suffix + VECTOR_SUFFIX)
+    dense = DenseRetriever(embedder, cache)
+    # Counted from what is stored, without sending: the same count the embedding then keeps
+    # to (ADR-106).
+    unembedded = dense.would_send(passages).unembedded
     _show(
         f"[bold]{len(topics)} topics[/bold] against {len(passages)} quotations, by meaning. "
-        f"The topics, and every quotation not already embedded beside the corpus, would be sent "
-        f"to [bold]{config.embedding_model}[/bold] on [bold]{host}[/bold]."
+        f"The topics, and the {unembedded} quotations never embedded beside the corpus, would "
+        f"be sent to [bold]{config.embedding_model}[/bold] on [bold]{host}[/bold]."
     )
+    # Opened where it is about to ask, so a no is recorded too (ADR-107).
+    audit = AuditLog(workspace, config)
+    run_id = audit.opened("coverage")
     # Asked before anything is sent. It measured in the same breath as it announced, and the
     # host can be another machine (ADR-105).
     if not typer.confirm("Send them?", default=False):
         _show("Nothing was sent, and nothing was written.")
+        audit.record(run_id, "confirmation_declined", "Declined coverage", {"action": "coverage"})
         raise typer.Exit(code=1)
     try:
-        vectors = tuple(DenseRetriever(embedder, cache).vectors_for(passages))
+        vectors = tuple(dense.vectors_for(passages))
         found = reach_of(topics, passages, vectors, embedder)
     except (EmbeddingError, ValueError) as error:
         _show(f"[red]{error}[/red]")
+        audit.record(
+            run_id, "run_failed", "Could not measure", {"action": "coverage", "error": str(error)}
+        )
         raise typer.Exit(code=1) from error
+    audit.embedded(
+        run_id,
+        "coverage",
+        embedder.name,
+        host,
+        {"topics": len(topics), "quotations": unembedded},
+    )
 
     floor = next((one.nearest for one in found if one.topic.control), 0.0)
     for one in found:
@@ -2622,7 +2766,9 @@ def coverage(
         taken = datetime.now(UTC).date().isoformat()
         destination = workspace.resolve_within(into)
         _write_or_exit(
-            destination, coverage_report(found, against.name, config.embedding_model, taken)
+            destination,
+            coverage_report(found, against.name, config.embedding_model, taken),
+            (audit, run_id, "coverage"),
         )
         # The numbers beside the report, the way findings sit beside a review: the window
         # paints a measurement without re-running an engine, and reads data rather than
@@ -2632,7 +2778,14 @@ def coverage(
         )
         beside = destination.with_suffix(REACHES_SUFFIX)
         beside.write_text(measured.model_dump_json(indent=2) + chr(10), encoding="utf-8")
+        audit.wrote(run_id, "coverage", beside)
         _show(f"[green]Written[/green] -> {into}")
+    audit.record(
+        run_id,
+        "run_finished",
+        "Finished coverage",
+        {"action": "coverage", "topics": len(topics), "quotations": len(passages)},
+    )
 
 
 @app.command()
@@ -2676,31 +2829,48 @@ def identify(
         _show(f"[red]{document} is not in the workspace.[/red]")
         raise typer.Exit(code=1)
 
+    kept = workspace.resolve_within(Path("identified.registry.json"))
     registry = RememberedRegistry(
-        CrossrefRegistry(config.registry_url, config.registry_mailto),
-        workspace.resolve_within(Path("identified.registry.json")),
+        CrossrefRegistry(config.registry_url, config.registry_mailto), kept
     )
+    audit = AuditLog(workspace, config)
     already = established_for(path)
     if already is not None:
         _show(f"[dim]Already established as {already.doi} on {already.established}.[/dim]")
 
     if doi is None:
-        _propose(path, registry, config)
+        _propose(path, registry, config, audit, kept)
         return
 
     wanted = doi.strip()
+    # Opened where it is about to ask, so a no is recorded too (ADR-107).
+    run_id = audit.opened("identify")
+    identified = bool(config.registry_mailto)
     _show(f"[yellow]1 DOI would be sent to {config.registry_url}.[/yellow]")
     if not typer.confirm("Ask the registry?", default=False):
         _show("Nothing was sent.")
+        audit.record(run_id, "confirmation_declined", "Declined identify", {"action": "identify"})
         raise typer.Exit(code=1)
     try:
         work = registry.about(wanted)
     except RegistryError as error:
         _show(f"[red]{error}[/red]")
+        audit.asked(run_id, "identify", config.registry_url, registry.sent, identified)
+        audit.record(
+            run_id,
+            "run_failed",
+            "The registry could not be reached",
+            {"action": "identify", "registry": config.registry_url},
+        )
         raise typer.Exit(code=1) from error
     registry.write()
+    audit.asked(run_id, "identify", config.registry_url, registry.sent, identified)
+    audit.wrote(run_id, "identify", kept)
     if work is None:
         _show(f"[red]The registry holds nothing for {wanted}.[/red] Nothing was written.")
+        audit.record(
+            run_id, "run_finished", "Finished identify", {"action": "identify", "held": False}
+        )
         raise typer.Exit(code=1)
 
     _show(f"[bold]{work.title}[/bold]")
@@ -2709,12 +2879,17 @@ def identify(
     _show(f"[dim]The document opens: {said}[/dim]")
     if not typer.confirm("Is that what this document is?", default=False):
         _show("[yellow]Nothing was written.[/yellow] A wrong DOI is worse than a missing one.")
+        audit.record(run_id, "confirmation_declined", "Declined identify", {"action": "identify"})
         raise typer.Exit(code=1)
     written = establish(path, wanted, work.title)
+    audit.wrote(run_id, "identify", written)
+    audit.record(run_id, "run_finished", "Finished identify", {"action": "identify", "held": True})
     _show(f"[green]Established[/green] -> {written.name}")
 
 
-def _propose(path: Path, registry: RememberedRegistry, config: Config) -> None:
+def _propose(
+    path: Path, registry: RememberedRegistry, config: Config, audit: AuditLog, kept: Path
+) -> None:
     """List the DOIs a document prints, with what the registry says each one is."""
     candidates = printed_dois(path.read_text(encoding="utf-8", errors="replace"))
     if not candidates:
@@ -2725,23 +2900,40 @@ def _propose(path: Path, registry: RememberedRegistry, config: Config) -> None:
         )
         return
     fresh = [one for one in candidates if not registry.holds(one)]
+    # Opened where it is about to ask, so a no is recorded too (ADR-107).
+    run_id = audit.opened("identify")
     _show(f"[bold]{len(candidates)} DOIs[/bold] printed near the front of {path.name}.")
     if fresh:
         _show(f"[yellow]{len(fresh)} would be sent to {config.registry_url}.[/yellow]")
         if not typer.confirm("Ask the registry what they are?", default=False):
             _show("Nothing was sent.")
+            audit.record(
+                run_id, "confirmation_declined", "Declined identify", {"action": "identify"}
+            )
             return
+    unreachable = 0
     for one in candidates:
         try:
             work = registry.about(one)
         except RegistryError as error:
             _show(f"  [red]{one}[/red]  {error}")
+            unreachable += 1
             continue
         if work is None:
             _show(f"  [dim]{one}[/dim]  the registry holds nothing for it")
             continue
         _show(f"  [bold]{one}[/bold]  {work.title}")
     registry.write()
+    audit.asked(
+        run_id, "identify", config.registry_url, registry.sent, bool(config.registry_mailto)
+    )
+    audit.wrote(run_id, "identify", kept)
+    audit.record(
+        run_id,
+        "run_finished",
+        "Finished identify",
+        {"action": "identify", "proposed": len(candidates), "unreachable": unreachable},
+    )
     said = opening_of(path.read_text(encoding="utf-8", errors="replace"))
     _show(f"[dim]The document opens: {said}[/dim]")
     _show(

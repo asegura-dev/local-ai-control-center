@@ -226,6 +226,7 @@ class RememberedRegistry(Registry):
         self._behind = behind
         self._path = remembered
         self._known: dict[str, dict[str, Any]] = {}
+        self._sent: list[str] = []
         if remembered.exists():
             try:
                 loaded = json.loads(remembered.read_text(encoding="utf-8"))
@@ -240,11 +241,23 @@ class RememberedRegistry(Registry):
         """Whether this DOI has already been answered, without asking anything."""
         return doi.strip().lower() in self._known
 
+    @property
+    def sent(self) -> tuple[str, ...]:
+        """Every DOI this passed on to the registry, in order - what actually left.
+
+        Not what a command announced: a DOI the registry does not hold is retried with what
+        extraction stuck to it cut off, and each cut is a request of its own (ADR-083). The
+        record of a run carries this (ADR-107).
+        """
+        return tuple(self._sent)
+
     def about(self, doi: str) -> Work | None:
         wanted = doi.strip().lower()
         if wanted in self._known:
             remembered = self._known[wanted]
             return Work(**remembered) if remembered else None
+        # Counted before asking, so a request that fails on the way out still counts as sent.
+        self._sent.append(wanted)
         answer = self._behind.about(wanted)
         self._known[wanted] = answer.model_dump() if answer else {}
         return answer

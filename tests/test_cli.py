@@ -11,6 +11,7 @@ import json
 import shutil
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from conftest import pdf_with_streams
@@ -18,8 +19,11 @@ from typer.testing import CliRunner
 
 from local_ai_control_center.cli import app
 from local_ai_control_center.features.ask import might_support
+from local_ai_control_center.features.identity import establish
 from local_ai_control_center.ports.embedder import Embedder
 from local_ai_control_center.ports.notifier import Delivery, Notification, Notifier
+from local_ai_control_center.ports.provider import Completion, Provider
+from local_ai_control_center.ports.registry import Registry, Work
 
 runner = CliRunner()
 
@@ -526,14 +530,18 @@ def test_measure_says_how_many_times_before_asking(tmp_path: Path) -> None:
 
 
 def test_declining_a_measurement_runs_nothing(tmp_path: Path) -> None:
-    """Defaults to no, like every other confirmation in LACC."""
+    """Defaults to no, like every other confirmation in LACC.
+
+    Nothing runs, and the no is recorded: this asserted an empty trail until ADR-107, when a
+    declined measurement began to leave what a declined `run` always had.
+    """
     config = _config_file(tmp_path)
     runner.invoke(
         app,
         ["measure", "summarize_file", "notes.txt", "-c", str(config), "--provider", "mock"],
         input="\n",
     )
-    assert not (tmp_path / "ws" / "audit.jsonl").exists()
+    assert _kinds(tmp_path) == ["run_started", "confirmation_declined"]
 
 
 def test_every_repetition_is_audited_separately(tmp_path: Path) -> None:
@@ -1543,6 +1551,8 @@ def test_coverage_asks_before_it_sends_anything_to_be_embedded(tmp_path: Path) -
     assert "Send them? [y/N]" in said
     assert "Nothing was sent" in said
     assert not any(path.suffix == ".vectors" for path in (tmp_path / "ws").iterdir())
+    # And the no is in the trail (ADR-107).
+    assert _kinds_of(tmp_path, "coverage") == ["run_started", "confirmation_declined"]
 
 
 # --- ranking by meaning asks before it reaches the engine (ADR-106) ------------------------
@@ -1654,3 +1664,216 @@ def test_review_says_what_it_embeds_before_it_asks(
     assert result.exit_code == 1
     assert "sends each paragraph and 2 quotations never embedded before" in said
     assert engine.sent == []
+
+
+# --- what reaches an engine or a registry leaves a record (ADR-107) ------------------------
+
+
+def _run_of(tmp_path: Path, action: str) -> list[dict[str, Any]]:
+    """The records of the last run opened for ``action``, in order."""
+    log = tmp_path / "ws" / "audit.jsonl"
+    records = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]
+    opened = [
+        record["run_id"]
+        for record in records
+        if record["kind"] == "run_started" and record["detail"].get("action") == action
+    ]
+    assert opened, f"no run of {action} was recorded"
+    return [record for record in records if record["run_id"] == opened[-1]]
+
+
+def _kinds_of(tmp_path: Path, action: str) -> list[str]:
+    return [record["kind"] for record in _run_of(tmp_path, action)]
+
+
+def _detail(run: list[dict[str, Any]], kind: str) -> dict[str, Any]:
+    return next(record["detail"] for record in run if record["kind"] == kind)
+
+
+class _Judges(Provider):
+    """An engine that finds every sentence supports every reading."""
+
+    @property
+    def name(self) -> str:
+        return "judges"
+
+    def complete(
+        self, prompt: str, temperature: float = 0.0, schema: dict[str, Any] | None = None
+    ) -> Completion:
+        return Completion(text='{"verdict": "follows", "why": "it says so"}', provider="judges")
+
+
+def _judging(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "local_ai_control_center.cli._build_provider",
+        lambda choice, config, skill="": _Judges(),
+    )
+
+
+class _Crossref(Registry):
+    """A registry that knows every DOI it is asked about."""
+
+    def __init__(self, url: str, mailto: str = "") -> None:
+        self.mailto = mailto
+
+    def about(self, doi: str) -> Work | None:
+        return Work(doi=doi, title="A work the registry knows", year=2024)
+
+
+def _with_a_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mailto: str = "") -> Path:
+    """The small corpus, a registry switched on and replaced, and a paper with its DOI."""
+    config = _corpus_file(tmp_path)
+    switches = "registry_url: https://api.crossref.org" + chr(10) + "network_access: true" + chr(10)
+    if mailto:
+        switches += f"registry_mailto: {mailto}" + chr(10)
+    config.write_text(config.read_text(encoding="utf-8") + switches, encoding="utf-8")
+    monkeypatch.setattr("local_ai_control_center.cli.CrossrefRegistry", _Crossref)
+    paper = tmp_path / "ws" / "paper.md"
+    paper.write_text("A paper about lymph nodes." + chr(10), encoding="utf-8")
+    establish(paper, "10.1000/lymph", "A paper about lymph nodes")
+    return config
+
+
+def test_a_declined_question_is_recorded(tmp_path: Path) -> None:
+    """`ask` opened its run after `Proceed?`, so a no left nothing at all."""
+    config = _corpus_file(tmp_path)
+    result = runner.invoke(app, ["ask", *_ASKING, "-c", str(config)], input="n\n")
+    assert result.exit_code == 0, result.stdout
+    assert _kinds_of(tmp_path, "ask_corpus") == ["run_started", "confirmation_declined"]
+
+
+def test_a_declined_measurement_is_recorded(tmp_path: Path) -> None:
+    config = _corpus_file(tmp_path)
+    runner.invoke(app, ["measure", "ask_corpus", *_ASKING, "-c", str(config)], input="n\n")
+    assert _kinds_of(tmp_path, "ask_corpus") == ["run_started", "confirmation_declined"]
+
+
+def test_review_records_its_judgements_by_digest_and_what_it_wrote(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _draft_and_corpus(tmp_path)
+    _judging(monkeypatch)
+    result = runner.invoke(
+        app,
+        ["review", "draft.md", "--against", "corpus.md", "--into", "review.md", "-c", str(config)],
+        input="y\n",
+    )
+    assert result.exit_code == 0, result.stdout
+    run = _run_of(tmp_path, "review")
+    kinds = [record["kind"] for record in run]
+    assert (kinds[0], kinds[-1]) == ("run_started", "run_finished")
+    judged = _detail(run, "readings_judged")
+    assert judged["paragraphs"] == 1
+    assert judged["judged"] == len(judged["judged_readings"]) > 0
+    assert "completion" not in judged, "the judge's reasons are kept only under full"
+    assert kinds.count("file_written") == 2, "the report and its findings"
+    assert "texts_embedded" not in kinds, "ranked by words: nothing went to be embedded"
+
+
+def test_a_declined_review_is_recorded(tmp_path: Path) -> None:
+    config = _draft_and_corpus(tmp_path)
+    runner.invoke(
+        app, ["review", "draft.md", "--against", "corpus.md", "-c", str(config)], input="\n"
+    )
+    assert _kinds_of(tmp_path, "review") == ["run_started", "confirmation_declined"]
+
+
+def test_review_by_meaning_records_what_it_embedded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    _judging(monkeypatch)
+    (tmp_path / "ws" / "draft.md").write_text(
+        "The sensitivity for pelvic lymph nodes was high in this cohort." + chr(10),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app, ["review", "draft.md", "--against", "corpus.md", "-c", str(config)], input="y\n"
+    )
+    assert result.exit_code == 0, result.stdout
+    embedded = _detail(_run_of(tmp_path, "review"), "texts_embedded")
+    assert (embedded["paragraphs"], embedded["quotations"]) == (1, 2)
+    assert embedded["model"] == "ollama:bge-m3"
+    assert len(engine.sent) == embedded["texts"], "what was recorded is what went"
+
+
+def test_resolve_records_what_went_to_the_registry_and_what_it_wrote(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _with_a_registry(tmp_path, monkeypatch)
+    result = runner.invoke(
+        app, ["resolve", "paper.md", "--into", "refs.md", "-c", str(config)], input="y\n"
+    )
+    assert result.exit_code == 0, result.stdout
+    run = _run_of(tmp_path, "resolve")
+    asked = _detail(run, "registry_asked")
+    assert (asked["asked"], asked["identified"]) == (1, False)
+    assert "dois" not in asked, "the list of them is a bibliography, kept only under full"
+    kinds = [record["kind"] for record in run]
+    assert kinds.count("file_written") == 2, "the kept answers and the bibliography"
+    assert kinds[-1] == "run_finished"
+
+
+def test_a_contact_address_goes_to_the_registry_and_never_into_the_trail(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _with_a_registry(tmp_path, monkeypatch, mailto="someone@example.org")
+    runner.invoke(app, ["resolve", "paper.md", "--into", "refs.md", "-c", str(config)], input="y\n")
+    assert _detail(_run_of(tmp_path, "resolve"), "registry_asked")["identified"] is True
+    trail = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8")
+    assert "someone@example.org" not in trail
+
+
+def test_a_declined_resolve_is_recorded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = _with_a_registry(tmp_path, monkeypatch)
+    runner.invoke(app, ["resolve", "paper.md", "--into", "refs.md", "-c", str(config)], input="\n")
+    assert _kinds_of(tmp_path, "resolve") == ["run_started", "confirmation_declined"]
+
+
+def test_identify_records_the_doi_it_asked_about_and_what_it_established(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _with_a_registry(tmp_path, monkeypatch)
+    (tmp_path / "ws" / "other.md").write_text("Another paper." + chr(10), encoding="utf-8")
+    result = runner.invoke(
+        app,
+        ["identify", "other.md", "--doi", "10.1000/other", "-c", str(config)],
+        input="y\n" + "y\n",
+    )
+    assert result.exit_code == 0, result.stdout
+    run = _run_of(tmp_path, "identify")
+    kinds = [record["kind"] for record in run]
+    assert (kinds[0], kinds[-1]) == ("run_started", "run_finished")
+    assert _detail(run, "registry_asked")["asked"] == 1
+    assert kinds.count("file_written") == 2, "the kept answer and the established DOI"
+
+
+def test_saying_a_document_is_not_that_work_is_recorded_as_a_no(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _with_a_registry(tmp_path, monkeypatch)
+    (tmp_path / "ws" / "other.md").write_text("Another paper." + chr(10), encoding="utf-8")
+    runner.invoke(
+        app,
+        ["identify", "other.md", "--doi", "10.1000/other", "-c", str(config)],
+        input="y\n" + "n\n",
+    )
+    kinds = _kinds_of(tmp_path, "identify")
+    assert "registry_asked" in kinds
+    assert kinds[-1] == "confirmation_declined"
+
+
+def test_coverage_records_what_it_embedded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config, engine = _with_meaning(tmp_path, monkeypatch)
+    (tmp_path / "ws" / "topics.md").write_text(
+        "lymph node detection" + chr(10) + "! the migration of birds" + chr(10), encoding="utf-8"
+    )
+    result = runner.invoke(
+        app, ["coverage", "topics.md", "--against", "corpus.md", "-c", str(config)], input="y\n"
+    )
+    assert result.exit_code == 0, result.stdout
+    run = _run_of(tmp_path, "coverage")
+    embedded = _detail(run, "texts_embedded")
+    assert (embedded["topics"], embedded["quotations"], embedded["texts"]) == (2, 2, 4)
+    assert len(engine.sent) == embedded["texts"], "what was recorded is what went"
+    assert run[-1]["kind"] == "run_finished"
