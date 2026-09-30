@@ -415,7 +415,8 @@ def _ask_flow(window: Window) -> None:
     wait(delay + 1)
     print(
         f"  stopped waiting: answer discarded {turns() == before}, nothing left in flight "
-        f"{corpus not in asking._PENDING}"
+        f"{corpus not in asking._PENDING}, the card says the engine finished "
+        f"{_shows(window, 'The engine finished after')} (ADR-118)"
     )
 
     _press(window, "Start over")
@@ -505,6 +506,37 @@ def _preparing_flow(window: Window, open_corpus: Any, elsewhere: Any) -> None:
     print(
         f"     left mid-way: nothing drawn into {elsewhere.name} {not drawn_elsewhere}, "
         f"no stale preview on return {not stale}"
+    )
+
+
+def _engines_flow(window: Window) -> None:
+    """Engines, against a stand-in that takes two seconds and does not answer (ADR-118).
+
+    The check ran on the window's thread: an engine that accepted a connection and said
+    nothing held the window for eight seconds. Here the press should return at once, a line
+    should count the seconds, and what did not answer should be drawn as not answering.
+    """
+    from local_ai_control_center.features.status import EngineSeen
+
+    def slow(host: str) -> EngineSeen:
+        time.sleep(2.0)
+        return EngineSeen(asked=True, host=host, detail="Cannot reach it: timed out.")
+
+    window.ask_engine = slow
+    engines = next(s for s in SECTIONS if s.name == "Engines")
+    window._go(engines)
+    _settle(window, 4)
+    started = time.perf_counter()
+    pressed = _press(window, "Ask it")
+    pressed_for = time.perf_counter() - started
+    counted = _until(window, lambda: _shows(window, "0s"), 1.0)
+    moved = _until(window, lambda: _shows(window, "1s"), 3.0)
+    said = _until(window, lambda: _shows(window, "unreachable"), 5.0)
+    why = _shows(window, "timed out")
+    print(
+        f"  a two-second check: pressed {pressed}, the press returned in {pressed_for:.2f} s, "
+        f"the line counted {counted}, the seconds moved {moved}, then it said unreachable "
+        f"{said} and why {why}"
     )
 
 
@@ -613,6 +645,9 @@ def main() -> int:
     print()
     print("Ask, against a stand-in engine")
     _ask_flow(window)
+    print()
+    print("Engines, against a stand-in that does not answer")
+    _engines_flow(window)
     print()
     print("Audit, against the real trail")
     _audit(window)

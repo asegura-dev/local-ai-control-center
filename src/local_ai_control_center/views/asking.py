@@ -574,6 +574,26 @@ def _give_up(pending: _Pending, panel: Panel) -> None:
         stop.configure(state="disabled")
 
 
+def _after_stopping(pending: _Pending, waiting: ctk.CTkLabel | None, panel: Panel) -> None:
+    """Watch a question somebody stopped waiting for, only to say when the engine finished.
+
+    The card said *may still be generating* and kept saying it after the engine had answered:
+    the watch ended at the stop, so nothing was left to notice (ADR-118). The answer is taken
+    off the queue and not looked at - discarded unread, as the card promised.
+    """
+    try:
+        pending.answers.get_nowait()
+    except queue.Empty:
+        panel.body.after(EVERY, lambda: _after_stopping(pending, waiting, panel))
+        return
+    if waiting is not None and _alive(waiting):
+        seconds = time.monotonic() - pending.began
+        waiting.configure(
+            text=f"Stopped waiting. The engine finished after {seconds:.0f}s; its answer was "
+            "discarded unread."
+        )
+
+
 def _watch(corpus: str, panel: Panel) -> None:
     """Count the seconds, and keep the answer when it arrives - whoever is looking.
 
@@ -590,9 +610,12 @@ def _watch(corpus: str, panel: Panel) -> None:
     if pending is None:
         return
     if pending.stopped.is_set():
-        # Whatever the worker puts in the queue later is never read.
+        # Whatever the worker puts in the queue later is never read - only that it came, so
+        # the card can stop saying the engine may still be generating (ADR-118). The corpus
+        # is free for another question at once, as it was.
         _PENDING.pop(corpus, None)
-        _DRAWN.pop(corpus, None)
+        drawn = _DRAWN.pop(corpus, None)
+        _after_stopping(pending, drawn[0] if drawn is not None else None, panel)
         return
     drawn = _DRAWN.get(corpus)
     try:

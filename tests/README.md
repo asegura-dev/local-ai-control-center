@@ -113,5 +113,6 @@ behaviour test caught were caught - or would have been - by one of these.
 The window's widgets. Tk cannot be exercised without a display, which is why the window is
 kept thin and every decision it draws lives in `features/`, where it is tested.
 `tools/measure_window.py` drives the real window instead - text cut off, sections out of
-reach, the wheel, Ask against a stand-in engine, the Audit section against the real trail -
+reach, the wheel, Ask and Engines against stand-in engines, the Audit section against the
+real trail -
 and reports; it concludes nothing.

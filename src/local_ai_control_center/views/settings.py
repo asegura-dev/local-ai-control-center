@@ -14,6 +14,9 @@ along the bottom has kept since it was written (ADR-077).
 
 from __future__ import annotations
 
+import queue
+import threading
+import time
 from pathlib import Path
 
 import customtkinter as ctk
@@ -27,6 +30,7 @@ from local_ai_control_center.features.editing import (
     differences,
     settings_shown,
 )
+from local_ai_control_center.features.status import EngineSeen
 from local_ai_control_center.views import paint
 from local_ai_control_center.views.section import Panel, Section, Sidebar, State
 
@@ -241,17 +245,72 @@ def _show_engines(side: Sidebar, panel: Panel, state: State) -> None:
         )
 
 
+EVERY = 200
+"""Milliseconds between looks at a check in flight, as Ask's (ADR-110)."""
+
+
+def _alive(widget: object) -> bool:
+    """Whether a widget is still on the screen - a poll outlives a section left (ADR-099)."""
+    try:
+        return bool(widget.winfo_exists())  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001 - a destroyed widget answers in several ways
+        return False
+
+
 def _ask(host: str, into: ctk.CTkFrame, panel: Panel, state: State) -> None:
-    """Ask one engine what it holds. Blocks briefly; the check has its own short timeout."""
+    """Ask one engine what it holds, on a worker, counting the seconds (ADR-118).
+
+    It asked on the window's thread. An engine that accepts a connection and never answers
+    held the window for the check's eight seconds, and the tester saw no notice while it
+    waited and an empty card after. Now the press returns at once, a line counts, and what
+    came back - or why nothing did - is drawn when it arrives. What is needed is read here;
+    the worker touches no widget.
+    """
     if state.ask_engine is None:
         return
     for child in into.winfo_children():
         child.destroy()
-    paint.text(into, "asking...", panel.skin.faint, 11)
-    into.update_idletasks()
-    seen = state.ask_engine(host)
+    counting = paint.text(into, f"asking {host}... 0s", panel.skin.faint, 11)
+    results: queue.Queue[EngineSeen] = queue.Queue()
+    ask = state.ask_engine
+
+    def work() -> None:
+        """The worker. Nothing it does can raise into Tk: a failure is drawn as one."""
+        try:
+            results.put(ask(host))
+        except Exception as error:  # noqa: BLE001 - a traceback here has nowhere to go
+            results.put(EngineSeen(asked=True, host=host, detail=str(error)))
+
+    began = time.monotonic()
+    threading.Thread(target=work, daemon=True, name="lacc-engine").start()
+    _await_engine(results, began, counting, host, into, panel)
+
+
+def _await_engine(
+    results: queue.Queue[EngineSeen],
+    began: float,
+    counting: ctk.CTkLabel,
+    host: str,
+    into: ctk.CTkFrame,
+    panel: Panel,
+) -> None:
+    """Look for the check's answer from inside `after`, and draw it while its card is there."""
+    if not _alive(into):
+        return
+    try:
+        seen = results.get_nowait()
+    except queue.Empty:
+        if _alive(counting):
+            counting.configure(text=f"asking {host}... {time.monotonic() - began:.0f}s")
+        panel.body.after(EVERY, lambda: _await_engine(results, began, counting, host, into, panel))
+        return
     for child in into.winfo_children():
         child.destroy()
+    _draw_seen(seen, into, panel)
+
+
+def _draw_seen(seen: EngineSeen, into: ctk.CTkFrame, panel: Panel) -> None:
+    """What the check found: whether it answered, why not, and what the engine holds."""
     colour = panel.skin.supported if seen.answered else panel.skin.contradicted
     paint.text(into, seen.said, colour, 12, bold=True)
     if seen.detail and not seen.answered:

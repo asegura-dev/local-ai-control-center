@@ -746,3 +746,9 @@ ADR-107 promised a run is recorded however it ends. Ctrl+C or the end of the inp
 [`ADR-117-more-things-the-program-said-that-were-not-so.md`](ADR-117-more-things-the-program-said-that-were-not-so.md)
 
 The second batch after ADR-103, several made false by a later record. `status` said *156 are no longer in their document* of quotations never found there, and counted 39 documents where the files are 38. `ask` told a person who had declined ranking by meaning that a model would have to be configured. `resolve --help` called itself the one command that reaches a registry and promised a DOI is never asked twice; `bib` said LACC reads nothing outside the workspace; `resolve` advised reading PDFs it had already read; `identify` asked to write a `registry_url` already written; a preview said *the contents read above* over nothing. Commands counted 21 of 23, leaving out `engine test` and `notify test`. And the help, written in Markdown and read as plain text, printed `**` and cut paragraphs mid-sentence - now read as Markdown. Each sentence now says what is so.
+
+### 118 - the window waits for no engine, and says when one finished
+
+[`ADR-118-the-window-waits-for-no-engine.md`](ADR-118-the-window-waits-for-no-engine.md)
+
+Engines was the last place the window asked an engine from its own thread: an engine that accepts a connection and never answers held it for the check's eight seconds, and on 25 September left no notice while it waited and an empty card after. It now asks on a worker, as Send and Prepare do, counts the seconds and draws the answer or why there was none. And a question somebody stopped waiting for kept saying *may still be generating* after the engine had answered, because the watch ended at the stop; it is watched now only to say when the engine finished, its answer discarded unread. Both driven in the real window against stand-ins.

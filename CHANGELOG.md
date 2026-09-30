@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **Engines held the window, and Stop waiting stayed out of date** (ADR-118). Asking an
+  engine what it holds ran on the window's thread, so one that accepts a connection and
+  never answers froze it for eight seconds and left an empty card. It runs on a worker
+  now, counting the seconds and drawing the answer or why there was none. After *Stop
+  waiting*, the card now says when the engine finished instead of *may still be
+  generating* for ever.
 - **Ten sentences the program printed were not so** (ADR-117).
   - `status`: *156 are no longer in their document* now reads *were not found in their
     document*; they never were. It counts 38 documents where it said 39.
