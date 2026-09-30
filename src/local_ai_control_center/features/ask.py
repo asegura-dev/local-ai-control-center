@@ -326,10 +326,17 @@ def prepare(
             how=selection.how,
             model=config.model,
             reaches=reaches,
+            # With a model configured, words were chosen by declining meaning, and "unless
+            # an embedding model is configured" was false (ADR-117).
             refusal=(
                 f"Nothing in those {selection.considered} passages matches that question. "
-                "The word ranking does not cross languages: a question in Spanish will not "
-                "find quotations in English unless an embedding model is configured."
+                "Ranked by words, a question in one language does not find quotations in "
+                "another: "
+                + (
+                    "say yes to ranking by meaning to cross them."
+                    if config.embedding_model
+                    else "an embedding model, configured, would cross them."
+                )
             ),
             ranked=ranked,
         )

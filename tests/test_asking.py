@@ -189,7 +189,16 @@ def test_a_question_matching_nothing_says_so_and_offers_no_way_to_send_it() -> N
     made = prepare("chromodynamics", "corpus.md", CORPUS, _config(), WordRetriever())
     assert not made.sendable
     assert made.considered == 3
-    assert "does not cross languages" in made.refusal
+    assert "does not find quotations in another" in made.refusal
+    assert "an embedding model, configured, would cross them" in made.refusal
+
+
+def test_with_a_model_configured_the_refusal_names_the_no_that_was_said() -> None:
+    """It said "unless an embedding model is configured" of one that was (ADR-117)."""
+    configured = _config().model_copy(update={"embedding_model": "bge-m3"})
+    made = prepare("chromodynamics", "corpus.md", CORPUS, configured, WordRetriever())
+    assert "say yes to ranking by meaning" in made.refusal
+    assert "is configured" not in made.refusal
 
 
 def test_a_ranking_that_fails_becomes_a_sentence_rather_than_an_exception() -> None:

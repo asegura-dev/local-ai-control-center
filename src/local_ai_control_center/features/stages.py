@@ -145,7 +145,11 @@ def stages_in(workspace: Path, context_file: str = "") -> Work:
     biggest = max(corpora, key=lambda p: p.stat().st_size, default=None)
     claims = parse_corpus(biggest.read_text(encoding="utf-8", errors="replace")) if biggest else ()
     refused = sum(1 for c in claims if "NOT IN THE DOCUMENT" in c.recorded_verdict)
-    covered = {c.document for c in claims}
+    # The files the quotations come from, counted as the window's Corpora counts them. The
+    # set below also holds the documents extracts were taken out of, which is right for
+    # saying what is covered and made "from 39 documents" of 38 files (ADR-117).
+    sources = {c.document for c in claims}
+    covered = set(sources)
     # A document whose extracted sections are collected is covered *through* them. The
     # extract says which document it came from, in a file beside it (ADR-082).
     for extract in by_kind["extract"]:
@@ -198,7 +202,7 @@ def stages_in(workspace: Path, context_file: str = "") -> Work:
             Stage(
                 name="Quotations",
                 command="lacc collect extract_claims <docs> --into corpus.md",
-                done=f"{len(claims):,} from {len(covered)} documents" if claims else "",
+                done=f"{len(claims):,} from {len(sources)} documents" if claims else "",
                 missing=(
                     f"{len(uncovered)} with none: {', '.join(name[:34] for name in uncovered[:3])}"
                     if uncovered
@@ -213,7 +217,9 @@ def stages_in(workspace: Path, context_file: str = "") -> Work:
                     if biggest
                     else ""
                 ),
-                missing=(f"{refused} are no longer in their document" if refused else ""),
+                # Found missing when collected or assembled: nothing says they were ever there.
+                # "No longer in their document" read as quotations lost since (ADR-117).
+                missing=(f"{refused:,} were not found in their document" if refused else ""),
             ),
             Stage(
                 name="References",

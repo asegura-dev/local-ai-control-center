@@ -25,6 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **Ten sentences the program printed were not so** (ADR-117).
+  - `status`: *156 are no longer in their document* now reads *were not found in their
+    document*; they never were. It counts 38 documents where it said 39.
+  - `ask` no longer asks for an embedding model that is configured and was declined.
+  - `resolve --help` names `identify` as the other command that reaches the registry, and
+    no longer promises a DOI is never asked twice.
+  - `bib` no longer says LACC reads nothing outside the workspace.
+  - `resolve` no longer advises reading PDFs it has already read.
+  - `identify` asks only for the switch that is off.
+  - A preview says *the prompt this builds* when nothing is listed above.
+  - Commands lists `engine test` and `notify test`: 23, as `lacc --help`.
+  - The help is read as the Markdown it is written in: no literal `**`, no paragraph cut
+    mid-sentence.
 - **A run could be left without an end** (ADR-116).
   - Ctrl+C or the end of the input at a question raised past every path that records a
     no. All fifteen questions now go through one that answers an interruption as no, says

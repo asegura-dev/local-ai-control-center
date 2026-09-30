@@ -213,6 +213,9 @@ _SKILLS: dict[str, Skill] = {
 app = typer.Typer(
     help="Local AI Control Center - run AI-assisted skills with control and audit.",
     no_args_is_help=True,
+    # The help is written in Markdown. Read as plain text it printed `**` around every
+    # emphasis and cut each paragraph where the source line ended (ADR-117).
+    rich_markup_mode="markdown",
 )
 
 
@@ -1192,13 +1195,15 @@ def resolve(
 ) -> None:
     """Ask a registry what each work is, using the DOI the document already carries.
 
-    **The one command here that talks to something that is not yours.** What leaves is a
-    DOI and nothing else: no document, no quotation, no corpus, no question and no text you
-    wrote. You are shown how many are about to be sent, and where, before any of them go.
+    **One of the two commands that talk to something that is not yours** - `identify` is
+    the other. What leaves is a DOI and nothing else: no document, no quotation, no corpus,
+    no question and no text you wrote. You are shown how many are about to be sent, and
+    where, before any of them go.
 
     Two switches have to be on - `network_access` and `registry_url` - and both are off by
-    default. Answers are kept beside the file written, so a DOI is never asked twice and a
-    bibliography can be rebuilt from what was actually received (ADR-067).
+    default. Answers are kept beside the file written, so a DOI answered for it is not asked
+    again and a bibliography can be rebuilt from what was actually received (ADR-067). A
+    different file, or `identify`, keeps its own answers (ADR-117).
     """
     config, workspace = _load(config_path)
     sources = [Path(name) for name in workspace.named(sources)]
@@ -1251,9 +1256,10 @@ def resolve(
         _show("[yellow]No DOI to resolve.[/yellow] Nothing here will invent one.")
         if converted and not cited:
             _show(
-                f"[dim]{_plain(converted)} of these are Markdown. A document's own DOI is in the "
-                "PDF's metadata and does not survive conversion - run this on the PDFs, or "
-                "add --cited to resolve what they cite instead.[/dim]"
+                f"[dim]{converted:,} of these are Markdown. A document's own DOI is in the "
+                "PDF's metadata, and the PDF beside each was read for it (ADR-101): none "
+                "carried one. Name it with lacc identify, or add --cited to resolve what "
+                "they cite instead.[/dim]"
             )
         elif cited:
             _show(
@@ -1410,8 +1416,9 @@ def bib(
             cited = workspace.resolve_within(adding_to)
             if not cited.is_file():
                 raise ValueError(
-                    f"{adding_to} is not in the workspace. LACC reads nothing outside it: copy "
-                    "the .bib you cite from into the workspace and name the copy."
+                    f"{adding_to} is not in the workspace. Copy the .bib you cite from into "
+                    "the workspace and name the copy: outside it, LACC reads only the draft "
+                    "lacc bring is given, and a bibliography is not one (ADR-117)."
                 )
             held = held_in(cited.read_text(encoding="utf-8", errors="replace"))
     except (ValueError, OSError) as error:
@@ -3055,10 +3062,18 @@ def identify(
     """
     config, workspace = _load(config_path)
     if not config.registry_url or not config.network_access:
+        # Only what is missing: it asked to write a registry_url already written (ADR-117).
+        missing = [
+            written
+            for written, needed in (
+                ("`registry_url: https://api.crossref.org`", not config.registry_url),
+                ("`network_access: true`", not config.network_access),
+            )
+            if needed
+        ]
         _show(
             "[red]This asks a registry, so it needs both switches on.[/red] Write "
-            "`registry_url: https://api.crossref.org` and `network_access: true` in your "
-            "configuration. Both are off by default."
+            f"{_plain(' and '.join(missing))} in your configuration. Both are off by default."
         )
         raise typer.Exit(code=1)
     try:
@@ -3674,7 +3689,11 @@ def _exit_refused() -> None:
     raise typer.Exit(code=1)
 
 
-engine_app = typer.Typer(help="Check the engine LACC will actually use.", no_args_is_help=True)
+engine_app = typer.Typer(
+    help="Check the engine LACC will actually use.",
+    no_args_is_help=True,
+    rich_markup_mode="markdown",
+)
 app.add_typer(engine_app, name="engine")
 
 
@@ -3723,7 +3742,11 @@ def engine_test(
     console.print(f"[green]It answered[/green] in {_plain(check.seconds)}s. A run would work.")
 
 
-notify_app = typer.Typer(help="Check and use the configured notifier.", no_args_is_help=True)
+notify_app = typer.Typer(
+    help="Check and use the configured notifier.",
+    no_args_is_help=True,
+    rich_markup_mode="markdown",
+)
 app.add_typer(notify_app, name="notify")
 
 

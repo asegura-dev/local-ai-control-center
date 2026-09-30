@@ -247,7 +247,10 @@ def test_bib_adding_to_a_file_outside_the_workspace_says_what_to_do(tmp_path: Pa
         ["bib", "b.registry.json", "--into", "r.bib", "--adding-to", "refs.bib", "-c", str(config)],
     )
     assert result.exit_code == 1
-    assert "copy the .bib you cite from into the workspace" in _said(result.stdout)
+    said = _said(result.stdout)
+    assert "Copy the .bib you cite from into the workspace" in said
+    # It said "LACC reads nothing outside it" after ADR-111 made that false (ADR-117).
+    assert "reads nothing outside" not in said and "a bibliography is not one" in said
     assert not (tmp_path / "ws" / "r.bib").exists()
 
 

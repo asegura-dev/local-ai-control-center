@@ -80,14 +80,23 @@ _SKIP = {"config_path"}
 
 
 def _described(documentation: str | None) -> tuple[str, str]:
-    """Split a docstring into its opening sentence and the rest, both tidied."""
+    """Split a docstring into its opening sentence and the rest, both tidied.
+
+    Tidied as the terminal now reads the same text, as Markdown (ADR-117): the emphasis
+    marks are not shown, and a paragraph is one line, however its source was wrapped. A
+    paragraph of list items keeps its lines.
+    """
     if not documentation:
         return "", ""
-    cleaned = inspect.cleandoc(documentation)
+    cleaned = inspect.cleandoc(documentation).replace("**", "")
     parts = cleaned.split("\n\n", 1)
     summary = " ".join(parts[0].split())
     rest = parts[1].strip() if len(parts) > 1 else ""
-    return summary, rest
+    paragraphs = [
+        block if block.lstrip().startswith("- ") else " ".join(block.split())
+        for block in rest.split("\n\n")
+    ]
+    return summary, "\n\n".join(paragraphs)
 
 
 def _declared(hint: Any) -> tuple[str, str, bool]:
@@ -151,11 +160,21 @@ def commands_of(application: Any) -> tuple[Command, ...]:
 
     Reads `registered_commands` by attribute. An object that does not have it yields
     nothing, which is what should happen rather than an exception in a window.
+
+    A group's commands are listed by their whole name - `engine test` - because that is
+    what is typed. Reading the commands alone, the section said 21 where `lacc --help`
+    lists 23 (ADR-117).
     """
     registered = getattr(application, "registered_commands", None)
     if not isinstance(registered, list):
         return ()
     found: list[Command] = []
+    for group in getattr(application, "registered_groups", None) or []:
+        prefix = getattr(group, "name", None)
+        if not prefix:
+            continue
+        for command in commands_of(getattr(group, "typer_instance", None)):
+            found.append(command.model_copy(update={"name": f"{prefix} {command.name}"}))
     for entry in registered:
         function = getattr(entry, "callback", None)
         if function is None:

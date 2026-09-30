@@ -80,7 +80,10 @@ class ExecutionPreview(BaseModel):
         if self.action.writes:
             lines.append(f"Writes:  {', '.join(str(path) for path in self.action.writes)}")
         if self.sends_to:
-            lines.append(f"Sends:   the contents read above, to {self.sends_to}")
+            # "Read above" only when something is listed above: a question to a corpus reads
+            # its passages through a ranking, not as targets, and nothing was there (ADR-117).
+            what = "the contents read above" if self.action.targets else "the prompt this builds"
+            lines.append(f"Sends:   {what}, to {self.sends_to}")
         if self.allowed:
             lines.append("Status:  would run")
         else:

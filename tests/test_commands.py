@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 import typer.main
@@ -98,9 +98,24 @@ def test_every_line_the_window_offers_to_copy_parses_once_filled_in() -> None:
 
     parsers = typer.main.get_command(app)
     for command in commands_of(app):
-        filled = [re.sub(r"<[^>]+>", "x", word) for word in command.usage.split()[2:]]
-        parser = parsers.commands[command.name]  # type: ignore[attr-defined]
+        # A group's command is two words, `engine test`, and its parser is inside the group's.
+        names = command.name.split()
+        parser: Any = parsers
+        for name in names:
+            parser = parser.commands[name]
+        words = command.usage.split()[1 + len(names) :]
+        filled = [re.sub(r"<[^>]+>", "x", word) for word in words]
         parser.make_context(command.name, filled)
+
+
+def test_the_commands_of_a_group_are_listed_by_their_whole_name() -> None:
+    """Commands said 21 where `lacc --help` lists 23: `engine` and `notify` were left out."""
+    from local_ai_control_center.cli import app
+
+    names = [command.name for command in commands_of(app)]
+    assert "engine test" in names and "notify test" in names
+    groups = sum(len(group.typer_instance.registered_commands) for group in app.registered_groups)
+    assert len(names) == len(app.registered_commands) + groups
 
 
 def test_the_configuration_option_is_left_out() -> None:

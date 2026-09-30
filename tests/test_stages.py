@@ -111,6 +111,18 @@ def test_a_document_covered_through_its_extracts_is_covered(tmp_path: Path) -> N
     (tmp_path / "corpus.md").write_text(_corpus("part.md"), encoding="utf-8")
     by_name = {s.name: s for s in stages_in(tmp_path).stages}
     assert not by_name["Quotations"].missing, "the guideline is covered through its extract"
+    # Covered through it, but not a file the quotation came from: "from 2 documents" of one
+    # file was the 39 against the window's 38 (ADR-117).
+    assert by_name["Quotations"].done == "1 from 1 documents"
+
+
+def test_quotations_not_found_are_not_said_to_have_been_lost(tmp_path: Path) -> None:
+    """Marked when collected, they were never found; "no longer in their document" read as
+    quotations that had fallen out since (ADR-117)."""
+    corpus = _corpus("a.md").replace("p. 1 - verified", "page unknown - **NOT IN THE DOCUMENT**")
+    (tmp_path / "corpus.md").write_text(corpus, encoding="utf-8")
+    corpus_stage = {s.name: s for s in stages_in(tmp_path).stages}["Corpus"]
+    assert corpus_stage.missing == "1 were not found in their document"
 
 
 # --- what `coverage` brought into the workspace, and what it reads (ADR-088) ---------------
