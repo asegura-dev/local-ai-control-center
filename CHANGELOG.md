@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **Five correct decisions ended in a traceback** (ADR-114).
+  - A configuration that is not YAML is now named with its line and column.
+  - An engine the configuration forbids - off this machine with the network off - is
+    refused in a sentence by `ask`, `review`, `coverage`, `sections --about` and
+    `engine test`, before any run opens.
+  - An `--into` outside the workspace, already there, or in a missing folder is refused
+    where the command starts. `review` and `coverage` used to find out after the engine
+    had done all the work.
+  - `bring` checks `drafts/` before its preview.
+  - `status` and `verify` no longer create a workspace that does not exist. A command that
+    writes still creates it, and now says so.
 - **What the terminal printed was not always what was written** (ADR-113). Rich reads
   anything shaped like `[word]` as a style, and the CLI's lines carry names, quotations,
   errors and the engine's answers beside its own markup. Of the 174 answers the trail keeps,

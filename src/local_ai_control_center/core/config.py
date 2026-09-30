@@ -521,7 +521,15 @@ def load_config(path: str | Path) -> Config:
     """
     file_path = Path(path)
     text = file_path.read_text(encoding="utf-8")
-    data = yaml.safe_load(text)
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as error:
+        # Promised above and not kept: the parser's own error is neither OSError nor
+        # ValueError, so it reached the terminal as a traceback from every command (ADR-114).
+        mark = getattr(error, "problem_mark", None)
+        where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
+        problem = getattr(error, "problem", None) or str(error)
+        raise ValueError(f"{file_path.name} is not valid YAML{where}: {problem}") from error
     if data is None:
         data = {}
     if not isinstance(data, dict):

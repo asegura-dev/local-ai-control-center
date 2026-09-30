@@ -105,6 +105,10 @@ It is on **the machine you run LACC from**, always. Even when the model runs som
 else, your documents do not move: LACC reads them here, and only the prompt built from
 them is sent to the engine.
 
+The folder does not have to exist. The first command that writes into it creates it and
+says so; `status`, `verify` and the other commands that only read tell you it is missing
+and create nothing, so a mistyped `workspace_root` does not seed folders (ADR-114).
+
 **Keep it out of a git repository.** LACC refuses to run if the workspace is inside a
 working tree, unless you set `workspace_in_repository: true`. That is not fussiness: your
 sources, the text extracted from them and the audit trail all live there, and inside a

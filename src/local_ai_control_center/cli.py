@@ -369,8 +369,13 @@ def _approve(difference: str) -> bool:
     return typer.confirm("Keep this revision?", default=False)
 
 
-def _load(config_path: Path) -> tuple[Config, Workspace]:
+def _load(config_path: Path, *, create: bool = True) -> tuple[Config, Workspace]:
     """Load configuration and build the workspace, or exit on failure.
+
+    A workspace that does not exist yet is created by a command that writes into it, and
+    said to have been (ADR-003, ADR-114): a mistyped `workspace_root` used to seed folders
+    without a word. A command that only reads passes ``create=False`` and is refused
+    instead - `status` said it wrote nothing while it made the folder.
 
     A `.env` beside the configuration supplies the variables it names, without overwriting
     anything already in the environment (ADR-030). It is read from that one directory: LACC
@@ -384,11 +389,24 @@ def _load(config_path: Path) -> tuple[Config, Workspace]:
         console.print(f"[red]Could not load configuration:[/red] {_plain(error)}")
         raise typer.Exit(code=1) from error
 
+    root = Path(config.workspace_root).expanduser()
+    existed = root.is_dir()
+    if not existed and not create:
+        console.print(
+            f"[red]The workspace {_plain(root)} does not exist.[/red] There is nothing to read "
+            "there: check workspace_root. A command that writes creates it."
+        )
+        raise typer.Exit(code=1)
     try:
         workspace = workspace_from_config(config)
     except WorkspaceExposed as error:
         console.print(f"[red]Refusing to use this workspace.[/red] {_plain(error)}")
         raise typer.Exit(code=1) from error
+    if not existed:
+        console.print(
+            f"[yellow]Created the workspace[/yellow] {_plain(workspace.root)}: it did not "
+            "exist. If that path is a mistake, fix workspace_root."
+        )
 
     suspicion = sync_folder_suspicion(workspace.root)
     if suspicion is not None:
@@ -767,6 +785,57 @@ def _write_or_exit(
         audit.wrote(run_id, action, destination)
 
 
+def _destination_or_exit(workspace: Workspace, into: Path) -> Path:
+    """Where a result will be written, refused before any work when it cannot go there.
+
+    Asked where a command starts, so a destination outside the workspace, already taken, or
+    in a folder that does not exist costs nothing - not an engine's time, and not a run left
+    without an end (ADR-114). This is the early word, not the guarantee: the write itself
+    still opens the file for exclusive creation, so a file made in between is still refused.
+    """
+    try:
+        destination = workspace.resolve_within(into)
+    except ValueError as error:
+        _show(f"[red]{_plain(error)}[/red] Nothing was done.")
+        raise typer.Exit(code=1) from error
+    if destination.exists():
+        _show(
+            f"[red]{_plain(destination.name)} already exists, and LACC writes its results only "
+            "to new files.[/red] Nothing was done."
+        )
+        raise typer.Exit(code=1)
+    if not destination.parent.is_dir():
+        _show(
+            f"[red]Cannot write {_plain(destination.name)}: the folder "
+            f"{_plain(destination.parent)} does not exist.[/red] Nothing was done."
+        )
+        raise typer.Exit(code=1)
+    return destination
+
+
+def _retriever_or_exit(config: Config, corpus: Path | None) -> Retriever:
+    """The ranking a configuration asks for, or why its engine may not be reached (ADR-114).
+
+    `_retriever_for` refuses an engine the configuration does not allow - off this machine
+    with the network off - and that refusal reached the terminal as a traceback from `ask`,
+    `review` and `sections --about`. Nothing had been sent; now nothing is shown but why.
+    """
+    try:
+        return _retriever_for(config, corpus)
+    except ProviderError as error:
+        _show(f"[red]{_plain(error)}[/red] Nothing was sent.")
+        raise typer.Exit(code=1) from error
+
+
+def _host_or_exit(config: Config) -> str:
+    """The engine's address, or why the configuration forbids reaching it (ADR-114)."""
+    try:
+        return resolve_engine_host(config.engine_host, config.network_access)
+    except ProviderError as error:
+        _show(f"[red]{_plain(error)}[/red] Nothing was sent.")
+        raise typer.Exit(code=1) from error
+
+
 def _build_provider(choice: ProviderChoice, config: Config, skill: str = "") -> Provider:
     """Construct the chosen provider, for this skill's model.
 
@@ -924,7 +993,7 @@ def preview(
 ) -> None:
     """Show what a skill would do, without asking, executing, or recording."""
     resolved = _resolve_skill(skill, config_path)
-    config, workspace = _load(config_path)
+    config, workspace = _load(config_path, create=False)
     plan = _plan_or_exit(resolved, tuple(requests), config)
     result = preview_action(
         plan.action, grant_for(resolved, config), config, workspace, config.remote_engine
@@ -969,7 +1038,7 @@ def references(
     it does not judge. A work cited by three of them may be the thing all three disagree
     with (ADR-064).
     """
-    _, workspace = _load(config_path)
+    _, workspace = _load(config_path, create=False)
     sources = [Path(name) for name in workspace.named(sources)]
     cited_by: dict[str, set[str]] = {}
     what: dict[str, str] = {}
@@ -1057,7 +1126,7 @@ def metadata(
     reference manager resolves journal, volume and pages against a record rather than a
     recollection. What a file does not carry is reported as missing, never guessed.
     """
-    _, workspace = _load(config_path)
+    _, workspace = _load(config_path, create=False)
     sources = [Path(name) for name in workspace.named(sources)]
     silent: list[str] = []
     for source in sources:
@@ -1179,7 +1248,7 @@ def resolve(
             )
         raise typer.Exit(code=1)
 
-    destination = workspace.resolve_within(into)
+    destination = _destination_or_exit(workspace, into)
     remembered = destination.with_suffix(".registry.json")
     registry = RememberedRegistry(
         CrossrefRegistry(config.registry_url, config.registry_mailto), remembered
@@ -1381,7 +1450,7 @@ def outline(
     than a guess at it, and most published papers carry one. When there is none, numbered
     headings are found in the text, which is what guidelines and theses have.
     """
-    config, workspace = _load(config_path)
+    config, workspace = _load(config_path, create=False)
     try:
         resolved = workspace.resolve_within(source)
     except ValueError as error:
@@ -1883,7 +1952,7 @@ def collect(
         console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
-    destination = workspace.resolve_within(into)
+    destination = _destination_or_exit(workspace, into)
     action = IntendedAction(
         name="collect",
         summary=f"Collect {skill} from {len(requests)} documents into {into}",
@@ -2148,7 +2217,7 @@ def _prepared_or_exit(
     except (ValueError, OSError) as error:
         console.print(f"[red]Cannot read {_plain(corpus_file)}: {_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
-    retriever = _retriever_for(config, resolved)
+    retriever = _retriever_or_exit(config, resolved)
     made = prepare(question, corpus_file.name, text, config, retriever)
     if made.awaiting is not None:
         _show(made.asks, markup=False)
@@ -2380,6 +2449,7 @@ def corpus(
     """
     _, workspace = _load(config_path)
     sources = [Path(name) for name in workspace.named(sources)]
+    destination = _destination_or_exit(workspace, into)
     collected: list[CollectedClaim] = []
     for source in sources:
         try:
@@ -2398,7 +2468,7 @@ def corpus(
     text = assembled(rechecked, marked, sources)
 
     try:
-        write_new_file(workspace.resolve_within(into), text)
+        write_new_file(destination, text)
     except ConversionError as error:
         console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
@@ -2462,6 +2532,7 @@ def review(
     ordinary case (ADR-068).
     """
     config, workspace = _load(config_path)
+    destination = _destination_or_exit(workspace, into) if into else None
     try:
         written = workspace.resolve_within(draft)
         corpus_file = workspace.resolve_within(against)
@@ -2489,7 +2560,7 @@ def review(
     passages = tuple(
         Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
     )
-    retriever = _retriever_for(config, corpus_file)
+    retriever = _retriever_or_exit(config, corpus_file)
 
     judgements = len(blocks) * CANDIDATES_PER_PARAGRAPH
     _show(
@@ -2597,8 +2668,7 @@ def review(
         "source may simply not be in this corpus.[/dim]"
     )
     written_report = report(findings, draft.name, against.name, 0)
-    if into:
-        destination = workspace.resolve_within(into)
+    if destination is not None:
         _write_or_exit(destination, written_report, (audit, run_id, "review"))
         # The same findings as data, beside the report, so the window can paint them over
         # the draft without re-running an engine (ADR-069).
@@ -2794,6 +2864,7 @@ def coverage(
     words, which is a false gap about your own bibliography.
     """
     config, workspace = _load(config_path)
+    destination = _destination_or_exit(workspace, into) if into is not None else None
     if not config.embedding_model:
         _show(
             "[red]This needs an embedding model.[/red] Set `embedding_model: bge-m3` in your "
@@ -2832,7 +2903,7 @@ def coverage(
         Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
     )
 
-    host = resolve_engine_host(config.engine_host, config.network_access)
+    host = _host_or_exit(config)
     embedder = OllamaEmbedder(config.embedding_model, host)
     cache = corpus_path.with_suffix(corpus_path.suffix + VECTOR_SUFFIX)
     dense = DenseRetriever(embedder, cache)
@@ -2880,9 +2951,8 @@ def coverage(
         "ordering, not an interval.[/dim]"
     )
 
-    if into is not None:
+    if destination is not None:
         taken = datetime.now(UTC).date().isoformat()
-        destination = workspace.resolve_within(into)
         _write_or_exit(
             destination,
             coverage_report(found, against.name, config.embedding_model, taken),
@@ -3096,7 +3166,21 @@ def bring(
         _show(f"[red]{_plain(why)}[/red]")
         raise typer.Exit(code=1)
 
-    folder = workspace.resolve_within(Path(DRAFTS))
+    # Where the copy would go is checked before the preview, not found out after the yes.
+    try:
+        folder = workspace.resolve_within(Path(DRAFTS))
+    except ValueError as error:
+        _show(
+            f"[red]{DRAFTS}/ leads outside the workspace, so nothing is copied into it.[/red] "
+            f"{_plain(error)}"
+        )
+        raise typer.Exit(code=1) from error
+    if folder.exists() and not folder.is_dir():
+        _show(
+            f"[red]{DRAFTS} is a file here, and copies go in a folder of that name.[/red] "
+            "Move or rename it, and bring the draft again."
+        )
+        raise typer.Exit(code=1)
     taken = {path.name for path in folder.iterdir()} if folder.is_dir() else set()
     today = date.today()
     name = copy_name(resolved, taken, today)
@@ -3180,6 +3264,10 @@ def sections(
     quotations already checked against it stay checked (ADR-076).
     """
     config, workspace = _load(config_path)
+    # Only a section taken is written; --into without --take writes nothing.
+    destination = (
+        _destination_or_exit(workspace, into) if into is not None and take is not None else None
+    )
     try:
         path = workspace.resolve_within(source)
     except ValueError as error:
@@ -3206,7 +3294,7 @@ def sections(
             # list that showed only the top would be making it for them (ADR-079). By
             # meaning only once asked: it sends the question and every section's opening,
             # every time. Declining ranks by words, on this machine (ADR-106).
-            retriever = _retriever_for(config, None)
+            retriever = _retriever_or_exit(config, None)
             outgoing = sections_would_send(text, retriever)
             if outgoing is not None:
                 _show(
@@ -3262,10 +3350,9 @@ def sections(
     if not wanted:
         _show(f"[red]{_plain(source.name)} does not number a section {_plain(take)}.[/red]")
         raise typer.Exit(code=1)
-    if into is None:
+    if destination is None:
         _show("[red]Name where to write it with --into.[/red]")
         raise typer.Exit(code=1)
-    destination = workspace.resolve_within(into)
     _write_or_exit(destination, wanted)
     # Which document this came out of, beside the file rather than inside it. Nothing is
     # written into an extract: the quotations checked against these files stay checked
@@ -3303,7 +3390,7 @@ def status(
     success; "832 quotations, 2 documents with none" is the same fact with the part that
     still needs doing attached (ADR-080).
     """
-    config, workspace = _load(config_path)
+    config, workspace = _load(config_path, create=False)
     work = stages_in(workspace.root, config.context_file)
     if not work.stages:
         _show(f"[red]{_plain(workspace.root)} is not a folder.[/red]")
@@ -3343,7 +3430,7 @@ def verify(
     writer for both (ADR-104). A workspace where nothing has been recorded has no trail yet,
     which is not a failure.
     """
-    _, workspace = _load(config_path)
+    _, workspace = _load(config_path, create=False)
     audit = AuditLog(workspace, load_config(config_path))
     walked = walk(audit.path)
     anchor = check_anchor(audit.path)
@@ -3547,8 +3634,8 @@ def engine_test(
 
     Exits non-zero when a run would not get an answer, so it is usable from a script.
     """
-    config, _ = _load(config_path)
-    host = resolve_engine_host(config.engine_host, config.network_access)
+    config, _ = _load(config_path, create=False)
+    host = _host_or_exit(config)
     console.print(
         f"Engine: [bold]{_plain(host)}[/bold]  model: "
         f"[bold]{_plain(config.model or '(none)')}[/bold]"

@@ -71,3 +71,8 @@ and hiding a side effect behind a constructor.
   stored value.
 - The core gains a third functional module, `workspace`, consumed the same way as
   `config` and `run`. Chapter 1 and the CHANGELOG are updated in this same phase.
+
+**Amended by ADR-114 (30-sep-2026).** The creation stays deliberate and is now also said: a
+command that writes prints that it created the workspace. A command that only reads -
+`status`, `verify`, `preview`, `references`, `metadata`, `outline`, `engine test` -
+refuses a workspace that does not exist and creates nothing.
