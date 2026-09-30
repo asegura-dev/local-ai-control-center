@@ -180,6 +180,7 @@ _A_VIEW_MAY_HOLD = frozenset(
         "_asking_for_the_window",  # composition: the one action the window runs (ADR-085)
         "_retriever_for",  # composition: word ranking, or that fused with an embedder
         "_trail_for_the_window",  # composition: the audit the window reads (ADR-104)
+        "_plain",  # presentation: text Rich must print as it is, never as a style (ADR-113)
     }
 )
 """What belongs in a view although it never prints. Each is named, never a category."""

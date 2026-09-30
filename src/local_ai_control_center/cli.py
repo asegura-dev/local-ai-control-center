@@ -23,6 +23,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.errors import MarkupError
 from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
@@ -239,20 +240,42 @@ def _console() -> Console:
 console = _console()
 
 
-def _show(text: str) -> None:
+def _plain(value: object) -> str:
+    """``value`` as text that Rich prints as it is, never as a style (ADR-113).
+
+    Everything put into a line this program prints goes through here: a file's name, a
+    quotation, an engine's answer, an error. Rich reads `[v2]` in any of them as a style and
+    drops it, and a stray `[/b]` raises - after the answer being printed had already arrived.
+    """
+    return escape(str(value))
+
+
+def _printed(text: str, markup: bool) -> None:
+    """Print ``text``, and as it is when its markup cannot be read (ADR-113)."""
+    try:
+        console.print(text, markup=markup)
+    except MarkupError:
+        console.print(text, markup=False)
+
+
+def _show(text: str, *, markup: bool = True) -> None:
     """Print an answer the engine produced, and never let printing lose it.
 
     Everything after this call is the part that matters - the quotations are checked, the
     readings are judged, the discards are reported - and all of it was lost to an exception
     raised while writing to a terminal. A display is the one place in this program where
     failing quietly is better than failing correctly (ADR-062).
+
+    ``markup`` is off for text the program did not write, printed whole: nothing in an
+    engine's answer is read as a style. A line whose markup is broken anyway is printed as
+    it is rather than raised (ADR-113).
     """
     try:
-        console.print(text)
+        _printed(text, markup)
     except (UnicodeEncodeError, OSError):
         plain = text.encode("ascii", "replace").decode("ascii")
         try:
-            console.print(plain)
+            _printed(plain, markup)
             console.print(
                 "[yellow]Some characters could not be shown by this terminal and were "
                 "replaced. The answer itself is unchanged.[/yellow]"
@@ -279,12 +302,12 @@ def _known_skills(config_path: Path) -> dict[str, Skill]:
     try:
         declared = load_declared_skills(config_path)
     except DeclarationError as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
     for skill in declared:
         if skill.name in _SKILLS:
             console.print(
-                f"[red]A declared skill is named {skill.name}, which is built in.[/red] "
+                f"[red]A declared skill is named {_plain(skill.name)}, which is built in.[/red] "
                 "Rename it: a file must not be able to replace a skill whose behaviour was "
                 "measured."
             )
@@ -300,13 +323,14 @@ def _resolve_skill(name: str, config_path: Path = DEFAULT_CONFIG_PATH) -> Skill:
     if skill is None:
         built_in = ", ".join(sorted(_SKILLS))
         declared = ", ".join(sorted(set(known) - set(_SKILLS)))
-        console.print(f"[red]Unknown skill:[/red] {name}")
-        console.print(f"Built in: {built_in}")
-        console.print(f"Declared: {declared or '(none)'}")
+        console.print(f"[red]Unknown skill:[/red] {_plain(name)}")
+        console.print(f"Built in: {_plain(built_in)}")
+        console.print(f"Declared: {_plain(declared or '(none)')}")
         raise typer.Exit(code=1)
     if isinstance(skill, FileSkill):
         console.print(
-            f"[yellow]{name} is a declared skill.[/yellow] Its wording came from a file and "
+            f"[yellow]{_plain(name)} is a declared skill.[/yellow] Its wording came from a file "
+            "and "
             "was not reviewed by anybody but its author. What it may do is unchanged: the "
             "same permissions, the same preview, the same checking."
         )
@@ -318,7 +342,7 @@ def _plan_or_exit(skill: Skill, requests: tuple[str, ...], config: Config) -> Sk
     try:
         return skill.plan(requests, config)
     except ValueError as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
 
@@ -357,24 +381,24 @@ def _load(config_path: Path) -> tuple[Config, Workspace]:
     try:
         config = load_config(config_path)
     except (OSError, ValueError) as error:
-        console.print(f"[red]Could not load configuration:[/red] {error}")
+        console.print(f"[red]Could not load configuration:[/red] {_plain(error)}")
         raise typer.Exit(code=1) from error
 
     try:
         workspace = workspace_from_config(config)
     except WorkspaceExposed as error:
-        console.print(f"[red]Refusing to use this workspace.[/red] {error}")
+        console.print(f"[red]Refusing to use this workspace.[/red] {_plain(error)}")
         raise typer.Exit(code=1) from error
 
     suspicion = sync_folder_suspicion(workspace.root)
     if suspicion is not None:
-        console.print(f"[yellow]Warning.[/yellow] {suspicion}")
+        console.print(f"[yellow]Warning.[/yellow] {_plain(suspicion)}")
     return config, workspace
 
 
 def _show_preview(preview: ExecutionPreview) -> None:
     """Render a preview in a panel."""
-    console.print(Panel(preview.render(), title="Execution preview", expand=False))
+    console.print(Panel(Text(preview.render()), title="Execution preview", expand=False))
 
 
 def _say_what_it_will_cost(
@@ -412,7 +436,7 @@ def _say_what_it_will_cost(
         return
 
     console.print(
-        f"[yellow]About {passes} passes[/yellow] over roughly {tokens:,} tokens of document. "
+        f"[yellow]About {passes:,} passes[/yellow] over roughly {tokens:,} tokens of document. "
         "Each pass is one call to the engine."
     )
     if passes >= _MANY_PASSES:
@@ -478,7 +502,7 @@ def run(
     try:
         provider = _build_provider(provider_choice, config, resolved.name)
     except ProviderError as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     plan = _plan_or_exit(resolved, tuple(requests), config)
@@ -530,7 +554,7 @@ def run(
             )
     except (ProviderError, ReadError, PromptTooLargeError, CannotReadInPasses) as error:
         _announce(resolved.name, "failed", time.monotonic() - started, config, audit, run_id)
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     _announce(resolved.name, result.outcome, time.monotonic() - started, config, audit, run_id)
@@ -551,7 +575,7 @@ def _say_how_it_was_read(result: RunResult) -> None:
     """
     if result.passes > 1:
         console.print(
-            f"[yellow]Read in {result.passes} passes.[/yellow] The model never saw the whole "
+            f"[yellow]Read in {result.passes:,} passes.[/yellow] The model never saw the whole "
             "document at once, so anything it says about the document as a whole rests on "
             "less than it appears to. Every quotation was still checked against all of it."
         )
@@ -568,14 +592,14 @@ def _warn_about_the_document(result: RunResult) -> None:
     """
     if result.markers_removed:
         console.print(
-            f"[yellow]{result.markers_removed} fence markers were removed from the "
+            f"[yellow]{_plain(result.markers_removed)} fence markers were removed from the "
             "document[/yellow] before it was sent. A document carrying one could otherwise "
             "end its own fence and have the rest read as instructions."
         )
     if result.instruction_shapes:
         console.print(
             "[yellow]The document contains text shaped like an instruction:[/yellow] "
-            + ", ".join(result.instruction_shapes)
+            + _plain(", ".join(result.instruction_shapes))
             + "."
         )
         console.print(
@@ -610,9 +634,9 @@ def _show_checked_quotations(result: RunResult) -> None:
         # be repeated by whoever trusts it (ADR-031).
         page = str(checked.found_on_page) if checked.found_on_page else "-"
         table.add_row(
-            checked.claim.claim[:60],
-            checked.claim.quote[:40],
-            page,
+            _plain(checked.claim.claim[:60]),
+            _plain(checked.claim.quote[:40]),
+            _plain(page),
             marks[checked.verdict],
         )
     console.print(table)
@@ -626,12 +650,12 @@ def _show_checked_quotations(result: RunResult) -> None:
     unplaced = sum(1 for checked in result.checked_claims if checked.found and not checked.holds)
     if missing:
         console.print(
-            f"[red]{missing} of {len(result.checked_claims)} quotations are not in the "
+            f"[red]{_plain(missing)} of {len(result.checked_claims)} quotations are not in the "
             "document.[/red] Do not cite those without opening it yourself."
         )
     if unplaced:
         console.print(
-            f"[dim]{unplaced} are in the document but could not be placed on a page - the "
+            f"[dim]{_plain(unplaced)} are in the document but could not be placed on a page - the "
             "source has no page markers, or the passage runs across a break.[/dim]"
         )
 
@@ -654,10 +678,10 @@ def _offer_the_nearest_text(result: RunResult) -> None:
     console.print()
     for checked in corrections:
         console.print("[red]Not in the document:[/red]")
-        console.print(f"  [dim]the model wrote  [/dim] {checked.claim.quote[:150]}")
+        console.print(f"  [dim]the model wrote  [/dim] {_plain(checked.claim.quote[:150])}")
         # "Closest text", never "what it meant": this is a string match, and LACC does not
         # know what the model was reaching for.
-        console.print(f"  [green]closest in source[/green] {checked.nearest[:150]}")
+        console.print(f"  [green]closest in source[/green] {_plain(checked.nearest[:150])}")
 
 
 def _warn_about_the_answer(result: RunResult, config: Config) -> None:
@@ -728,7 +752,7 @@ def _write_or_exit(
     try:
         write_new_file(destination, text)
     except ConversionError as error:
-        _show(f"[red]{error}[/red]")
+        _show(f"[red]{_plain(error)}[/red]")
         if record is not None:
             audit, run_id, action = record
             audit.record(
@@ -764,7 +788,8 @@ def _say_which_model(config: Config, skill: str) -> None:
     chosen = config.model_for(skill)
     if chosen and chosen != config.model:
         console.print(
-            f"[yellow]{skill} runs on {chosen}[/yellow], not {config.model or 'the default'} - "
+            f"[yellow]{_plain(skill)} runs on {_plain(chosen)}[/yellow], not "
+            f"{_plain(config.model or 'the default')} - "
             "your configuration names a model for this skill."
         )
 
@@ -854,7 +879,7 @@ def _announce(
         notifier = notifier_from_config(config)
     except NotifierMisconfigured as error:
         audit.record(run_id, "notification_failed", "Notifier misconfigured", {"error": str(error)})
-        console.print(f"[yellow]Notification not sent:[/yellow] {error}")
+        console.print(f"[yellow]Notification not sent:[/yellow] {_plain(error)}")
         return
     if notifier is None:
         return
@@ -880,7 +905,8 @@ def _announce(
     )
     if not delivery.delivered:
         console.print(
-            f"[yellow]Notification not delivered[/yellow] ({delivery.transport}): {delivery.detail}"
+            f"[yellow]Notification not delivered[/yellow] ({_plain(delivery.transport)}): "
+            f"{_plain(delivery.detail)}"
         )
 
 
@@ -955,7 +981,7 @@ def references(
             path = workspace.resolve_within(source)
             text = path.read_text(encoding="utf-8", errors="replace")
         except (ValueError, OSError) as error:
-            console.print(f"[red]{error}[/red]")
+            console.print(f"[red]{_plain(error)}[/red]")
             continue
         # What this document says about itself, so "do I have it?" is answered against a
         # fact the file states rather than against a filename (ADR-047).
@@ -969,7 +995,7 @@ def references(
             parsed += 1
         else:
             silent += 1
-            console.print(f"[dim]{source}: no numbered reference list found.[/dim]")
+            console.print(f"[dim]{_plain(source)}: no numbered reference list found.[/dim]")
         for entry in found:
             if entry.doi:
                 cited_by.setdefault(entry.doi.lower(), set()).add(str(source))
@@ -985,8 +1011,8 @@ def references(
     )
 
     console.print(
-        f"[green]{parsed} of {parsed + silent} documents parsed[/green]; {entries} references, "
-        f"{sum(len(v) for v in cited_by.values())} with a DOI."
+        f"[green]{parsed:,} of {parsed + silent:,} documents parsed[/green]; "
+        f"{entries:,} references, {sum(len(v) for v in cited_by.values())} with a DOI."
     )
     if not shared:
         console.print("Nothing here is cited by more than one of them.")
@@ -1003,10 +1029,10 @@ def references(
             if doi in held
             else "[yellow]not among the ones identifiable by DOI[/yellow]"
         )
-        console.print(f"  [bold]{len(who)}x[/bold]  {what.get(doi, doi)[:150]}")
-        console.print(f"        {doi}  {mark}")
+        console.print(f"  [bold]{len(who)}x[/bold]  {_plain(what.get(doi, doi)[:150])}")
+        console.print(f"        {_plain(doi)}  {_plain(mark)}")
         for name in sorted(who):
-            console.print(f"        [dim]<- {name}[/dim]")
+            console.print(f"        [dim]<- {_plain(name)}[/dim]")
     console.print(
         f"[dim]{len(held)} of the documents given carry a DOI in their own metadata, so only "
         f"those could be matched against. Counted, not judged: a work several papers cite "
@@ -1038,28 +1064,28 @@ def metadata(
         try:
             path = workspace.resolve_within(source)
         except ValueError as error:
-            console.print(f"[red]{error}[/red]")
+            console.print(f"[red]{_plain(error)}[/red]")
             raise typer.Exit(code=1) from error
         if not path.exists():
-            console.print(f"[red]{source} is not in the workspace.[/red]")
+            console.print(f"[red]{_plain(source)} is not in the workspace.[/red]")
             raise typer.Exit(code=1)
 
         found = metadata_of(path)
-        console.print(f"[bold]{source.name}[/bold]")
+        console.print(f"[bold]{_plain(source.name)}[/bold]")
         if not found.says_anything:
             console.print("  [yellow]This file says nothing about itself.[/yellow]")
             silent.append(source.name)
             continue
         if found.title:
-            console.print(f"  Title:   {found.title}")
+            console.print(f"  Title:   {_plain(found.title)}")
         if found.authors:
-            console.print(f"  Authors: {', '.join(found.authors)}")
+            console.print(f"  Authors: {_plain(', '.join(found.authors))}")
         if found.doi:
-            console.print(f"  DOI:     [bold]{found.doi}[/bold]")
+            console.print(f"  DOI:     [bold]{_plain(found.doi)}[/bold]")
         if found.date:
-            console.print(f"  Date:    {found.date}")
+            console.print(f"  Date:    {_plain(found.date)}")
         if found.missing:
-            console.print(f"  [dim]Not in the file: {', '.join(found.missing)}[/dim]")
+            console.print(f"  [dim]Not in the file: {_plain(', '.join(found.missing))}[/dim]")
 
     if silent:
         console.print(
@@ -1112,10 +1138,10 @@ def resolve(
         try:
             path = workspace.resolve_within(source)
         except ValueError as error:
-            _show(f"[red]{error}[/red]")
+            _show(f"[red]{_plain(error)}[/red]")
             raise typer.Exit(code=1) from error
         if not path.exists():
-            _show(f"[red]{source} is not in the workspace.[/red]")
+            _show(f"[red]{_plain(source)} is not in the workspace.[/red]")
             raise typer.Exit(code=1)
         own = metadata_of(path).doi
         stated = established_for(path)
@@ -1141,7 +1167,7 @@ def resolve(
         _show("[yellow]No DOI to resolve.[/yellow] Nothing here will invent one.")
         if converted and not cited:
             _show(
-                f"[dim]{converted} of these are Markdown. A document's own DOI is in the "
+                f"[dim]{_plain(converted)} of these are Markdown. A document's own DOI is in the "
                 "PDF's metadata and does not survive conversion - run this on the PDFs, or "
                 "add --cited to resolve what they cite instead.[/dim]"
             )
@@ -1161,7 +1187,7 @@ def resolve(
     fresh = sorted(doi for doi in wanted if not registry.holds(doi))
 
     _show(
-        f"[bold]{len(wanted)} DOIs[/bold], of which {len(wanted) - len(fresh)} are already known."
+        f"[bold]{len(wanted)} DOIs[/bold], of which {len(wanted) - len(fresh):,} are already known."
     )
     # Opened where it is about to ask or act, so a no is recorded too (ADR-107).
     audit = AuditLog(workspace, config)
@@ -1169,11 +1195,13 @@ def resolve(
     identified = bool(config.registry_mailto)
     if fresh:
         _show(
-            f"[yellow]{len(fresh)} would be sent to {config.registry_url}.[/yellow] "
+            f"[yellow]{len(fresh)} would be sent to {_plain(config.registry_url)}.[/yellow] "
             "A DOI is public; the list of them is your bibliography."
         )
         if config.registry_mailto:
-            _show(f"Identifying you as [bold]{config.registry_mailto}[/bold], as configured.")
+            _show(
+                f"Identifying you as [bold]{_plain(config.registry_mailto)}[/bold], as configured."
+            )
         if not typer.confirm("Send them?", default=False):
             _show("Nothing was sent.")
             audit.record(run_id, "confirmation_declined", "Declined resolve", {"action": "resolve"})
@@ -1186,7 +1214,7 @@ def resolve(
         try:
             answer = registry.about(doi)
         except RegistryError as error:
-            _show(f"[red]{error}[/red]")
+            _show(f"[red]{_plain(error)}[/red]")
             _show("Nothing was written. What had been answered is kept, so a retry asks less.")
             registry.write()
             audit.asked(run_id, "resolve", config.registry_url, registry.sent, identified)
@@ -1237,10 +1265,10 @@ def resolve(
             "repaired": repaired,
         },
     )
-    _show(f"[green]{len(resolved)} of {len(wanted)} resolved[/green] -> {into}")
+    _show(f"[green]{len(resolved)} of {len(wanted)} resolved[/green] -> {_plain(into)}")
     if repaired:
         _show(
-            f"[dim]{repaired} were recovered by cutting what extraction had stuck to them, "
+            f"[dim]{_plain(repaired)} were recovered by cutting what extraction had stuck to them, "
             "and the registry confirmed each cut.[/dim]"
         )
     if unknown:
@@ -1280,7 +1308,10 @@ def bib(
     """
     _, workspace = _load(config_path)
     if into.suffix.lower() != ".bib":
-        _show(f"[red]A BibTeX file ends in .bib, and {into} does not.[/red] Nothing was written.")
+        _show(
+            f"[red]A BibTeX file ends in .bib, and {_plain(into)} does not.[/red] Nothing was "
+            "written."
+        )
         raise typer.Exit(code=1)
     try:
         destination = workspace.resolve_within(into)
@@ -1300,27 +1331,27 @@ def bib(
                 )
             held = held_in(cited.read_text(encoding="utf-8", errors="replace"))
     except (ValueError, OSError) as error:
-        _show(f"[red]{error}[/red]")
+        _show(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     written = bibtex(works, held)
     if written.entries:
         _write_or_exit(destination, written.text)
-        _show(f"[green]{len(written.entries)} entries[/green] -> {into}")
+        _show(f"[green]{len(written.entries)} entries[/green] -> {_plain(into)}")
     else:
         _show("[yellow]Nothing new to write.[/yellow] Nothing was written.")
     if written.already:
-        _show(f"{len(written.already)} left out: {adding_to} already holds them.")
+        _show(f"{len(written.already)} left out: {_plain(adding_to)} already holds them.")
     if nothing:
-        _show(f"[dim]{nothing} DOIs the registry holds nothing for, so nothing to write.[/dim]")
+        _show(f"[dim]{nothing:,} DOIs the registry holds nothing for, so nothing to write.[/dim]")
     if written.unwritable:
         _show(
             f"[yellow]{len(written.unwritable)} DOIs would break the file and were left out:"
-            f"[/yellow] {', '.join(written.unwritable)}"
+            f"[/yellow] {_plain(', '.join(written.unwritable))}"
         )
     if written.unread:
         _show(
-            f"[dim]{written.unread} were received before volume, issue and pages were read; "
+            f"[dim]{written.unread:,} were received before volume, issue and pages were read; "
             "each says so above its entry. Resolving again into a new file reads them.[/dim]"
         )
 
@@ -1354,10 +1385,10 @@ def outline(
     try:
         resolved = workspace.resolve_within(source)
     except ValueError as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
     if not resolved.exists():
-        console.print(f"[red]{source} is not in the workspace.[/red]")
+        console.print(f"[red]{_plain(source)} is not in the workspace.[/red]")
         raise typer.Exit(code=1)
 
     found = embedded_outline(resolved) if resolved.suffix.lower() == ".pdf" else ()
@@ -1368,7 +1399,8 @@ def outline(
         how = "numbered headings found in the text"
     if not found:
         console.print(
-            f"[yellow]No sections found in {source.name}.[/yellow] It carries no outline, and "
+            f"[yellow]No sections found in {_plain(source.name)}.[/yellow] It carries no "
+            "outline, and "
             "its headings are not numbered - so there is nothing here that can be located "
             "without guessing at how lines were typed."
         )
@@ -1381,19 +1413,24 @@ def outline(
         words = tuple(word.strip() for word in about.split(",") if word.strip())
         shown = matching(sections, words)
 
-    console.print(f"[bold]{source.name}[/bold] - {len(sections)} sections, from {how}.")
+    console.print(
+        f"[bold]{_plain(source.name)}[/bold] - {len(sections)} sections, from {_plain(how)}."
+    )
     if contents:
-        console.print(f"{contents} more are lines from its table of contents, not shown.")
+        console.print(f"{_plain(contents)} more are lines from its table of contents, not shown.")
     for heading in shown:
         indent = "  " * min(heading.depth, 5)
         number = f"{heading.number} " if heading.number else ""
-        console.print(f"  [dim]p.{heading.page:>4}[/dim]  {indent}{number}{heading.title}")
+        console.print(
+            f"  [dim]p.{heading.page:>4d}[/dim]  "
+            f"{_plain(indent)}{_plain(number)}{_plain(heading.title)}"
+        )
 
     if about:
         # Said whichever way it came out. A filter that shows its hits and hides its
         # count is the invisible omission this command exists to avoid.
         console.print(
-            f"[yellow]{len(sections) - len(shown)} of {len(sections)} sections are hidden "
+            f"[yellow]{_plain(len(sections) - len(shown))} of {len(sections)} sections are hidden "
             f"by --about.[/yellow] Run without it to see them; the words are yours, and a "
             "section can be about a subject without being named for it."
         )
@@ -1409,7 +1446,7 @@ def _text_to_outline(path: Path, config: Config) -> str:
     try:
         return converter_for(path).extract_text(path)
     except ConversionError as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
 
@@ -1465,7 +1502,7 @@ def ingest(
         try:
             jobs.append((source, target, converter_for(source)))
         except ConversionError as error:
-            console.print(f"[red]{error}[/red]")
+            console.print(f"[red]{_plain(error)}[/red]")
             raise typer.Exit(code=1) from error
 
     action = IntendedAction(
@@ -1522,9 +1559,9 @@ def ingest(
             )
 
     if len(jobs) > 1:
-        console.print(Panel(f"{done} of {len(jobs)} documents converted", title="Ingested"))
+        console.print(Panel(f"{_plain(done)} of {len(jobs)} documents converted", title="Ingested"))
     for source, message in failed:
-        console.print(f"[yellow]{source}:[/yellow] {message}")
+        console.print(f"[yellow]{_plain(source)}:[/yellow] {_plain(message)}")
 
     # A batch that converted something reports what failed and exits zero; one that
     # converted nothing failed, and a script checking the exit code must be told (ADR-017).
@@ -1545,7 +1582,7 @@ def _report_hidden_text(hidden: tuple[HiddenText, ...], fragments: int = 0) -> N
     if not hidden:
         return
     console.print(
-        f"[yellow]{len(hidden)} of {fragments or len(hidden)} pieces of text in this "
+        f"[yellow]{len(hidden)} of {_plain(fragments or len(hidden))} pieces of text in this "
         "document are not visible to a reader.[/yellow] Most of a document being invisible "
         "describes its layout - a scan, a wide infographic. A handful in a typeset paper "
         "describes something else."
@@ -1553,10 +1590,12 @@ def _report_hidden_text(hidden: tuple[HiddenText, ...], fragments: int = 0) -> N
     for item in hidden[:8]:
         where = f"p. {item.page}, {item.reason}"
         console.print(
-            f"  [dim]{where}[/dim] {item.text[:90]}" if item.text else f"  [dim]{where}[/dim]"
+            f"  [dim]{_plain(where)}[/dim] {_plain(item.text[:90])}"
+            if item.text
+            else f"  [dim]{_plain(where)}[/dim]"
         )
     if len(hidden) > 8:
-        console.print(f"  [dim]and {len(hidden) - 8} more[/dim]")
+        console.print(f"  [dim]and {_plain(len(hidden) - 8)} more[/dim]")
     console.print(
         "[dim]Checking quotations is no defence against this: text hidden in the document "
         "is in the document, so a quotation of it verifies.[/dim]"
@@ -1581,15 +1620,15 @@ def _report_ingestion(
     paper with three hidden names among thousands of fragments said "3 of 3" (ADR-103).
     """
     if result.outcome == "completed":
-        console.print(Panel(f"Extracted text written to {destination}", title="Ingested"))
+        console.print(Panel(f"Extracted text written to {_plain(destination)}", title="Ingested"))
         if furniture:
             console.print(
-                f"[dim]{furniture} lines were dropped as page furniture - running headers, "
+                f"[dim]{_plain(furniture)} lines were dropped as page furniture - running headers, "
                 "footers and page numbers repeated across pages.[/dim]"
             )
         if fonts_in_part:
             console.print(
-                f"[dim]pypdf read a font's encoding only in part {fonts_in_part} times. "
+                f"[dim]pypdf read a font's encoding only in part {_plain(fonts_in_part)} times. "
                 "Measured, that changes spacing and not words (ADR-103).[/dim]"
             )
         _report_hidden_text(hidden, fragments)
@@ -1637,14 +1676,14 @@ def measure(
     # passages hole unfilled. It is reached through `ask` and through here, and nowhere else.
     if corpus_file is not None and skill != AskCorpusSkill().name:
         console.print(
-            f"[red]--from measures ask_corpus, not {skill}.[/red] Write "
+            f"[red]--from measures ask_corpus, not {_plain(skill)}.[/red] Write "
             '`lacc measure ask_corpus "your question" --from corpus.md`.'
         )
         raise typer.Exit(code=1)
     resolved = AskCorpusSkill() if corpus_file is not None else _resolve_skill(skill, config_path)
     if "write_files" in resolved.required:
         console.print(
-            f"[red]{skill} writes files, and measuring must not act.[/red] Repeating an "
+            f"[red]{_plain(skill)} writes files, and measuring must not act.[/red] Repeating an "
             "action that has effects would multiply them; a measurement only observes."
         )
         raise typer.Exit(code=1)
@@ -1654,7 +1693,7 @@ def measure(
     try:
         provider = _build_provider(provider_choice, config, resolved.name)
     except ProviderError as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     plan = _plan_or_exit(resolved, tuple(requests), config)
@@ -1706,7 +1745,7 @@ def measure(
                     )
             except (ProviderError, ReadError, PromptTooLargeError) as error:
                 where = "The warm-up run" if attempt == 0 else f"Run {attempt}"
-                console.print(f"[red]{where} failed:[/red] {error}")
+                console.print(f"[red]{_plain(where)} failed:[/red] {_plain(error)}")
                 raise typer.Exit(code=1) from error
             if attempt == 0:
                 continue
@@ -1748,14 +1787,14 @@ def _report_thespread(skill_name: str, model: str, rows: list[tuple[int, int, in
     totals = [total for _, total, _ in rows]
     verified = [held for _, _, held in rows]
     rates = [held * 100 // total for _, total, held in rows if total]
-    console.print(f"  quotations  {spread(totals)}")
-    console.print(f"  in the document  {spread(verified)}")
-    console.print(f"  rate        {spread(rates)}")
+    console.print(f"  quotations  {_plain(spread(totals))}")
+    console.print(f"  in the document  {_plain(spread(verified))}")
+    console.print(f"  rate        {_plain(spread(rates))}")
 
     if rates and max(rates) - min(rates) >= 10:
         console.print()
         console.print(
-            f"[yellow]This configuration varied by {max(rates) - min(rates)} points "
+            f"[yellow]This configuration varied by {_plain(max(rates) - min(rates))} points "
             f"across {len(rows)} runs.[/yellow] A single run would not have told you "
             "that, and cannot be compared against another single run."
         )
@@ -1831,7 +1870,7 @@ def collect(
     requests = list(workspace.named(requests))
     if not resolved.plan((requests[0],), config).verify_quotes:
         console.print(
-            f"[red]{skill} does not check its quotations, so there is nothing to collect "
+            f"[red]{_plain(skill)} does not check its quotations, so there is nothing to collect "
             "that could be trusted.[/red] A long file of unchecked prose is no better than "
             "the model that wrote it."
         )
@@ -1841,7 +1880,7 @@ def collect(
     try:
         provider = _build_provider(provider_choice, config, resolved.name)
     except ProviderError as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     destination = workspace.resolve_within(into)
@@ -1897,7 +1936,7 @@ def collect(
         write_new_file(destination, collected_markdown(resolved.name, config.model, gathered))
     except ConversionError as error:
         _announce_the_traverse(resolved.name, gathered, started, config, audit, "failed")
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     # The command that runs for an hour is the one that most needs to say it finished, and
@@ -1915,13 +1954,15 @@ def collect(
     )
     console.print(
         Panel(
-            f"{verified} of {total} quotations are in their document, written to {into}",
+            f"{verified:,} of {total:,} quotations are in their document, written to "
+            f"{_plain(into)}",
             title="Collected",
         )
     )
     if failed:
         console.print(
-            f"[yellow]{len(failed)} documents were not collected:[/yellow] {', '.join(failed)}"
+            f"[yellow]{len(failed)} documents were not collected:[/yellow] "
+            f"{_plain(', '.join(failed))}"
         )
 
 
@@ -1936,7 +1977,8 @@ def _corpus_skill(name: str, config_path: Path) -> Skill:
     declared = getattr(skill, "declared", None)
     if declared is None or not declared.over_a_corpus:
         console.print(
-            f"[red]{name} does not work over a corpus.[/red] A skill used with --using must "
+            f"[red]{_plain(name)} does not work over a corpus.[/red] A skill used with --using "
+            "must "
             "declare `over: corpus`, because it is handed retrieved passages rather than a "
             "file it named."
         )
@@ -2012,7 +2054,7 @@ def ask(
     try:
         provider = _build_provider(provider_choice, config, resolved.name)
     except ProviderError as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     run_id = new_run_id()
@@ -2037,12 +2079,12 @@ def ask(
             result = ask_once(resolved, plan, material, config, workspace, provider, audit, run_id)
     except (ProviderError, PromptTooLargeError) as error:
         _announce(resolved.name, "failed", time.monotonic() - started, config, audit, run_id)
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     _announce(resolved.name, result.outcome, time.monotonic() - started, config, audit, run_id)
     if result.completion is not None:
-        _show(result.completion.text)
+        _show(result.completion.text, markup=False)
     _check_against_what_was_sent(
         result,
         material,
@@ -2055,7 +2097,7 @@ def ask(
         resolve_engine_host(config.engine_host, config.network_access),
     )
     console.print(
-        f"[dim]{made.set_aside} of {made.considered} passages were not sent. An "
+        f"[dim]{_plain(made.set_aside)} of {_plain(made.considered)} passages were not sent. An "
         "answer drawn from a selection is an answer about that selection.[/dim]"
     )
 
@@ -2104,12 +2146,12 @@ def _prepared_or_exit(
         resolved = workspace.resolve_within(corpus_file)
         text = resolved.read_text(encoding="utf-8", errors="replace")
     except (ValueError, OSError) as error:
-        console.print(f"[red]Cannot read {corpus_file}: {error}[/red]")
+        console.print(f"[red]Cannot read {_plain(corpus_file)}: {_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
     retriever = _retriever_for(config, resolved)
     made = prepare(question, corpus_file.name, text, config, retriever)
     if made.awaiting is not None:
-        console.print(made.asks)
+        _show(made.asks, markup=False)
         if judge:
             console.print(
                 "[dim]With --judge, each reading of the answer is ranked the same way.[/dim]"
@@ -2133,11 +2175,11 @@ def _prepared_or_exit(
         # Includes a ranking that could not be made: refused rather than quietly falling back
         # to words, because a selection made by a different method is a different answer and
         # saying so afterwards is worse than not answering (ADR-061).
-        console.print(f"[red]{made.refusal}[/red]")
+        console.print(f"[red]{_plain(made.refusal)}[/red]")
         raise typer.Exit(code=1)
     console.print(
-        f"[green]{made.selected} passages selected[/green] of {made.considered}; "
-        f"{made.set_aside} set aside. [dim]{made.how}[/dim]"
+        f"[green]{_plain(made.selected)} passages selected[/green] of {_plain(made.considered)}; "
+        f"{_plain(made.set_aside)} set aside. [dim]{_plain(made.how)}[/dim]"
     )
     return made, retriever
 
@@ -2220,8 +2262,10 @@ def _judge_the_readings(
         )
         sending = retriever.would_send(passages) if retriever is not None else None
         for claim, verdict in flagged:
-            console.print(f"  [yellow]?[/yellow] {claim.claim.claim[:95]}")
-            console.print(f"    [dim]{verdict.verdict}: {verdict.detail[:110]}[/dim]")
+            console.print(f"  [yellow]?[/yellow] {_plain(claim.claim.claim[:95])}")
+            console.print(
+                f"    [dim]{_plain(verdict.verdict)}: {_plain(verdict.detail[:110])}[/dim]"
+            )
             if retriever is None:
                 continue
             for candidate in might_support(
@@ -2232,8 +2276,8 @@ def _judge_the_readings(
                     if candidate.page
                     else candidate.source
                 )
-                console.print(f"    [dim]could support it: {candidate.text[:95]}[/dim]")
-                console.print(f"    [dim]                  [{where}][/dim]")
+                console.print(f"    [dim]could support it: {_plain(candidate.text[:95])}[/dim]")
+                console.print(f"    [dim]                  [{_plain(where)}][/dim]")
         if sending is not None:
             # Ranked by meaning: each flagged reading went to be embedded to find what might
             # carry it, inside the run somebody agreed to (ADR-108).
@@ -2241,7 +2285,9 @@ def _judge_the_readings(
                 run_id, plan.action.name, sending.model, reaches, {"readings": len(flagged)}
             )
     if undecided:
-        console.print(f"[dim]{undecided} could not be judged, and that is not approval.[/dim]")
+        console.print(
+            f"[dim]{_plain(undecided)} could not be judged, and that is not approval.[/dim]"
+        )
 
 
 def _check_against_what_was_sent(
@@ -2299,7 +2345,7 @@ def _check_against_what_was_sent(
         "document."
     )
     for claim in invented:
-        console.print(f"  [red]x[/red] {claim.claim.quote[:100]}")
+        console.print(f"  [red]x[/red] {_plain(claim.claim.quote[:100])}")
     if provider is not None:
         _judge_the_readings(checked, provider, plan, audit, run_id, passages, retriever, reaches)
 
@@ -2339,7 +2385,7 @@ def corpus(
         try:
             text = workspace.resolve_within(source).read_text(encoding="utf-8", errors="replace")
         except (ValueError, OSError) as error:
-            console.print(f"[red]Cannot read {source}: {error}[/red]")
+            console.print(f"[red]Cannot read {_plain(source)}: {_plain(error)}[/red]")
             raise typer.Exit(code=1) from error
         collected.extend(parse_corpus(text))
 
@@ -2354,15 +2400,19 @@ def corpus(
     try:
         write_new_file(workspace.resolve_within(into), text)
     except ConversionError as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     real = sum(1 for _, found in rechecked if found)
-    console.print(f"[green]{len(collected)} quotations from {len(sources)} files[/green] -> {into}")
-    console.print(f"  {real} are in their document, {len(collected) - real} are not.")
+    console.print(
+        f"[green]{len(collected)} quotations from {len(sources)} files[/green] -> {_plain(into)}"
+    )
+    console.print(
+        f"  {_plain(real)} are in their document, {_plain(len(collected) - real)} are not."
+    )
     if marked:
         shown = sum(1 for claim, _ in rechecked if claim.quote in marked)
-        console.print(f"  {shown} mention your words; none were removed.")
+        console.print(f"  {_plain(shown)} mention your words; none were removed.")
     if missing:
         console.print(
             f"[yellow]{len(missing)} came from documents not in the workspace[/yellow] and "
@@ -2416,11 +2466,11 @@ def review(
         written = workspace.resolve_within(draft)
         corpus_file = workspace.resolve_within(against)
     except ValueError as error:
-        _show(f"[red]{error}[/red]")
+        _show(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
     for path, what in ((written, draft), (corpus_file, against)):
         if not path.exists():
-            _show(f"[red]{what} is not in the workspace.[/red]")
+            _show(f"[red]{_plain(what)} is not in the workspace.[/red]")
             raise typer.Exit(code=1)
 
     blocks = paragraphs_in(written.read_text(encoding="utf-8", errors="replace"))
@@ -2434,7 +2484,7 @@ def review(
         if "NOT IN THE DOCUMENT" not in c.recorded_verdict
     ]
     if not collected:
-        _show(f"[red]{against} holds no usable quotations.[/red]")
+        _show(f"[red]{_plain(against)} holds no usable quotations.[/red]")
         raise typer.Exit(code=1)
     passages = tuple(
         Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
@@ -2444,13 +2494,16 @@ def review(
     judgements = len(blocks) * CANDIDATES_PER_PARAGRAPH
     _show(
         f"[bold]{len(blocks)} paragraphs[/bold] against [bold]{len(passages)} quotations[/bold]: "
-        f"about {judgements} judgements, a few seconds each."
+        f"about {_plain(judgements)} judgements, a few seconds each."
     )
     outgoing = retriever.would_send(passages)
     if outgoing is not None:
         # Said before the question it already asks: finding what each paragraph rests on
         # sends the paragraph, and every quotation never embedded, to be embedded (ADR-106).
-        _show(ranking_would_send(outgoing, reaching(config), sends="each paragraph"))
+        _show(
+            ranking_would_send(outgoing, reaching(config), sends="each paragraph"),
+            markup=False,
+        )
     # Opened where it is about to ask, so a no is recorded too (ADR-107).
     audit = AuditLog(workspace, config)
     run_id = audit.opened("review")
@@ -2493,7 +2546,7 @@ def review(
     except EmbeddingError as error:
         # The judge turns an engine that went away into an undecided verdict; the ranking
         # cannot, and a run that stopped here would otherwise have no end (ADR-107).
-        _show(f"[red]{error}[/red]")
+        _show(f"[red]{_plain(error)}[/red]")
         audit.record(
             run_id, "run_failed", "Could not rank", {"action": "review", "error": str(error)}
         )
@@ -2535,8 +2588,10 @@ def review(
     if against_it:
         _show(f"[red]{len(against_it)} paragraphs your corpus contradicts.[/red] Read these first.")
         for finding in against_it:
-            _show(f"  [red]Line {finding.paragraph.line}[/red] - {finding.document}")
-    _show(f"[green]{held} held up[/green], [yellow]{len(uncovered)} not covered[/yellow].")
+            _show(
+                f"  [red]Line {_plain(finding.paragraph.line)}[/red] - {_plain(finding.document)}"
+            )
+    _show(f"[green]{_plain(held)} held up[/green], [yellow]{len(uncovered)} not covered[/yellow].")
     _show(
         "[dim]Not covered means nothing collected holds it - not that it is wrong. The "
         "source may simply not be in this corpus.[/dim]"
@@ -2551,7 +2606,7 @@ def review(
         beside = destination.with_suffix(FINDINGS_SUFFIX)
         write_new_file(beside, reviewed.model_dump_json(indent=2))
         audit.wrote(run_id, "review", beside)
-        _show(f"-> {into}")
+        _show(f"-> {_plain(into)}")
     audit.record(run_id, "run_finished", "Finished review", {"action": "review"})
 
 
@@ -2753,15 +2808,15 @@ def coverage(
         topics = topics_in(topics_path.read_text(encoding="utf-8", errors="replace"))
         text = corpus_path.read_text(encoding="utf-8", errors="replace")
     except (ValueError, OSError) as error:
-        _show(f"[red]{error}[/red]")
+        _show(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     if not topics:
-        _show(f"[red]{topics_file} names no topics.[/red] One per line.")
+        _show(f"[red]{_plain(topics_file)} names no topics.[/red] One per line.")
         raise typer.Exit(code=1)
     if missing_control(topics):
         _show(
-            f"[red]No control topic.[/red] Mark one line with `{CONTROL_MARK}` - a subject "
+            f"[red]No control topic.[/red] Mark one line with `{_plain(CONTROL_MARK)}` - a subject "
             "deliberately outside your field. Without a floor these numbers have no meaning, "
             "and a reader supplies one from somewhere."
         )
@@ -2769,7 +2824,9 @@ def coverage(
 
     collected = [c for c in parse_corpus(text) if "NOT IN THE DOCUMENT" not in c.recorded_verdict]
     if not collected:
-        _show(f"[yellow]{against} holds no quotation that was found in its document.[/yellow]")
+        _show(
+            f"[yellow]{_plain(against)} holds no quotation that was found in its document.[/yellow]"
+        )
         raise typer.Exit(code=1)
     passages = tuple(
         Passage(text=c.quote, source=c.document, note=c.claim, page=c.page) for c in collected
@@ -2784,8 +2841,8 @@ def coverage(
     unembedded = dense.would_send(passages).unembedded
     _show(
         f"[bold]{len(topics)} topics[/bold] against {len(passages)} quotations, by meaning. "
-        f"The topics, and the {unembedded} quotations never embedded beside the corpus, would "
-        f"be sent to [bold]{config.embedding_model}[/bold] on [bold]{host}[/bold]."
+        f"The topics, and the {unembedded:,} quotations never embedded beside the corpus, would "
+        f"be sent to [bold]{_plain(config.embedding_model)}[/bold] on [bold]{_plain(host)}[/bold]."
     )
     # Opened where it is about to ask, so a no is recorded too (ADR-107).
     audit = AuditLog(workspace, config)
@@ -2800,7 +2857,7 @@ def coverage(
         vectors = tuple(dense.vectors_for(passages))
         found = reach_of(topics, passages, vectors, embedder)
     except (EmbeddingError, ValueError) as error:
-        _show(f"[red]{error}[/red]")
+        _show(f"[red]{_plain(error)}[/red]")
         audit.record(
             run_id, "run_failed", "Could not measure", {"action": "coverage", "error": str(error)}
         )
@@ -2817,7 +2874,7 @@ def coverage(
     for one in found:
         name = f"{one.topic.said}  (control)" if one.topic.control else one.topic.said
         colour = "dim" if one.nearest <= floor else "white"
-        _show(f"  [{colour}]{one.nearest:.2f}[/{colour}]  {name}")
+        _show(f"  [{colour}]{one.nearest:.2f}[/{colour}]  {_plain(name)}")
     _show(
         f"[dim]The floor is {floor:.2f}. Nothing here is called a gap: a similarity is an "
         "ordering, not an interval.[/dim]"
@@ -2840,7 +2897,7 @@ def coverage(
         beside = destination.with_suffix(REACHES_SUFFIX)
         beside.write_text(measured.model_dump_json(indent=2) + chr(10), encoding="utf-8")
         audit.wrote(run_id, "coverage", beside)
-        _show(f"[green]Written[/green] -> {into}")
+        _show(f"[green]Written[/green] -> {_plain(into)}")
     audit.record(
         run_id,
         "run_finished",
@@ -2884,10 +2941,10 @@ def identify(
     try:
         path = workspace.resolve_within(document)
     except ValueError as error:
-        _show(f"[red]{error}[/red]")
+        _show(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
     if not path.exists():
-        _show(f"[red]{document} is not in the workspace.[/red]")
+        _show(f"[red]{_plain(document)} is not in the workspace.[/red]")
         raise typer.Exit(code=1)
 
     kept = workspace.resolve_within(Path("identified.registry.json"))
@@ -2897,7 +2954,10 @@ def identify(
     audit = AuditLog(workspace, config)
     already = established_for(path)
     if already is not None:
-        _show(f"[dim]Already established as {already.doi} on {already.established}.[/dim]")
+        _show(
+            f"[dim]Already established as {_plain(already.doi)} on "
+            f"{_plain(already.established)}.[/dim]"
+        )
 
     if doi is None:
         _propose(path, registry, config, audit, kept)
@@ -2907,7 +2967,7 @@ def identify(
     # Opened where it is about to ask, so a no is recorded too (ADR-107).
     run_id = audit.opened("identify")
     identified = bool(config.registry_mailto)
-    _show(f"[yellow]1 DOI would be sent to {config.registry_url}.[/yellow]")
+    _show(f"[yellow]1 DOI would be sent to {_plain(config.registry_url)}.[/yellow]")
     if not typer.confirm("Ask the registry?", default=False):
         _show("Nothing was sent.")
         audit.record(run_id, "confirmation_declined", "Declined identify", {"action": "identify"})
@@ -2915,7 +2975,7 @@ def identify(
     try:
         work = registry.about(wanted)
     except RegistryError as error:
-        _show(f"[red]{error}[/red]")
+        _show(f"[red]{_plain(error)}[/red]")
         audit.asked(run_id, "identify", config.registry_url, registry.sent, identified)
         audit.record(
             run_id,
@@ -2928,16 +2988,16 @@ def identify(
     audit.asked(run_id, "identify", config.registry_url, registry.sent, identified)
     audit.wrote(run_id, "identify", kept)
     if work is None:
-        _show(f"[red]The registry holds nothing for {wanted}.[/red] Nothing was written.")
+        _show(f"[red]The registry holds nothing for {_plain(wanted)}.[/red] Nothing was written.")
         audit.record(
             run_id, "run_finished", "Finished identify", {"action": "identify", "held": False}
         )
         raise typer.Exit(code=1)
 
-    _show(f"[bold]{work.title}[/bold]")
-    _show(f"[dim]{as_entry(work)}[/dim]")
+    _show(f"[bold]{_plain(work.title)}[/bold]")
+    _show(f"[dim]{_plain(as_entry(work))}[/dim]")
     said = opening_of(path.read_text(encoding="utf-8", errors="replace"))
-    _show(f"[dim]The document opens: {said}[/dim]")
+    _show(f"[dim]The document opens: {_plain(said)}[/dim]")
     if not typer.confirm("Is that what this document is?", default=False):
         _show("[yellow]Nothing was written.[/yellow] A wrong DOI is worse than a missing one.")
         audit.record(run_id, "confirmation_declined", "Declined identify", {"action": "identify"})
@@ -2945,7 +3005,7 @@ def identify(
     written = establish(path, wanted, work.title)
     audit.wrote(run_id, "identify", written)
     audit.record(run_id, "run_finished", "Finished identify", {"action": "identify", "held": True})
-    _show(f"[green]Established[/green] -> {written.name}")
+    _show(f"[green]Established[/green] -> {_plain(written.name)}")
 
 
 def _propose(
@@ -2955,7 +3015,7 @@ def _propose(
     candidates = printed_dois(path.read_text(encoding="utf-8", errors="replace"))
     if not candidates:
         _show(
-            f"[yellow]{path.name} prints no DOI in its front matter.[/yellow] Nothing to "
+            f"[yellow]{_plain(path.name)} prints no DOI in its front matter.[/yellow] Nothing to "
             "propose - two of the four documents this was measured on are arXiv preprints, "
             "which carry none."
         )
@@ -2963,9 +3023,9 @@ def _propose(
     fresh = [one for one in candidates if not registry.holds(one)]
     # Opened where it is about to ask, so a no is recorded too (ADR-107).
     run_id = audit.opened("identify")
-    _show(f"[bold]{len(candidates)} DOIs[/bold] printed near the front of {path.name}.")
+    _show(f"[bold]{len(candidates)} DOIs[/bold] printed near the front of {_plain(path.name)}.")
     if fresh:
-        _show(f"[yellow]{len(fresh)} would be sent to {config.registry_url}.[/yellow]")
+        _show(f"[yellow]{len(fresh)} would be sent to {_plain(config.registry_url)}.[/yellow]")
         if not typer.confirm("Ask the registry what they are?", default=False):
             _show("Nothing was sent.")
             audit.record(
@@ -2977,13 +3037,13 @@ def _propose(
         try:
             work = registry.about(one)
         except RegistryError as error:
-            _show(f"  [red]{one}[/red]  {error}")
+            _show(f"  [red]{_plain(one)}[/red]  {_plain(error)}")
             unreachable += 1
             continue
         if work is None:
-            _show(f"  [dim]{one}[/dim]  the registry holds nothing for it")
+            _show(f"  [dim]{_plain(one)}[/dim]  the registry holds nothing for it")
             continue
-        _show(f"  [bold]{one}[/bold]  {work.title}")
+        _show(f"  [bold]{_plain(one)}[/bold]  {_plain(work.title)}")
     registry.write()
     audit.asked(
         run_id, "identify", config.registry_url, registry.sent, bool(config.registry_mailto)
@@ -2996,7 +3056,7 @@ def _propose(
         {"action": "identify", "proposed": len(candidates), "unreachable": unreachable},
     )
     said = opening_of(path.read_text(encoding="utf-8", errors="replace"))
-    _show(f"[dim]The document opens: {said}[/dim]")
+    _show(f"[dim]The document opens: {_plain(said)}[/dim]")
     _show(
         "[dim]Nothing was chosen. A document prints its own DOI and the DOIs it cites, and "
         "no test separates them - which is why this asks you. Name one with --doi.[/dim]"
@@ -3024,16 +3084,16 @@ def bring(
     # asking is what reaches the other machine (ADR-112).
     typed = source.expanduser().absolute()
     if on_the_network(str(typed)) or drive_is_remote(str(typed)):
-        _show(f"[red]{escape(not_on_this_machine(str(typed)))}[/red]")
+        _show(f"[red]{_plain(not_on_this_machine(str(typed)))}[/red]")
         raise typer.Exit(code=1)
     resolved = typed.resolve()
     if on_the_network(str(resolved)):
-        _show(f"[red]{escape(not_on_this_machine(str(resolved)))}[/red]")
+        _show(f"[red]{_plain(not_on_this_machine(str(resolved)))}[/red]")
         raise typer.Exit(code=1)
     size = resolved.stat().st_size if resolved.is_file() else None
     why = refusal(resolved, workspace.is_within(resolved), size, exists=resolved.exists())
     if why:
-        _show(f"[red]{escape(why)}[/red]")
+        _show(f"[red]{_plain(why)}[/red]")
         raise typer.Exit(code=1)
 
     folder = workspace.resolve_within(Path(DRAFTS))
@@ -3043,9 +3103,9 @@ def bring(
     destination = workspace.resolve_within(Path(DRAFTS) / name)
     shown = f"{size / 1024:,.0f} KB" if size and size >= 1024 else f"{size} bytes"
     # Names are printed as text: Rich reads `[v2]` in a name as a style and drops it (ADR-112).
-    _show(f"[bold]Would read[/bold]  {escape(str(resolved))}")
-    _show(f"            outside the workspace, {shown}")
-    _show(f"[bold]Copy to[/bold]     {DRAFTS}/{escape(name)}")
+    _show(f"[bold]Would read[/bold]  {_plain(resolved)}")
+    _show(f"            outside the workspace, {_plain(shown)}")
+    _show(f"[bold]Copy to[/bold]     {DRAFTS}/{_plain(name)}")
     _show("[dim]Your file is read and never opened for writing.[/dim]")
     # Opened where it is about to ask, so a no is recorded too (ADR-107).
     audit = AuditLog(workspace, config)
@@ -3058,7 +3118,7 @@ def bring(
     try:
         content = resolved.read_bytes()
     except OSError as error:
-        _show(f"[red]Cannot read {escape(str(resolved))}: {escape(str(error))}[/red]")
+        _show(f"[red]Cannot read {_plain(resolved)}: {_plain(error)}[/red]")
         audit.record(
             run_id, "run_failed", "Could not read it", {"action": "bring", "error": str(error)}
         )
@@ -3076,7 +3136,7 @@ def bring(
         with destination.open("xb") as handle:
             handle.write(content)
     except OSError as error:
-        _show(f"[red]Cannot write {DRAFTS}/{escape(name)}: {escape(str(error))}[/red]")
+        _show(f"[red]Cannot write {DRAFTS}/{_plain(name)}: {_plain(error)}[/red]")
         audit.record(
             run_id, "run_failed", "Could not copy it", {"action": "bring", "error": str(error)}
         )
@@ -3086,11 +3146,11 @@ def bring(
     _write_or_exit(beside, noted(resolved, today, digest), (audit, run_id, "bring"))
     audit.record(run_id, "run_finished", "Finished bring", {"action": "bring"})
 
-    _show(f"[green]Brought[/green] -> {DRAFTS}/{escape(name)}")
+    _show(f"[green]Brought[/green] -> {DRAFTS}/{_plain(name)}")
     if resolved.suffix.lower() in {".md", ".txt"}:
-        _show(f'[dim]Review it: lacc review "{DRAFTS}/{escape(name)}" --against <corpus>[/dim]')
+        _show(f'[dim]Review it: lacc review "{DRAFTS}/{_plain(name)}" --against <corpus>[/dim]')
     else:
-        _show(f'[dim]Convert it first: lacc ingest "{DRAFTS}/{escape(name)}"[/dim]')
+        _show(f'[dim]Convert it first: lacc ingest "{DRAFTS}/{_plain(name)}"[/dim]')
 
 
 @app.command()
@@ -3123,17 +3183,18 @@ def sections(
     try:
         path = workspace.resolve_within(source)
     except ValueError as error:
-        _show(f"[red]{error}[/red]")
+        _show(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
     if not path.exists():
-        _show(f"[red]{source} is not in the workspace.[/red]")
+        _show(f"[red]{_plain(source)} is not in the workspace.[/red]")
         raise typer.Exit(code=1)
 
     text = path.read_text(encoding="utf-8", errors="replace")
     found = sections_in(text)
     if not found:
         _show(
-            f"[yellow]{source.name} numbers no sections.[/yellow] Most do not: a heading in a "
+            f"[yellow]{_plain(source.name)} numbers no sections.[/yellow] Most do not: a "
+            "heading in a "
             "PDF is a larger font, and nothing of that survives extraction. Read it in passes "
             "instead, with `--in-passes`."
         )
@@ -3151,7 +3212,8 @@ def sections(
                 _show(
                     ranking_would_send(
                         outgoing, reaching(config), one="section opening", many="section openings"
-                    )
+                    ),
+                    markup=False,
                 )
                 if not typer.confirm("Rank by meaning?", default=False):
                     retriever = WordRetriever()
@@ -3172,25 +3234,33 @@ def sections(
                     failed,
                 )
             if failed:
-                _show(f"[red]{failed}[/red]")
+                _show(f"[red]{_plain(failed)}[/red]")
                 raise typer.Exit(code=1)
-            _show(f"[bold]{len(found)} sections[/bold] in {source.name}, most about it first")
+            _show(
+                f"[bold]{len(found)} sections[/bold] in {_plain(source.name)}, most about it first"
+            )
             for section in found[:12]:
-                _show(f"  [dim]{section.line:>6}[/dim]  {section.number}  {section.title}")
+                _show(
+                    f"  [dim]{section.line:>6d}[/dim]  {_plain(section.number)}  "
+                    f"{_plain(section.title)}"
+                )
             if len(found) > 12:
-                _show(f"  [dim]and {len(found) - 12} more, in the same order[/dim]")
+                _show(f"  [dim]and {_plain(len(found) - 12)} more, in the same order[/dim]")
             _show("[dim]Nothing was read but this document. Take one with --take.[/dim]")
             return
-        _show(f"[bold]{len(found)} sections[/bold] in {source.name}")
+        _show(f"[bold]{len(found)} sections[/bold] in {_plain(source.name)}")
         for section in found:
             indent = "  " * (section.depth - 1)
-            _show(f"  [dim]{section.line:>6}[/dim]  {indent}{section.number}  {section.title}")
+            _show(
+                f"  [dim]{section.line:>6d}[/dim]  {_plain(indent)}{_plain(section.number)}  "
+                f"{_plain(section.title)}"
+            )
         _show("[dim]Order them by a question with --about, or take one with --take.[/dim]")
         return
 
     wanted = section_of(text, take)
     if not wanted:
-        _show(f"[red]{source.name} does not number a section {take}.[/red]")
+        _show(f"[red]{_plain(source.name)} does not number a section {_plain(take)}.[/red]")
         raise typer.Exit(code=1)
     if into is None:
         _show("[red]Name where to write it with --into.[/red]")
@@ -3212,7 +3282,7 @@ def sections(
         ),
     )
     _show(
-        f"[green]Section {take}[/green] -> {into}   "
+        f"[green]Section {_plain(take)}[/green] -> {_plain(into)}   "
         f"[dim]{estimate_tokens(wanted):,} tokens of {estimate_tokens(text):,}[/dim]"
     )
 
@@ -3236,22 +3306,24 @@ def status(
     config, workspace = _load(config_path)
     work = stages_in(workspace.root, config.context_file)
     if not work.stages:
-        _show(f"[red]{workspace.root} is not a folder.[/red]")
+        _show(f"[red]{_plain(workspace.root)} is not a folder.[/red]")
         raise typer.Exit(code=1)
 
-    _show(f"[dim]{work.workspace}[/dim]")
+    _show(f"[dim]{_plain(work.workspace)}[/dim]")
     for stage in work.stages:
-        mark = "[green]done[/green]" if stage.settled else "[yellow]open[/yellow]"
+        mark, style = ("done", "green") if stage.settled else ("open", "yellow")
         _show("")
-        _show(f"  {mark}  [bold]{stage.name}[/bold]")
+        _show(f"  [{style}]{_plain(mark)}[/{style}]  [bold]{_plain(stage.name)}[/bold]")
         if stage.done:
-            _show(f"        {stage.done}")
+            _show(f"        {_plain(stage.done)}")
         if stage.missing:
-            _show(f"        [yellow]{stage.missing}[/yellow]")
+            _show(f"        [yellow]{_plain(stage.missing)}[/yellow]")
         if not stage.done:
-            _show(f"        [dim]{stage.command}[/dim]")
+            _show(f"        [dim]{_plain(stage.command)}[/dim]")
     _show("")
-    _show(f"[dim]{work.settled} of {len(work.stages)} stages have nothing outstanding.[/dim]")
+    _show(
+        f"[dim]{_plain(work.settled)} of {len(work.stages)} stages have nothing outstanding.[/dim]"
+    )
 
 
 _MARKUP = {"good": "green", "warn": "yellow", "bad": "red", "plain": "", "quiet": "dim"}
@@ -3285,11 +3357,13 @@ def _print_said(said: Said) -> None:
     """One sentence about the trail, stressed the way its tone says."""
     colour = _MARKUP[said.tone]
     if said.tone == "quiet":
-        console.print(f"[dim]{' '.join(part for part in (said.lead, said.rest) if part)}[/dim]")
+        console.print(
+            f"[dim]{_plain(' '.join(part for part in (said.lead, said.rest) if part))}[/dim]"
+        )
     elif colour and said.lead:
-        console.print(f"[{colour}]{said.lead}[/{colour}] {said.rest}")
+        console.print(f"[{colour}]{_plain(said.lead)}[/{colour}] {_plain(said.rest)}")
     else:
-        console.print(" ".join(part for part in (said.lead, said.rest) if part))
+        _show(" ".join(part for part in (said.lead, said.rest) if part), markup=False)
 
 
 def _trail_for_the_window(config: Config, workspace: Workspace) -> Callable[[], Trail]:
@@ -3346,7 +3420,7 @@ def _show_profile(profile: SystemProfile) -> None:
             models_text = "Engine present, but no models installed."
     else:
         models_text = "No local engine detected."
-    console.print(Panel(models_text, title="Inference engine", expand=False))
+    console.print(Panel(Text(models_text), title="Inference engine", expand=False))
 
     hardware_lines = [
         f"OS:           {profile.os_name}",
@@ -3362,7 +3436,7 @@ def _show_profile(profile: SystemProfile) -> None:
             f"Uptime:       {profile.uptime_hours} h",
         ]
     )
-    console.print(Panel("\n".join(hardware_lines), title="Hardware", expand=False))
+    console.print(Panel(Text("\n".join(hardware_lines)), title="Hardware", expand=False))
 
     table = Table(title="Rough model fit (approximate)", expand=False)
     table.add_column("Size")
@@ -3389,7 +3463,7 @@ def _show_profile(profile: SystemProfile) -> None:
     _show_window_costs(profile)
 
     for note in profile.notes:
-        console.print(f"[yellow]note:[/yellow] {note}")
+        console.print(f"[yellow]note:[/yellow] {_plain(note)}")
 
 
 def _show_window_costs(profile: SystemProfile) -> None:
@@ -3416,10 +3490,10 @@ def _show_window_costs(profile: SystemProfile) -> None:
     for cost in profile.window_costs:
         colour = colours[cost.status]
         table.add_row(
-            cost.model,
+            _plain(cost.model),
             f"{cost.window_tokens:,}",
-            f"{cost.cache_gb} GB",
-            f"[{colour}]{cost.total_gb} GB[/{colour}]",
+            f"{_plain(cost.cache_gb)} GB",
+            f"[{colour}]{_plain(cost.total_gb)} GB[/{colour}]",
         )
     console.print(table)
     console.print(
@@ -3433,9 +3507,9 @@ def _report(result: RunResult) -> None:
     """Print the outcome of a run."""
     if result.outcome == "completed" and result.completion is not None:
         try:
-            console.print(Panel(result.completion.text, title="Result", expand=False))
+            console.print(Panel(Text(result.completion.text), title="Result", expand=False))
         except (UnicodeEncodeError, OSError):
-            _show(result.completion.text)
+            _show(result.completion.text, markup=False)
     elif result.outcome == "refused":
         _exit_refused()
     elif result.outcome == "declined":
@@ -3475,7 +3549,10 @@ def engine_test(
     """
     config, _ = _load(config_path)
     host = resolve_engine_host(config.engine_host, config.network_access)
-    console.print(f"Engine: [bold]{host}[/bold]  model: [bold]{config.model or '(none)'}[/bold]")
+    console.print(
+        f"Engine: [bold]{_plain(host)}[/bold]  model: "
+        f"[bold]{_plain(config.model or '(none)')}[/bold]"
+    )
 
     if not config.model:
         console.print("[red]No model configured.[/red] Name one with `model:` in the config.")
@@ -3483,20 +3560,20 @@ def engine_test(
 
     check = check_engine(config.model, host, config.context_tokens, config.thinking)
     if not check.reached:
-        console.print(f"[red]{check.detail}[/red]")
+        console.print(f"[red]{_plain(check.detail)}[/red]")
         raise typer.Exit(code=1)
 
     console.print(f"[green]Reached it.[/green] {len(check.models)} models installed.")
     if not check.model_installed:
-        console.print(f"[red]{check.detail}[/red]")
+        console.print(f"[red]{_plain(check.detail)}[/red]")
         if check.models:
-            console.print("Installed there: " + ", ".join(check.models))
+            console.print("Installed there: " + _plain(", ".join(check.models)))
         raise typer.Exit(code=1)
 
     if not check.answered:
-        console.print(f"[red]{check.detail}[/red]")
+        console.print(f"[red]{_plain(check.detail)}[/red]")
         raise typer.Exit(code=1)
-    console.print(f"[green]It answered[/green] in {check.seconds}s. A run would work.")
+    console.print(f"[green]It answered[/green] in {_plain(check.seconds)}s. A run would work.")
 
 
 notify_app = typer.Typer(help="Check and use the configured notifier.", no_args_is_help=True)
@@ -3516,10 +3593,12 @@ def _report_where_the_settings_came_from(config: Config, config_path: Path) -> N
         if os.environ.get(name, "").strip()
     ]
     if found:
-        console.print(f"[dim]Found {', '.join(found)} in the environment.[/dim]")
+        console.print(f"[dim]Found {_plain(', '.join(found))} in the environment.[/dim]")
     if settings.server_url:
         # The address, unlike the secrets, is safe to print: it is in the file already.
-        console.print(f"[dim]Sending to {settings.server_url}, named in the configuration.[/dim]")
+        console.print(
+            f"[dim]Sending to {_plain(settings.server_url)}, named in the configuration.[/dim]"
+        )
 
 
 @notify_app.command("test")
@@ -3541,7 +3620,7 @@ def notify_test(
     try:
         notifier = notifier_from_config(config)
     except NotifierMisconfigured as error:
-        console.print(f"[red]{error}[/red]")
+        console.print(f"[red]{_plain(error)}[/red]")
         raise typer.Exit(code=1) from error
 
     if notifier is None:
@@ -3557,8 +3636,9 @@ def notify_test(
             )
         if not os.environ.get(settings.topic_env, "").strip():
             console.print(
-                f"Nothing found for: {settings.topic_env}. Put it in "
-                f"[bold]{config_path.parent / DOTENV_FILENAME}[/bold] or in your environment."
+                f"Nothing found for: {_plain(settings.topic_env)}. Put it in "
+                f"[bold]{_plain(config_path.parent / DOTENV_FILENAME)}[/bold] or in your "
+                "environment."
             )
         raise typer.Exit(code=1)
 
@@ -3576,9 +3656,13 @@ def notify_test(
         {"transport": delivery.transport, "delivered": delivery.delivered},
     )
     if not delivery.delivered:
-        console.print(f"[red]Not delivered[/red] ({delivery.transport}): {delivery.detail}")
+        console.print(
+            f"[red]Not delivered[/red] ({_plain(delivery.transport)}): {_plain(delivery.detail)}"
+        )
         raise typer.Exit(code=1)
-    console.print(f"[green]Sent[/green] via {delivery.transport}: {delivery.detail}")
+    console.print(
+        f"[green]Sent[/green] via {_plain(delivery.transport)}: {_plain(delivery.detail)}"
+    )
 
 
 def main() -> None:

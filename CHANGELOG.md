@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **What the terminal printed was not always what was written** (ADR-113). Rich reads
+  anything shaped like `[word]` as a style, and the CLI's lines carry names, quotations,
+  errors and the engine's answers beside its own markup. Of the 174 answers the trail keeps,
+  10 lost a part on screen - among them a cited source, `[eau-6.4.5-nodal-rcN1.md, p. 107]`,
+  printed as nothing - and a stray `[/b]` ended the program after the answer had arrived.
+  Every value put into a printed line is escaped, what is printed whole goes out with markup
+  off, and a line whose markup breaks is printed as it is. A test reads `cli.py` and fails on
+  any value put in unescaped.
 - **The file `bring` read was not always the file named** (ADR-112). On Windows, Click - under
   Typer - rewrote every argument before LACC saw it: `~` and `%VARIABLES%` expanded, and `*`,
   `?` and `[...]` matched against the folder the command ran in. `bring "cap [1].md"`, beside
