@@ -17,7 +17,7 @@ from local_ai_control_center.features.review import reviewed_from, reviews_in
 from local_ai_control_center.views import paint
 from local_ai_control_center.views.section import Listing, Panel, Section, Sidebar, State
 
-ORDER = {"contradicted": 0, "nothing": 1, "supported": 2}
+ORDER = {"contradicted": 0, "undecided": 1, "nothing": 2, "supported": 3}
 """Worst first. A person reads from the top, so what can put a false claim in a thesis
 goes there (ADR-068)."""
 
@@ -78,10 +78,11 @@ def _show_review(key: str, panel: Panel, state: State) -> None:
         reviewed.draft,
         f"{len(reviewed.findings)} paragraphs against {reviewed.corpus}   ·   "
         f"{counted['supported']} held up, {counted['contradicted']} contradicted, "
-        f"{counted['nothing']} not covered\n"
-        "Not covered means nothing collected holds it - not that it is wrong.",
+        f"{counted['nothing']} not covered"
+        + (f", {counted['undecided']} not judged" if counted["undecided"] else "")
+        + "\nNot covered means nothing collected holds it - not that it is wrong.",
     )
-    for finding in sorted(reviewed.findings, key=lambda f: ORDER.get(f.verdict, 3)):
+    for finding in sorted(reviewed.findings, key=lambda f: ORDER.get(f.verdict, len(ORDER))):
         paint.paragraph(panel.body, panel.skin, finding)
 
 

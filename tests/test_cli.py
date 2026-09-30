@@ -1513,8 +1513,15 @@ def test_ingest_says_how_much_is_hidden_out_of_how_much(tmp_path: Path) -> None:
 
 
 def _draft_and_corpus(tmp_path: Path) -> Path:
-    """A workspace holding the small corpus and a one-paragraph draft against it."""
+    """A workspace holding the small corpus and a one-paragraph draft against it.
+
+    With a model named: `review` builds its judge before it asks, and refuses a configuration
+    that names none (ADR-115).
+    """
     config = _corpus_file(tmp_path)
+    config.write_text(
+        config.read_text(encoding="utf-8") + "model: qwen2.5:3b" + chr(10), encoding="utf-8"
+    )
     (tmp_path / "ws" / "draft.md").write_text(
         "The sensitivity for pelvic lymph nodes was high in this cohort." + chr(10),
         encoding="utf-8",
@@ -1528,8 +1535,10 @@ def test_review_defaults_to_no_before_it_reaches_the_engine(tmp_path: Path) -> N
     result = runner.invoke(
         app, ["review", "draft.md", "--against", "corpus.md", "-c", str(config)], input="\n"
     )
-    assert result.exit_code == 1
+    # A no is an answer, not a failure: said and ended with 0, as bring and ask do (ADR-115).
+    assert result.exit_code == 0
     assert "[y/N]" in result.stdout
+    assert "Declined." in result.stdout
 
 
 def test_coverage_asks_before_it_sends_anything_to_be_embedded(tmp_path: Path) -> None:

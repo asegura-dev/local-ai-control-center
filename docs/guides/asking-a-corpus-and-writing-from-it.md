@@ -208,6 +208,11 @@ contradicts, and what it does not cover - *not covered* meaning nothing you coll
 it, which is not the same as wrong (ADR-068). It asks before it sends anything, and no is the
 default. The window's *Reviews* section paints the findings over the draft.
 
+A paragraph can also come back *not judged*: the engine did not answer for it, so nothing
+was concluded - which is not your corpus failing to hold it. Run the review again once the
+engine answers. A draft brought in as `.docx` or PDF is converted first with `lacc ingest`,
+and `review` reads the `.md` that writes (ADR-115).
+
 ## Where the corpus is thin
 
     lacc coverage topics.md --against everything.md --into coverage.md

@@ -59,8 +59,12 @@ class Finding(BaseModel):
 
     document: str = ""
     verdict: str = "nothing"
-    """`supported`, `contradicted`, or `nothing` - the last meaning nothing in the corpus
-    was judged to hold it, which is not the same as the paragraph being wrong."""
+    """`supported`, `contradicted`, `nothing` or `undecided`.
+
+    `nothing` means what was judged did not hold it, which is not the same as the paragraph
+    being wrong. `undecided` means the judge did not answer for something closest to it - an
+    engine that did not load - so nothing was concluded at all (ADR-115). It used to be
+    reported as `nothing`: a corpus blamed for an engine that was switched off."""
 
     detail: str = ""
 
@@ -166,7 +170,44 @@ def concluded(paragraph: Paragraph, judged: list[tuple[str, str, Judgement]]) ->
                 detail=judgement.detail,
                 considered=looked_at,
             )
+    # A candidate the judge could not answer for might have held it: without it, "nothing
+    # holds this" is not something anyone knows (ADR-115).
+    silent = next((j for _, _, j in judged if j.verdict == "undecided"), None)
+    if silent is not None:
+        return Finding(
+            paragraph=paragraph, verdict="undecided", detail=silent.detail, considered=looked_at
+        )
     return Finding(paragraph=paragraph, considered=looked_at)
+
+
+NOT_TEXT = frozenset({".pdf", ".docx"})
+"""What a draft may be brought as but not reviewed as: `ingest` turns these into Markdown."""
+
+
+def draft_text(name: str, data: bytes) -> str:
+    """A draft's bytes as text, or a ValueError saying why they are not text to judge.
+
+    A `.docx` is a zip and a PDF is not prose: read as text, the first "paragraph" began
+    `PK...[Content_Types].xml` and a yes would have sent sixty-nine judgements of it to the
+    engine. And text that is not UTF-8 is refused rather than read with replacement marks,
+    which sent `Dise?o metodol?gico` to be judged without a word (ADR-115). A byte-order mark
+    is not a character of the draft, and is dropped.
+    """
+    suffix = Path(name).suffix.lower()
+    if suffix in NOT_TEXT:
+        raise ValueError(
+            f"{name} is a {suffix} file, not text. Convert it first - "
+            f'lacc ingest "{name}" - and review the .md it writes.'
+        )
+    if b"\x00" in data[:4096]:
+        raise ValueError(f"{name} is not text: it holds bytes no text file does.")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise ValueError(
+            f"{name} is not UTF-8 text: the byte 0x{data[error.start]:02x} at position "
+            f"{error.start} is not a character in it. Save it as UTF-8 and bring it again."
+        ) from error
 
 
 def _shortened(text: str, longest: int = 220) -> str:
@@ -179,13 +220,19 @@ def report(findings: list[Finding], draft: str, corpus: str, skipped: int) -> st
     held = [f for f in findings if f.verdict == "supported"]
     against = [f for f in findings if f.verdict == "contradicted"]
     nothing = [f for f in findings if f.verdict == "nothing"]
+    undecided = [f for f in findings if f.verdict == "undecided"]
 
     lines = [
         f"# Review of {draft}",
         "",
         f"{len(findings)} paragraphs read against {corpus}. "
         f"{len(held)} are held up by a quotation in it, {len(against)} are contradicted by "
-        f"one, and {len(nothing)} are not covered by it either way.",
+        f"one, and {len(nothing)} are not covered by it either way."
+        + (
+            f" **{len(undecided)} were not judged**: the engine did not answer."
+            if undecided
+            else ""
+        ),
         "",
         "**Nothing here says a paragraph is wrong.** This reports whether your own sources "
         "hold a sentence up, not whether the sentence is true - a paragraph resting on a "
@@ -216,6 +263,20 @@ def report(findings: list[Finding], draft: str, corpus: str, skipped: int) -> st
                 f"*{finding.document}* - {finding.detail}"
                 if finding.detail
                 else f"*{finding.document}*",
+                "",
+            ]
+    if undecided:
+        lines += [
+            "## Not judged: the engine did not answer",
+            "",
+            "The judge could not answer for these, so nothing was concluded about them - which "
+            "is not your corpus failing to hold them. Review the draft again once the engine "
+            "answers.",
+            "",
+        ]
+        for finding in undecided:
+            lines += [
+                f"**Line {finding.paragraph.line}.** {_shortened(finding.paragraph.text)}",
                 "",
             ]
     if nothing:

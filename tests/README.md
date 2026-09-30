@@ -84,7 +84,7 @@ behaviour test caught were caught - or would have been - by one of these.
 |---|---|
 | `test_asking.py` | Asking from the window: what is prepared, and what never raises (ADR-085). |
 | `test_thread.py` | A thread of questions, and the one thing it must never carry (ADR-091). |
-| `test_review.py` | Reading a draft against a corpus (ADR-068). |
+| `test_review.py` | Reading a draft against a corpus (ADR-068); what could not be judged or read, said apart (ADR-115). |
 | `test_coverage.py` | How far the nearest quotation is from a topic (ADR-088). |
 | `test_identity.py` | Which work a document is, and a DOI established for either of its files (ADR-087, ADR-103). |
 | `test_bibtex.py` | BibTeX written from what a registry said, and nothing else (ADR-102). |

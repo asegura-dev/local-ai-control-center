@@ -95,6 +95,8 @@ class Palette(BaseModel):
             "contradicted": self.contradicted,
             "supported": self.supported,
             "nothing": self.uncovered,
+            # Faint, not amber: nothing was concluded, so nothing is being argued (ADR-115).
+            "undecided": self.faint,
         }.get(verdict, self.faint)
 
 

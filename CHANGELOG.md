@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **`review` blamed the corpus for an engine that did not answer** (ADR-115). A judge that
+  could not answer was counted as *not covered*, so a stopped engine turned *1 held up* into
+  *1 not covered*, with exit 0 and no word about it. `undecided` is now a verdict of its own:
+  *N not judged: the engine did not answer*, in the report, the findings and the window, and
+  exit 1 when nothing was judged. A `.docx` or PDF is refused with the `ingest` to run first,
+  and text that is not UTF-8 is refused where it breaks rather than read with replacement
+  marks. A no says *Declined* and ends with 0. The judge is built before the question, so a
+  configuration naming no model is refused there instead of after the yes. And the budget
+  meant to hold every quotation counts their notes too: a corpus of one quotation had never
+  reached the judge.
 - **Five correct decisions ended in a traceback** (ADR-114).
   - A configuration that is not YAML is now named with its line and column.
   - An engine the configuration forbids - off this machine with the network off - is

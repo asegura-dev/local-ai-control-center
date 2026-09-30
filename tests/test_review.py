@@ -7,10 +7,18 @@ which is the shape of defect this project has found seven times by using the too
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from local_ai_control_center.cli import app
 from local_ai_control_center.features.review import (
     Finding,
     Paragraph,
     concluded,
+    draft_text,
     paragraphs_in,
     report,
 )
@@ -104,10 +112,26 @@ def test_support_is_reported_with_the_quotation_that_holds_it() -> None:
     assert not finding.worth_a_look
 
 
-def test_a_judge_that_could_not_answer_is_not_support() -> None:
-    """Treating silence as approval is how a check becomes decoration (ADR-053)."""
-    judged = [("a.md", "words", Judgement(verdict="undecided"))]
-    assert concluded(_para(), judged).verdict == "nothing"
+def test_a_judge_that_could_not_answer_is_not_support_and_not_uncovered() -> None:
+    """Silence is not approval (ADR-053), and it is not a verdict on the corpus either.
+
+    This asserted `nothing` until ADR-115: an engine switched off was reported as a corpus
+    that does not hold the paragraph.
+    """
+    judged = [("a.md", "words", Judgement(verdict="undecided", detail="no answer"))]
+    finding = concluded(_para(), judged)
+    assert finding.verdict == "undecided"
+    assert finding.detail == "no answer"
+    assert finding.worth_a_look
+
+
+def test_one_candidate_left_unjudged_leaves_the_paragraph_unjudged() -> None:
+    """What was not judged might have held it: "nothing holds this" is not known."""
+    judged = [
+        ("a.md", "unrelated", Judgement(verdict="neither")),
+        ("b.md", "the one that might", Judgement(verdict="undecided")),
+    ]
+    assert concluded(_para(), judged).verdict == "undecided"
 
 
 def test_nothing_found_is_reported_as_uncovered_never_as_wrong() -> None:
@@ -152,3 +176,102 @@ def test_a_long_paragraph_is_shortened_in_the_report_but_findable() -> None:
     written = report([Finding(paragraph=long_one)], "draft.md", "corpus.md", 0)
     assert "Line 42" in written
     assert "…" in written
+
+
+def test_the_report_names_what_was_not_judged_apart_from_what_is_uncovered() -> None:
+    findings = [Finding(paragraph=_para(), verdict="undecided"), Finding(paragraph=_para())]
+    written = report(findings, "draft.md", "corpus.md", 0)
+    assert "and 1 are not covered by it either way. **1 were not judged**" in written
+    assert written.index("Not judged: the engine did not answer") < written.index(
+        "Not covered by your corpus"
+    )
+
+
+# --- what can be read as a draft (ADR-115) ---------------------------------------------------
+
+
+def test_a_document_that_is_not_text_is_sent_to_ingest_first() -> None:
+    for name in ("drafts/cap3 (2026-09-29).docx", "notes.PDF"):
+        with pytest.raises(ValueError, match="Convert it first") as refused:
+            draft_text(name, b"PK\x03\x04 anything")
+        assert f'lacc ingest "{name}"' in str(refused.value)
+
+
+def test_bytes_no_text_file_holds_are_refused() -> None:
+    with pytest.raises(ValueError, match="is not text"):
+        draft_text("draft.md", b"PK\x03\x04\x00\x00[Content_Types].xml")
+
+
+def test_text_that_is_not_utf8_is_refused_where_it_breaks() -> None:
+    """Replacement marks were sent to the judge as `Dise?o metodol?gico`, without a word."""
+    latin1 = "Diseño metodológico".encode("latin-1")
+    with pytest.raises(ValueError, match=r"byte 0xf1 at position 4"):
+        draft_text("latin1.md", latin1)
+
+
+def test_utf8_is_read_and_a_byte_order_mark_is_not_part_of_the_draft() -> None:
+    assert draft_text("a.md", "Diseño".encode()) == "Diseño"
+    assert draft_text("a.md", "Diseño".encode("utf-8-sig")) == "Diseño"
+
+
+# --- the command ----------------------------------------------------------------------------
+
+
+def _review_setup(tmp_path: Path, *extra: str) -> Path:
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    quote = "The sensitivity for pelvic lymph nodes was 82 per cent."
+    (workspace / "paper.md").write_text(quote + chr(10), encoding="utf-8")
+    (workspace / "corpus.md").write_text(
+        chr(10).join(["## paper.md", "", f"> {quote}", "", "p. 1 - sensitivity", ""]),
+        encoding="utf-8",
+    )
+    (workspace / "draft.md").write_text(
+        "The sensitivity for pelvic lymph nodes was high in this cohort of patients." + chr(10),
+        encoding="utf-8",
+    )
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        chr(10).join([f"workspace_root: {workspace}", *extra]) + chr(10), encoding="utf-8"
+    )
+    return config
+
+
+def test_an_engine_that_does_not_answer_is_not_reported_as_uncovered(tmp_path: Path) -> None:
+    """The tester's case: the same paragraph read `1 held up` with the engine and `1 not
+    covered` without it, exit 0, and not a word about the judge (ADR-115)."""
+    config = _review_setup(tmp_path, "model: qwen2.5:14b", "engine_host: http://127.0.0.1:9")
+    result = CliRunner().invoke(
+        app,
+        ["review", "draft.md", "--against", "corpus.md", "--into", "r.md", "-c", str(config)],
+        input="y\n",
+    )
+    said = " ".join(result.stdout.split())
+    assert "1 not judged" in said and "0 not covered" in said
+    assert result.exit_code == 1, "nothing at all was judged"
+    reviewed = json.loads((tmp_path / "ws" / "r.findings.json").read_text(encoding="utf-8"))
+    assert [finding["verdict"] for finding in reviewed["findings"]] == ["undecided"]
+
+
+def test_a_configuration_without_a_model_is_refused_before_the_question(tmp_path: Path) -> None:
+    """It was a traceback after the yes, with the run left open."""
+    config = _review_setup(tmp_path)
+    result = CliRunner().invoke(
+        app, ["review", "draft.md", "--against", "corpus.md", "-c", str(config)], input="y\n"
+    )
+    assert result.exit_code == 1
+    assert result.exception is None or isinstance(result.exception, SystemExit)
+    assert "No model configured" in " ".join(result.stdout.split())
+    assert "Read it?" not in result.stdout
+    assert not (tmp_path / "ws" / "audit.jsonl").exists()
+
+
+def test_a_docx_brought_in_is_not_reviewed_as_text(tmp_path: Path) -> None:
+    config = _review_setup(tmp_path)
+    (tmp_path / "ws" / "cap3.docx").write_bytes(b"PK\x03\x04\x14\x00 [Content_Types].xml")
+    result = CliRunner().invoke(
+        app, ["review", "cap3.docx", "--against", "corpus.md", "-c", str(config)], input="y\n"
+    )
+    assert result.exit_code == 1
+    assert 'lacc ingest "cap3.docx"' in " ".join(result.stdout.split())
+    assert "Read it?" not in result.stdout

@@ -19,6 +19,7 @@ VERDICT_SAID = {
     "contradicted": "your corpus says otherwise",
     "supported": "held up by your corpus",
     "nothing": "not covered - which is not the same as wrong",
+    "undecided": "not judged - the engine did not answer",
 }
 
 

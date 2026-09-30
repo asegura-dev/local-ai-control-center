@@ -164,6 +164,7 @@ from local_ai_control_center.features.review import (
     Finding,
     Reviewed,
     concluded,
+    draft_text,
     paragraphs_in,
     report,
 )
@@ -2544,7 +2545,11 @@ def review(
             _show(f"[red]{_plain(what)} is not in the workspace.[/red]")
             raise typer.Exit(code=1)
 
-    blocks = paragraphs_in(written.read_text(encoding="utf-8", errors="replace"))
+    try:
+        blocks = paragraphs_in(draft_text(str(draft), written.read_bytes()))
+    except ValueError as error:
+        _show(f"[red]{_plain(error)}[/red]")
+        raise typer.Exit(code=1) from error
     if not blocks:
         _show("[yellow]Nothing in this document asserts anything.[/yellow]")
         raise typer.Exit(code=1)
@@ -2575,6 +2580,13 @@ def review(
             ranking_would_send(outgoing, reaching(config), sends="each paragraph"),
             markup=False,
         )
+    # Built before the question: a configuration naming no model was a traceback after the
+    # yes, with a run left open (ADR-115).
+    try:
+        provider = _build_provider(ProviderChoice.ollama, config)
+    except ProviderError as error:
+        _show(f"[red]{_plain(error)}[/red] Nothing was sent.")
+        raise typer.Exit(code=1) from error
     # Opened where it is about to ask, so a no is recorded too (ADR-107).
     audit = AuditLog(workspace, config)
     run_id = audit.opened("review")
@@ -2582,9 +2594,9 @@ def review(
     # sent a whole draft for judging (ADR-105).
     if not typer.confirm("Read it?", default=False):
         audit.record(run_id, "confirmation_declined", "Declined review", {"action": "review"})
-        raise typer.Exit(code=1)
+        _show("[yellow]Declined.[/yellow] Nothing was read.")
+        return
 
-    provider = _build_provider(ProviderChoice.ollama, config)
     judge = AskingJudge(provider)
     findings: list[Finding] = []
     # Every judgement by digest, and the judge's reasons for `full` alone - the record
@@ -2593,8 +2605,12 @@ def review(
     reasons: list[dict[str, str]] = []
     # A budget large enough for everything: the ranking is what is wanted here, not a
     # selection, and a quotation dropped for space would be support the writer never sees.
-    # Computed once - the corpus does not change between paragraphs.
-    whole = sum(estimate_tokens(passage.text) for passage in passages) + len(passages)
+    # Computed once - the corpus does not change between paragraphs. What a passage costs is
+    # its text and its note, as the ranking counts it: counting the text alone left a corpus
+    # of one quotation with no room for it, and its paragraph "not covered" (ADR-115).
+    whole = sum(
+        estimate_tokens(passage.text) + estimate_tokens(passage.note) for passage in passages
+    ) + len(passages)
     try:
         with console.status(f"Reading {len(blocks)} paragraphs..."):
             for block in blocks:
@@ -2625,7 +2641,8 @@ def review(
 
     against_it = [f for f in findings if f.verdict == "contradicted"]
     uncovered = [f for f in findings if f.verdict == "nothing"]
-    held = len(findings) - len(against_it) - len(uncovered)
+    unjudged = [f for f in findings if f.verdict == "undecided"]
+    held = len(findings) - len(against_it) - len(uncovered) - len(unjudged)
     if outgoing is not None:
         host = resolve_engine_host(config.engine_host, config.network_access)
         audit.embedded(
@@ -2651,6 +2668,7 @@ def review(
             "contradicted": len(against_it),
             "held": held,
             "not_covered": len(uncovered),
+            "not_judged": len(unjudged),
             "undecided": sum(1 for row in rows if row["verdict"] == "undecided"),
             "judged_readings": rows,
             "completion": reasons,
@@ -2662,7 +2680,13 @@ def review(
             _show(
                 f"  [red]Line {_plain(finding.paragraph.line)}[/red] - {_plain(finding.document)}"
             )
-    _show(f"[green]{_plain(held)} held up[/green], [yellow]{len(uncovered)} not covered[/yellow].")
+    _show(f"[green]{held:,} held up[/green], [yellow]{len(uncovered)} not covered[/yellow].")
+    if unjudged:
+        # An engine that did not answer is not a corpus that did not hold it (ADR-115).
+        _show(
+            f"[yellow]{len(unjudged)} not judged:[/yellow] the engine did not answer, so "
+            "nothing was concluded about them. Review again once it answers."
+        )
     _show(
         "[dim]Not covered means nothing collected holds it - not that it is wrong. The "
         "source may simply not be in this corpus.[/dim]"
@@ -2678,6 +2702,8 @@ def review(
         audit.wrote(run_id, "review", beside)
         _show(f"-> {_plain(into)}")
     audit.record(run_id, "run_finished", "Finished review", {"action": "review"})
+    if unjudged and len(unjudged) == len(findings):
+        raise typer.Exit(code=1)
 
 
 def _engine_at(config: Config, host: str) -> EngineSeen:
