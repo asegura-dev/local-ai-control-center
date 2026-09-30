@@ -37,7 +37,7 @@ What exists, by what it is for:
 2. **Close what the test of 29 September found - begun.** Twenty-six defects, two of them
    against a principle, one record per cause: ADR-112, the file named is the file read;
    ADR-113, what the terminal prints is what was written; ADR-114, a refusal, not a
-   traceback; ADR-115, what review could not judge.
+   traceback; ADR-115, what review could not judge; ADR-116, every run has an end.
 3. **Measure the newer models on the old question - begun.** On 28 September extraction was
    re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations
    are not in their document, against 38 of the 14B's 216, and the figure this project is

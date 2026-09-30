@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **A run could be left without an end** (ADR-116).
+  - Ctrl+C or the end of the input at a question raised past every path that records a
+    no. All fifteen questions now go through one that answers an interruption as no, says
+    so, and records the run as declined.
+  - `measure` records the refusal its preview meets, as `run` and `ask` do.
+  - A record takes its time inside its turn: with four writers, 48 of 607 times had gone
+    backwards.
+  - `identify` no longer says *Nothing was written* after keeping the registry's answer.
 - **`review` blamed the corpus for an engine that did not answer** (ADR-115). A judge that
   could not answer was counted as *not covered*, so a stopped engine turned *1 held up* into
   *1 not covered*, with exit 0 and no word about it. `undecided` is now a verdict of its own:

@@ -60,6 +60,7 @@ leave: reports, findings, kept answers, bibliographies, an established DOI.
 **A refusal in `measure`.** When its preview is not allowed - a permission missing - `measure`
 exits saying so and records nothing, as before; `run` and `ask` record it as `run_refused`,
 through the cycle. It is not a no somebody said, which is what this record is about.
+*Decided in ADR-116: `measure` records it as `run_refused` too.*
 
 **The ranking's own calls.** `ask`, `measure`, the window and `sections --about` embed a
 question when ranking by meaning (ADR-106), and none of them records that it did. It is the same

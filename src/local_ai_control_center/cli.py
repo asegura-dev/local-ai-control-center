@@ -367,7 +367,7 @@ def _approve(difference: str) -> bool:
         else:
             rendered.append(line + chr(10), style="dim")
     console.print(Panel(rendered, title="What the revision would change", expand=False))
-    return typer.confirm("Keep this revision?", default=False)
+    return _asked("Keep this revision?")
 
 
 def _load(config_path: Path, *, create: bool = True) -> tuple[Config, Workspace]:
@@ -468,10 +468,24 @@ def _say_what_it_will_cost(
         )
 
 
+def _asked(question: str) -> bool:
+    """Ask a yes-or-no question whose default is no; an interrupted one is answered no.
+
+    Ctrl+C, or the end of the input, at a prompt raised `Abort` past every path that records a
+    no, and the run that had asked stayed open in the trail - *no end recorded* (ADR-116).
+    Answered as the default, it goes down the same path a no does, and is said.
+    """
+    try:
+        return typer.confirm(question, default=False)
+    except typer.Abort:
+        _show("[yellow]Interrupted: taken as no.[/yellow]")
+        return False
+
+
 def _confirm(preview: ExecutionPreview) -> bool:
     """Ask the user whether to proceed. Defaults to no."""
     _show_preview(preview)
-    return typer.confirm("Proceed?", default=False)
+    return _asked("Proceed?")
 
 
 @app.command()
@@ -531,7 +545,7 @@ def run(
     _show_preview(preview)
     _say_which_model(config, resolved.name)
     _say_what_it_will_cost(plan.action, config, workspace, in_passes, pages_per_pass)
-    if not typer.confirm("Proceed?", default=False):
+    if not _asked("Proceed?"):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 
@@ -1272,7 +1286,7 @@ def resolve(
             _show(
                 f"Identifying you as [bold]{_plain(config.registry_mailto)}[/bold], as configured."
             )
-        if not typer.confirm("Send them?", default=False):
+        if not _asked("Send them?"):
             _show("Nothing was sent.")
             audit.record(run_id, "confirmation_declined", "Declined resolve", {"action": "resolve"})
             raise typer.Exit(code=1)
@@ -1591,7 +1605,7 @@ def ingest(
     if not preview.allowed:
         _exit_refused()
     question = "Proceed?" if len(jobs) == 1 else f"Convert {len(jobs)} documents?"
-    if not typer.confirm(question, default=False):
+    if not _asked(question):
         console.print("[yellow]Declined.[/yellow] Nothing was written.")
         return
 
@@ -1781,10 +1795,23 @@ def measure(
     )
     _show_preview(preview)
     if not preview.allowed:
+        # Recorded as the cycle records a refused `run` and `ask`: this one never reached it,
+        # and a refusal the trail did not hold was a run nobody could find (ADR-116).
+        refused = audit.opened(resolved.name)
+        audit.record(
+            refused,
+            "run_refused",
+            f"Refused {resolved.name}",
+            {
+                "action": resolved.name,
+                "missing": list(preview.missing_capabilities),
+                "out_of_bounds": [str(path) for path in preview.out_of_bounds],
+            },
+        )
         _exit_refused()
     # The confirmation is for the repetition, not for one action with a multiplier hidden
     # behind it: the person is told how many times before being asked.
-    if not typer.confirm(f"Run this {runs} times, plus one warm-up?", default=False):
+    if not _asked(f"Run this {runs} times, plus one warm-up?"):
         # Recorded, as a declined `run` is (ADR-107).
         declined = audit.opened(resolved.name)
         audit.record(
@@ -1967,7 +1994,7 @@ def collect(
     _show_preview(preview)
     if not preview.allowed:
         _exit_refused()
-    if not typer.confirm(f"Read {len(requests)} documents and write {into}?", default=False):
+    if not _asked(f"Read {len(requests)} documents and write {into}?"):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 
@@ -2226,7 +2253,7 @@ def _prepared_or_exit(
             console.print(
                 "[dim]With --judge, each reading of the answer is ranked the same way.[/dim]"
             )
-        if typer.confirm("Rank by meaning?", default=False):
+        if _asked("Rank by meaning?"):
             agreed = made.awaiting.unembedded
             made = prepare(question, corpus_file.name, text, config, retriever, agreed=agreed)
         else:
@@ -2592,7 +2619,7 @@ def review(
     run_id = audit.opened("review")
     # No is the default, as everywhere else an engine is reached. It said yes, and Enter
     # sent a whole draft for judging (ADR-105).
-    if not typer.confirm("Read it?", default=False):
+    if not _asked("Read it?"):
         audit.record(run_id, "confirmation_declined", "Declined review", {"action": "review"})
         _show("[yellow]Declined.[/yellow] Nothing was read.")
         return
@@ -2946,7 +2973,7 @@ def coverage(
     run_id = audit.opened("coverage")
     # Asked before anything is sent. It measured in the same breath as it announced, and the
     # host can be another machine (ADR-105).
-    if not typer.confirm("Send them?", default=False):
+    if not _asked("Send them?"):
         _show("Nothing was sent, and nothing was written.")
         audit.record(run_id, "confirmation_declined", "Declined coverage", {"action": "coverage"})
         raise typer.Exit(code=1)
@@ -3064,7 +3091,7 @@ def identify(
     run_id = audit.opened("identify")
     identified = bool(config.registry_mailto)
     _show(f"[yellow]1 DOI would be sent to {_plain(config.registry_url)}.[/yellow]")
-    if not typer.confirm("Ask the registry?", default=False):
+    if not _asked("Ask the registry?"):
         _show("Nothing was sent.")
         audit.record(run_id, "confirmation_declined", "Declined identify", {"action": "identify"})
         raise typer.Exit(code=1)
@@ -3084,7 +3111,11 @@ def identify(
     audit.asked(run_id, "identify", config.registry_url, registry.sent, identified)
     audit.wrote(run_id, "identify", kept)
     if work is None:
-        _show(f"[red]The registry holds nothing for {_plain(wanted)}.[/red] Nothing was written.")
+        # The registry's answer - that it holds nothing - was kept just above, as every answer
+        # is; what was not written is a DOI for the document (ADR-116).
+        _show(
+            f"[red]The registry holds nothing for {_plain(wanted)}.[/red] No DOI was established."
+        )
         audit.record(
             run_id, "run_finished", "Finished identify", {"action": "identify", "held": False}
         )
@@ -3094,8 +3125,11 @@ def identify(
     _show(f"[dim]{_plain(as_entry(work))}[/dim]")
     said = opening_of(path.read_text(encoding="utf-8", errors="replace"))
     _show(f"[dim]The document opens: {_plain(said)}[/dim]")
-    if not typer.confirm("Is that what this document is?", default=False):
-        _show("[yellow]Nothing was written.[/yellow] A wrong DOI is worse than a missing one.")
+    if not _asked("Is that what this document is?"):
+        _show(
+            "[yellow]No DOI was established.[/yellow] A wrong DOI is worse than a missing one. "
+            f"The registry's answer stays in {_plain(kept.name)}, as every answer does."
+        )
         audit.record(run_id, "confirmation_declined", "Declined identify", {"action": "identify"})
         raise typer.Exit(code=1)
     written = establish(path, wanted, work.title)
@@ -3122,7 +3156,7 @@ def _propose(
     _show(f"[bold]{len(candidates)} DOIs[/bold] printed near the front of {_plain(path.name)}.")
     if fresh:
         _show(f"[yellow]{len(fresh)} would be sent to {_plain(config.registry_url)}.[/yellow]")
-        if not typer.confirm("Ask the registry what they are?", default=False):
+        if not _asked("Ask the registry what they are?"):
             _show("Nothing was sent.")
             audit.record(
                 run_id, "confirmation_declined", "Declined identify", {"action": "identify"}
@@ -3220,7 +3254,7 @@ def bring(
     # Opened where it is about to ask, so a no is recorded too (ADR-107).
     audit = AuditLog(workspace, config)
     run_id = audit.opened("bring")
-    if not typer.confirm("Bring it?", default=False):
+    if not _asked("Bring it?"):
         audit.record(run_id, "confirmation_declined", "Declined bring", {"action": "bring"})
         _show("[yellow]Declined.[/yellow] Nothing of it was read.")
         return
@@ -3329,7 +3363,7 @@ def sections(
                     ),
                     markup=False,
                 )
-                if not typer.confirm("Rank by meaning?", default=False):
+                if not _asked("Rank by meaning?"):
                     retriever = WordRetriever()
                     outgoing = None
             failed = ""

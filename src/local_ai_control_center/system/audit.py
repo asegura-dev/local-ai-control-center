@@ -303,18 +303,22 @@ class AuditLog:
         allows continuing. Raises :class:`AuditWriteError` when the policy is to
         abort.
         """
-        pending = AuditEvent(
-            timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            run_id=run_id,
-            kind=kind,
-            message=message,
-            detail=self._filter_detail(detail or {}),
-        )
+        kept = self._filter_detail(detail or {})
         try:
             # The head is read in the same turn as the append, never remembered: a log that
             # remembered it chained to its own last record while another log - the window's
             # Prepare, a terminal - had written since, and broke the chain (ADR-109).
             with _turn(self._path, writing=True):
+                # And the time is taken in the turn too. Taken before it, a writer that waited
+                # stamped an earlier time than the record it came after: 48 of 607 steps went
+                # backwards with four writers (ADR-116).
+                pending = AuditEvent(
+                    timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    run_id=run_id,
+                    kind=kind,
+                    message=message,
+                    detail=kept,
+                )
                 previous = _last_digest(self._path)
                 event = pending.chained(previous)
                 with self._path.open("a", encoding="utf-8") as handle:

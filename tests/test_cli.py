@@ -1872,6 +1872,23 @@ def test_saying_a_document_is_not_that_work_is_recorded_as_a_no(
     assert kinds[-1] == "confirmation_declined"
 
 
+def test_saying_no_to_a_work_says_what_was_kept_and_what_was_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """It said "Nothing was written" after keeping the registry's answer (ADR-116)."""
+    config = _with_a_registry(tmp_path, monkeypatch)
+    (tmp_path / "ws" / "other.md").write_text("Another paper." + chr(10), encoding="utf-8")
+    result = runner.invoke(
+        app,
+        ["identify", "other.md", "--doi", "10.1000/other", "-c", str(config)],
+        input="y\n" + "n\n",
+    )
+    said = " ".join(result.stdout.split())
+    assert "No DOI was established" in said
+    assert "The registry's answer stays in" in said
+    assert "Nothing was written" not in said
+
+
 def test_coverage_records_what_it_embedded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config, engine = _with_meaning(tmp_path, monkeypatch)
     (tmp_path / "ws" / "topics.md").write_text(
