@@ -752,3 +752,9 @@ The second batch after ADR-103, several made false by a later record. `status` s
 [`ADR-118-the-window-waits-for-no-engine.md`](ADR-118-the-window-waits-for-no-engine.md)
 
 Engines was the last place the window asked an engine from its own thread: an engine that accepts a connection and never answers held it for the check's eight seconds, and on 25 September left no notice while it waited and an empty card after. It now asks on a worker, as Send and Prepare do, counts the seconds and draws the answer or why there was none. And a question somebody stopped waiting for kept saying *may still be generating* after the engine had answered, because the watch ended at the stop; it is watched now only to say when the engine finished, its answer discarded unread. Both driven in the real window against stand-ins.
+
+### 119 - a new workspace reaches nothing until somebody writes that it may
+
+[`ADR-119-a-new-workspace-reaches-nothing-until-told.md`](ADR-119-a-new-workspace-reaches-nothing-until-told.md)
+
+The window's Workspaces section wrote a new configuration carrying over what makes an engine reachable - from one that reaches another machine, `network_access: true` and the host - so a new workspace was granted the network by nobody, while the Configuration section says that permission is not changed from the window. A configuration the window writes now says `network_access: false`; the engine it came from is named in a comment beside the switch, so granting it is two edits a person makes in the file. A host on this machine is carried as it is. Decided by the person on 29 September.

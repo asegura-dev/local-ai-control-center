@@ -117,8 +117,12 @@ def test_a_name_without_a_suffix_gets_one(tmp_path: Path) -> None:
     assert intended("another.yaml", tmp_path, _config()).name == "another.yaml"
 
 
-def test_the_engine_settings_come_with_it(tmp_path: Path) -> None:
-    """A configuration without them is a workspace that cannot do anything."""
+def test_the_engine_settings_come_with_it_and_the_permission_does_not(tmp_path: Path) -> None:
+    """A configuration without them is a workspace that cannot do anything.
+
+    The permission used to come too: `network_access: true`, granted to the new workspace by
+    nobody (ADR-119). The engine is named in a comment; granting it is a line a person writes.
+    """
     written = as_yaml(
         tmp_path,
         _config(network_access=True, engine_host="http://desk:11434", embedding_model="bge-m3"),
@@ -126,8 +130,27 @@ def test_the_engine_settings_come_with_it(tmp_path: Path) -> None:
     assert "model: qwen2.5:14b" in written
     assert "context_tokens: 32768" in written
     assert "embedding_model: bge-m3" in written
-    assert "network_access: true" in written
-    assert "engine_host: http://desk:11434" in written
+    assert "network_access: false" in written
+    assert "network_access: true" not in written
+    assert "# engine_host: http://desk:11434" in written
+
+
+def test_what_is_written_reaches_nothing_off_this_machine(tmp_path: Path) -> None:
+    from local_ai_control_center.core.config import load_config
+
+    path = tmp_path / "made.yaml"
+    remote = _config(network_access=True, engine_host="http://desk:11434")
+    path.write_text(as_yaml(tmp_path / "work", remote), encoding="utf-8")
+    loaded = load_config(path)
+    assert loaded.network_access is False
+    assert "desk" not in (loaded.engine_host or "")
+
+
+def test_a_host_on_this_machine_is_carried_as_it_is(tmp_path: Path) -> None:
+    """Without the network a host that works is local: nothing to grant, so nothing hidden."""
+    written = as_yaml(tmp_path, _config(engine_host="http://localhost:11500"))
+    assert "engine_host: http://localhost:11500" in written
+    assert "# engine_host" not in written
 
 
 def test_nothing_of_the_old_workspace_comes_with_it() -> None:

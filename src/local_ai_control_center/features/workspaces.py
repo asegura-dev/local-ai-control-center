@@ -142,10 +142,17 @@ def intended(name: str, root: Path, like: Config) -> Points:
 
 
 def as_yaml(root: Path, like: Config) -> str:
-    """The configuration file, as text, carrying over what makes an engine reachable.
+    """The configuration file, as text, carrying over what the engine is - never the permission.
 
     Written rather than dumped from the model: a dump would carry every default the contract
     has, and a configuration a person cannot read is one they cannot correct.
+
+    **The network is not carried** (ADR-119). It used to be: a workspace made from one that
+    reaches another machine was written with `network_access: true`, a permission granted to
+    the new workspace by nobody, while the window says that permission is not changed from
+    it. A new configuration starts where every configuration does, with nothing leaving this
+    machine. The engine it came from is named in a comment, so granting it is one line a
+    person writes, in the file.
     """
     lines = [
         "# Written by lacc window. An ordinary configuration - edit it freely.",
@@ -156,8 +163,17 @@ def as_yaml(root: Path, like: Config) -> str:
         lines.append(f"context_tokens: {like.context_tokens}")
     if like.embedding_model:
         lines.append(f"embedding_model: {like.embedding_model}")
-    if like.network_access:
-        lines += ["", "network_access: true", f"engine_host: {like.engine_host}"]
+    lines += ["", "network_access: false"]
+    if like.engine_host and like.network_access:
+        lines += [
+            f"# The configuration this was made from reaches an engine at {like.engine_host}.",
+            "# To reach it from this workspace too, change the line above to true and remove",
+            "# the # below. The window does not grant it.",
+            f"# engine_host: {like.engine_host}",
+        ]
+    elif like.engine_host:
+        # Without the network, a host that works is one on this machine: carried as it is.
+        lines.append(f"engine_host: {like.engine_host}")
     if like.registry_url:
         lines.append(f"registry_url: {like.registry_url}")
     if like.audit_level == "full":

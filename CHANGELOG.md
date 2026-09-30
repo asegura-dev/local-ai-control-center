@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is refused by qwen2.5 with a 400. The server guide says so, and how to know the variables
   took: the first restart left the engine exactly as it was.
 
+### Changed
+- **A workspace made from the window reaches nothing until somebody writes that it may**
+  (ADR-119). The configuration it writes says `network_access: false`, whatever the one it
+  was made from says; the engine it came from is named in a comment beside the switch.
+  It used to carry `network_access: true`, a permission nobody granted for the new
+  workspace.
+
 ### Fixed
 - **Engines held the window, and Stop waiting stayed out of date** (ADR-118). Asking an
   engine what it holds ran on the window's thread, so one that accepts a connection and
