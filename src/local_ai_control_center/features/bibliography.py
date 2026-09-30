@@ -37,7 +37,10 @@ def as_entry(work: Work) -> str:
         parts.append(work.container)
     if work.year:
         parts.append(str(work.year))
-    line = ". ".join(parts) if parts else "**The registry holds nothing under this DOI.**"
+    # A part that ends in its own period - `et al.`, an abbreviated journal - is not given
+    # a second one by the join: `et al..` (ADR-120).
+    joined = ". ".join(part.removesuffix(".") for part in parts)
+    line = joined if parts else "**The registry holds nothing under this DOI.**"
     return f"{line}  <{work.doi}>"
 
 

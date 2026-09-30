@@ -88,6 +88,7 @@ behaviour test caught were caught - or would have been - by one of these.
 | `test_coverage.py` | How far the nearest quotation is from a topic (ADR-088). |
 | `test_identity.py` | Which work a document is, and a DOI established for either of its files (ADR-087, ADR-103). |
 | `test_bibtex.py` | BibTeX written from what a registry said, and nothing else (ADR-102). |
+| `test_wording.py` | The small things the terminal said wrong: counts and their words, one period, a heading a PDF broke read whole, the whole question in a preview, `--version` (ADR-120). |
 | `test_endings.py` | Every run the trail opens has an end: an interrupted question answered no, the refusal `measure` meets recorded, a record's time taken in its turn (ADR-116). |
 | `test_refusals.py` | A refusal, not a traceback: a broken configuration, a forbidden engine, a destination it may not write and a `drafts` that is not a folder, each refused before any work; a command that only reads creates no workspace (ADR-114). |
 | `test_printing.py` | What the terminal prints is what was written: every value put into a printed line escaped, answers printed whole with markup off, a stray closing tag printed rather than raised (ADR-113). |

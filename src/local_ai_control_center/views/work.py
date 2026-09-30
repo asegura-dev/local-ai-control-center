@@ -47,7 +47,8 @@ def _show_work(side: Sidebar, panel: Panel, state: State) -> None:
         return
     panel.said(
         "Where the work stands",
-        f"{work.settled} of {len(work.stages)} stages have nothing outstanding.   ·   "
+        f"{work.settled} of {len(work.stages)} stages "
+        f"{'has' if work.settled == 1 else 'have'} nothing outstanding.   ·   "
         f"{state.workspace}\nCounted from the files every time. No model is called and "
         "nothing is written.",
     )

@@ -66,6 +66,7 @@ record (ADR-008).
 | `run.py` | A unique, readable identifier for one execution, and its progress (ADR-002). |
 | `sections.py` | The sections a document numbers for itself (ADR-076). |
 | `skill.py` | Skills: named units of work whose `plan` is pure; effects happen in the cycle. |
+| `wording.py` | A count and the word it counts, agreeing: `1 section`, `2 sections` (ADR-120). |
 | `workspace.py` | The bounded area LACC may operate in, and the boundary that refuses `..`, links and absolute paths (ADR-003, ADR-017); what a typed name or pattern names inside it (ADR-112). |
 
 ## `ports/` - what LACC needs from the world

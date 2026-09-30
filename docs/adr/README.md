@@ -758,3 +758,9 @@ Engines was the last place the window asked an engine from its own thread: an en
 [`ADR-119-a-new-workspace-reaches-nothing-until-told.md`](ADR-119-a-new-workspace-reaches-nothing-until-told.md)
 
 The window's Workspaces section wrote a new configuration carrying over what makes an engine reachable - from one that reaches another machine, `network_access: true` and the host - so a new workspace was granted the network by nobody, while the Configuration section says that permission is not changed from the window. A configuration the window writes now says `network_access: false`; the engine it came from is named in a comment beside the switch, so granting it is two edits a person makes in the file. A host on this machine is carried as it is. Decided by the person on 29 September.
+
+### 120 - the small things the terminal said wrong
+
+[`ADR-120-small-things-said-wrong.md`](ADR-120-small-things-said-wrong.md)
+
+Minors, each in a line read for its numbers or names: counts that did not agree with their word (*1 sections*, *1 of 6 stages have*), a doubled period after *et al.*, a registry's date taken in UTC and so a day ahead of the copy made the same evening, the question in `ask`'s preview cut at sixty characters, headings a PDF broke mid-word read as *Recommendat* beside an unnamed column of line numbers, no `lacc --version`, and a window check that read back a line its own script had written. A count and its word now agree through `core/wording.py`; a period is not doubled; the date is this machine's; the preview carries the whole question; a heading broken mid-word is joined when the result still reads as a title; `--version` exists; the check reads the line `lacc window` draws.

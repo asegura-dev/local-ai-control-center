@@ -601,7 +601,9 @@ class AskCorpusSkill(Skill):
         question = requests[0].strip()
         action = IntendedAction(
             name=self.name,
-            summary=f"Answer from checked passages: {question[:60]}",
+            # Whole: the preview is what is agreed to, and a question cut at sixty
+            # characters was agreed to in part (ADR-120).
+            summary=f"Answer from checked passages: {' '.join(question.split())}",
             required=self.required,
         )
         break_ = chr(10)

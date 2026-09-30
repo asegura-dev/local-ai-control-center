@@ -32,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   workspace.
 
 ### Fixed
+- **Small things the terminal said wrong** (ADR-120).
+  - Counts agree with their word, and verbs with their count: *1 section*, *1 of 6
+    stages has*.
+  - *et al.* and an abbreviated journal are no longer given a second period.
+  - A registry's answer is dated by this machine's day, not UTC's.
+  - The preview of `ask` carries the whole question.
+  - `sections` reads a heading a PDF broke mid-word whole, and names its column of line
+    numbers.
+  - `tools/measure_window.py` checks the line `lacc window` draws beside Prepare.
 - **Engines held the window, and Stop waiting stayed out of date** (ADR-118). Asking an
   engine what it holds ran on the window's thread, so one that accepts a connection and
   never answers froze it for eight seconds and left an empty card. It runs on a worker
@@ -211,6 +220,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counted stray carriage returns, and there it had become an ordinary line break.
 
 ### Added
+- **`lacc --version`** (ADR-120).
 - **`lacc bring <file>`: a draft of yours, copied in by name** (ADR-111). The thesis is written
   outside the workspace, so `review` had never read it and `status` said *nothing of yours has
   been read yet*. `bring` reads the one file named - never a folder or a pattern - after

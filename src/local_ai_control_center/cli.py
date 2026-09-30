@@ -29,6 +29,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from local_ai_control_center import __version__
 from local_ai_control_center.adapters.asking import AskingJudge
 from local_ai_control_center.adapters.crossref import (
     CrossrefRegistry,
@@ -93,6 +94,7 @@ from local_ai_control_center.core.skill import (
     SummarizeFileSkill,
     grant_for,
 )
+from local_ai_control_center.core.wording import counted
 from local_ai_control_center.core.workspace import (
     Workspace,
     WorkspaceExposed,
@@ -210,6 +212,14 @@ _SKILLS: dict[str, Skill] = {
     "assess_source": AssessSourceSkill(),
 }
 
+
+def _version(asked: bool) -> None:
+    """Print the version and stop: `lacc --version` did not exist (ADR-120)."""
+    if asked:
+        print(f"lacc {__version__}")
+        raise typer.Exit()
+
+
 app = typer.Typer(
     help="Local AI Control Center - run AI-assisted skills with control and audit.",
     no_args_is_help=True,
@@ -217,6 +227,18 @@ app = typer.Typer(
     # emphasis and cut each paragraph where the source line ended (ADR-117).
     rich_markup_mode="markdown",
 )
+
+
+@app.callback()
+def _options(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version", callback=_version, is_eager=True, help="Print the version and stop."
+        ),
+    ] = False,
+) -> None:
+    """Local AI Control Center - run AI-assisted skills with control and audit."""
 
 
 def _console() -> Console:
@@ -1256,8 +1278,9 @@ def resolve(
         _show("[yellow]No DOI to resolve.[/yellow] Nothing here will invent one.")
         if converted and not cited:
             _show(
-                f"[dim]{converted:,} of these are Markdown. A document's own DOI is in the "
-                "PDF's metadata, and the PDF beside each was read for it (ADR-101): none "
+                f"[dim]{converted:,} of these "
+                f"{_plain('is' if converted == 1 else 'are')} Markdown. A document's own DOI "
+                "is in the PDF's metadata, and the PDF beside each was read for it (ADR-101): none "
                 "carried one. Name it with lacc identify, or add --cited to resolve what "
                 "they cite instead.[/dim]"
             )
@@ -1428,7 +1451,9 @@ def bib(
     written = bibtex(works, held)
     if written.entries:
         _write_or_exit(destination, written.text)
-        _show(f"[green]{len(written.entries)} entries[/green] -> {_plain(into)}")
+        _show(
+            f"[green]{counted(len(written.entries), 'entry', 'entries')}[/green] -> {_plain(into)}"
+        )
     else:
         _show("[yellow]Nothing new to write.[/yellow] Nothing was written.")
     if written.already:
@@ -1505,7 +1530,8 @@ def outline(
         shown = matching(sections, words)
 
     console.print(
-        f"[bold]{_plain(source.name)}[/bold] - {len(sections)} sections, from {_plain(how)}."
+        f"[bold]{_plain(source.name)}[/bold] - {counted(len(sections), 'section')}, "
+        f"from {_plain(how)}."
     )
     if contents:
         console.print(f"{_plain(contents)} more are lines from its table of contents, not shown.")
@@ -2603,7 +2629,8 @@ def review(
 
     judgements = len(blocks) * CANDIDATES_PER_PARAGRAPH
     _show(
-        f"[bold]{len(blocks)} paragraphs[/bold] against [bold]{len(passages)} quotations[/bold]: "
+        f"[bold]{counted(len(blocks), 'paragraph')}[/bold] against "
+        f"[bold]{counted(len(passages), 'quotation')}[/bold]: "
         f"about {_plain(judgements)} judgements, a few seconds each."
     )
     outgoing = retriever.would_send(passages)
@@ -3400,8 +3427,10 @@ def sections(
                 _show(f"[red]{_plain(failed)}[/red]")
                 raise typer.Exit(code=1)
             _show(
-                f"[bold]{len(found)} sections[/bold] in {_plain(source.name)}, most about it first"
+                f"[bold]{counted(len(found), 'section')}[/bold] in {_plain(source.name)}, "
+                "most about it first"
             )
+            _show("  [dim]  line  section[/dim]")
             for section in found[:12]:
                 _show(
                     f"  [dim]{section.line:>6d}[/dim]  {_plain(section.number)}  "
@@ -3411,7 +3440,8 @@ def sections(
                 _show(f"  [dim]and {_plain(len(found) - 12)} more, in the same order[/dim]")
             _show("[dim]Nothing was read but this document. Take one with --take.[/dim]")
             return
-        _show(f"[bold]{len(found)} sections[/bold] in {_plain(source.name)}")
+        _show(f"[bold]{counted(len(found), 'section')}[/bold] in {_plain(source.name)}")
+        _show("  [dim]  line  section[/dim]")
         for section in found:
             indent = "  " * (section.depth - 1)
             _show(
@@ -3483,8 +3513,10 @@ def status(
         if not stage.done:
             _show(f"        [dim]{_plain(stage.command)}[/dim]")
     _show("")
+    verb = "has" if work.settled == 1 else "have"
     _show(
-        f"[dim]{_plain(work.settled)} of {len(work.stages)} stages have nothing outstanding.[/dim]"
+        f"[dim]{work.settled:,} of {len(work.stages)} stages {_plain(verb)} nothing "
+        "outstanding.[/dim]"
     )
 
 

@@ -62,6 +62,7 @@ from local_ai_control_center.features.appearance import (  # noqa: E402
     WINDOW_PREFERENCES,
     preferences_from,
 )
+from local_ai_control_center.features.ask import before_preparing  # noqa: E402
 from local_ai_control_center.features.commands import commands_of  # noqa: E402
 from local_ai_control_center.features.prompts import prompts_of  # noqa: E402
 from local_ai_control_center.features.status import status_of  # noqa: E402
@@ -116,6 +117,9 @@ def _open(config_path: pathlib.Path) -> Window:
         *_asking_for_the_window(config, workspace),
         config.context_file or "",
         _trail_for_the_window(config, workspace),
+        # The line `lacc window` puts beside Prepare, not one this script writes: measured
+        # before, the check below read back a sentence it had set itself (ADR-120).
+        before_preparing=before_preparing(config),
     )
 
 
@@ -323,6 +327,7 @@ def _ask_flow(window: Window) -> None:
     from local_ai_control_center.views import asking
 
     delay = 1.0
+    real_line = window.before_preparing
     window.prepare_question, window.send_question = _stand_in(delay)
     ask = next(s for s in SECTIONS if s.name == "Ask")
     elsewhere = SECTIONS[0]
@@ -334,6 +339,12 @@ def _ask_flow(window: Window) -> None:
         return
     key = rows[0]
     corpus = pathlib.Path(key).name
+    window.tree.selection_set(key)
+    _settle(window, 4)
+    print(
+        f"  the line beside Prepare is the one lacc window draws: "
+        f"{bool(real_line) and _shows(window, real_line[:40])}"
+    )
 
     def open_corpus() -> None:
         window._go(ask)

@@ -202,7 +202,7 @@ def test_status_counts_what_was_brought_and_names_the_way_in(tmp_path: Path) -> 
         app, ["bring", str(outside / "03 Metodología.md"), "-c", str(config)], input="y\n"
     )
     writing = next(stage for stage in stages_in(workspace).stages if stage.name == "Writing")
-    assert writing.done == "1 drafts brought in"
+    assert writing.done == "1 draft brought in", "the count and its word agree (ADR-120)"
     assert "none of them reviewed" in writing.missing
 
 

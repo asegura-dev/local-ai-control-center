@@ -26,6 +26,7 @@ from local_ai_control_center.core.corpus import parse_corpus
 from local_ai_control_center.core.drafts import drafts_in
 from local_ai_control_center.core.kinds import kind_of
 from local_ai_control_center.core.references import references_in, without_truncations
+from local_ai_control_center.core.wording import counted
 
 RESOLVED_MARK = "## Resolved"
 """The heading a bibliography puts its resolved works under.
@@ -90,7 +91,7 @@ def _writing(brought: int, reviewed: int) -> Stage:
     done = ", ".join(
         part
         for part in (
-            f"{brought} drafts brought in" if brought else "",
+            f"{counted(brought, 'draft')} brought in" if brought else "",
             f"{reviewed} reviewed" if reviewed else "",
         )
         if part

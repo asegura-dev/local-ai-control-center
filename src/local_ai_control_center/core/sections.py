@@ -171,14 +171,18 @@ def _under(top: Section, lines: list[str], ends_at: int) -> list[Section]:
             continue
         label, title = match.group(1), match.group(2)
         if not title:
-            following = next(
-                (
-                    lines[n].strip()
-                    for n in range(number, min(number + 2, len(lines)))
-                    if lines[n].strip()
-                ),
-                "",
+            at = next(
+                (n for n in range(number, min(number + 2, len(lines))) if lines[n].strip()),
+                None,
             )
+            following = lines[at].strip() if at is not None else ""
+            after = lines[at + 1].strip() if at is not None and at + 1 < len(lines) else ""
+            # A heading the PDF broke mid-word goes on, in lowercase, on the next line:
+            # `Recommendat` / `ions for staging of prostate cancer` (ADR-120).
+            if following[-1:].islower() and after[:1].islower():
+                joined = following + after
+                if len(joined.split()) <= _LONGEST_TITLE:
+                    following = joined
             title = following if len(following.split()) <= _LONGEST_TITLE else ""
         if title and (len(title.split()) > _LONGEST_TITLE or not title[0].isupper()):
             continue

@@ -23,7 +23,7 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import UTC, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -189,7 +189,9 @@ class CrossrefRegistry(Registry):
         message = payload.get("message") if isinstance(payload, dict) else None
         if not isinstance(message, dict):
             return None
-        return work_from(message, wanted, datetime.now(UTC).strftime("%Y-%m-%d"))
+        # The day this machine was on, as the copies `bring` makes are named by: at 19:55
+        # on the 29th here, UTC had already said the 30th (ADR-120).
+        return work_from(message, wanted, date.today().isoformat())
 
 
 def answers_in(path: Path) -> dict[str, Work | None]:
