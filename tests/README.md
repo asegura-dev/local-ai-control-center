@@ -37,7 +37,7 @@ behaviour test caught were caught - or would have been - by one of these.
 |---|---|
 | `test_config.py` | The configuration contract and its YAML loader. |
 | `test_permissions.py` | The permission contract, the configuration as a ceiling, and checking. |
-| `test_workspace.py` | The workspace contract and its boundary. |
+| `test_workspace.py` | The workspace contract and its boundary, and patterns matched inside it and nowhere else (ADR-112). |
 | `test_preview.py` | What a preview reports, and what it must not do. |
 | `test_skill.py` | The skill contract and the demonstration skill. |
 | `test_declared.py` | Skills written in a file, and what a file may not decide (ADR-048). |
@@ -88,7 +88,7 @@ behaviour test caught were caught - or would have been - by one of these.
 | `test_coverage.py` | How far the nearest quotation is from a topic (ADR-088). |
 | `test_identity.py` | Which work a document is, and a DOI established for either of its files (ADR-087, ADR-103). |
 | `test_bibtex.py` | BibTeX written from what a registry said, and nothing else (ADR-102). |
-| `test_bring.py` | One named file brought into the workspace: refused for anything wider, shown before it is read, never replacing, recorded (ADR-111). |
+| `test_bring.py` | One named file brought into the workspace: refused for anything wider, shown before it is read, never replacing, recorded (ADR-111); read as typed, never from a share, and shown as it is named (ADR-112). |
 | `test_stages.py` | Where the work stands, stage by stage (ADR-080). |
 | `test_status.py` | What the bottom of the window says, and what it does not do to find out (ADR-077). |
 | `test_navigate.py` | Ordering a document's sections by what a question is about (ADR-079). |

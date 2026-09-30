@@ -8,17 +8,29 @@ recorded - and refused for anything else.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import sys
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+import pytest
 from typer.testing import CliRunner
 
-from local_ai_control_center.cli import app
+from local_ai_control_center import cli
+from local_ai_control_center.cli import app, main
 from local_ai_control_center.core.drafts import BROUGHT, DRAFTS, drafts_in
-from local_ai_control_center.features.bring import MOST_BYTES, copy_name, noted, refusal
+from local_ai_control_center.features.bring import (
+    MOST_BYTES,
+    copy_name,
+    not_on_this_machine,
+    noted,
+    on_the_network,
+    refusal,
+)
 from local_ai_control_center.features.stages import stages_in
+from local_ai_control_center.system.profiler import drive_is_remote
 
 runner = CliRunner()
 TODAY = date(2026, 9, 29)
@@ -192,3 +204,117 @@ def test_status_counts_what_was_brought_and_names_the_way_in(tmp_path: Path) -> 
     writing = next(stage for stage in stages_in(workspace).stages if stage.name == "Writing")
     assert writing.done == "1 drafts brought in"
     assert "none of them reviewed" in writing.missing
+
+
+# --- the file named is the file read (ADR-112) -------------------------------------------------
+
+
+def test_arguments_reach_lacc_as_typed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """On Windows, Click would match `[1]`, `*` and `?` against the folder and expand `%VAR%`."""
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(cli, "app", lambda **kwargs: seen.update(kwargs))
+    main()
+    assert seen == {"windows_expand_args": False}
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the expansion exists only on Windows")
+def test_brackets_in_a_name_are_the_name_not_a_pattern(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The case the tester found: beside `cap 1.md`, `cap [1].md` proposed to read the other."""
+    config, _, outside = _workspace(tmp_path)
+    (outside / "cap 1.md").write_text("otro" + chr(10), encoding="utf-8")
+    named = outside / "cap [1].md"
+    named.write_text("este" + chr(10), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["lacc", "bring", str(named), "-c", str(config)])
+    monkeypatch.setattr(sys, "stdin", io.StringIO("n" + chr(10)))
+    with pytest.raises(SystemExit) as ended:
+        main()
+    said = " ".join(capsys.readouterr().out.split())
+    assert ended.value.code in (0, None)
+    assert "cap [1].md" in said
+    assert "cap 1.md" not in said
+
+
+def test_the_shapes_of_a_share_are_known_by_their_text() -> None:
+    assert on_the_network(chr(92) * 2 + r"archivos\tesis\03.md")
+    assert on_the_network("//archivos/tesis/03.md")
+    assert on_the_network(chr(92) * 2 + r"?\UNC\archivos\tesis\03.md")
+    assert on_the_network(chr(92) * 2 + r".\unc\archivos\tesis\03.md")
+    assert not on_the_network(r"C:\Users\Aleja\tesis\03.md")
+    assert not on_the_network(chr(92) * 2 + r"?\C:\Users\Aleja\tesis\03.md")
+    assert not on_the_network("tesis/03.md")
+
+
+def test_a_drive_on_this_machine_is_not_remote(tmp_path: Path) -> None:
+    assert drive_is_remote(str(tmp_path)) is False
+    assert drive_is_remote("//archivos/tesis/03.md") is False
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="a share is a Windows path")
+def test_a_share_is_refused_before_anything_asks_about_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the network off or on: bring reads files on this machine, and asking reaches it."""
+    config, workspace, _ = _workspace(tmp_path)
+    asked: list[str] = []
+    resolve = Path.resolve
+
+    def watched(self: Path, strict: bool = False) -> Path:
+        asked.append(str(self))
+        return resolve(self, strict)
+
+    monkeypatch.setattr(Path, "resolve", watched)
+    for shared in (chr(92) * 2 + r"archivos.invalid\tesis\03.md", "//archivos.invalid/tesis/03.md"):
+        result = runner.invoke(app, ["bring", shared, "-c", str(config)], input="y\n")
+        assert result.exit_code == 1
+        assert "is on another machine" in " ".join(result.stdout.split())
+        assert "Bring it?" not in result.stdout
+    assert [path for path in asked if "archivos.invalid" in path] == []
+    assert _trail(workspace) == []
+
+
+def test_a_drive_windows_calls_remote_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config, workspace, outside = _workspace(tmp_path)
+    monkeypatch.setattr(cli, "drive_is_remote", lambda path: True)
+    source = outside / "03 Metodología.md"
+    result = runner.invoke(app, ["bring", str(source), "-c", str(config)], input="y\n")
+    assert result.exit_code == 1
+    assert "is on another machine" in " ".join(result.stdout.split())
+    assert drafts_in(workspace) == ()
+    assert "never a file share" in not_on_this_machine("Z:/03.md")
+
+
+def test_a_missing_file_is_called_missing_and_a_folder_a_folder(tmp_path: Path) -> None:
+    assert "There is no file at" in refusal(Path("vault/no.md"), False, None, exists=False)
+    assert "never a folder" in refusal(Path("vault"), False, None, exists=True)
+    config, _, outside = _workspace(tmp_path)
+    result = runner.invoke(app, ["bring", str(outside / "no.md"), "-c", str(config)], input="y\n")
+    assert result.exit_code == 1
+    said = " ".join(result.stdout.split())
+    assert "There is no file at" in said and "never a folder" not in said
+
+
+def test_a_name_with_brackets_is_shown_as_it_is(tmp_path: Path) -> None:
+    """Rich reads `[v2]` as a style: the preview dropped it, and the command it suggested failed."""
+    config, workspace, outside = _workspace(tmp_path)
+    named = outside / "Metodología [v2].md"
+    named.write_text("Una versión." + chr(10), encoding="utf-8")
+    result = runner.invoke(app, ["bring", str(named), "-c", str(config)], input="y\n")
+    assert result.exit_code == 0, result.stdout
+    said = " ".join(result.stdout.split())
+    assert "Metodología [v2].md" in said
+    assert 'lacc review "drafts/Metodología [v2] (' in said
+    assert [copy.name.startswith("Metodología [v2] (") for copy in drafts_in(workspace)] == [True]
+
+
+def test_a_pattern_is_not_a_file_bring_will_read(tmp_path: Path) -> None:
+    """`capit*.md` was accepted when it matched one file. Now it is a name, and nothing has it."""
+    config, workspace, outside = _workspace(tmp_path)
+    result = runner.invoke(app, ["bring", str(outside / "03*.md"), "-c", str(config)], input="y\n")
+    assert result.exit_code == 1
+    said = " ".join(result.stdout.split())
+    assert "There is no file at" in said and "not patterns" in said
+    assert drafts_in(workspace) == ()

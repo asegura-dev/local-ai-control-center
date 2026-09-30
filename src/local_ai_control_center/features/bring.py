@@ -5,8 +5,9 @@ pure: whether a file may be brought, what its copy is called, and what the note 
 Where copies live is `core.drafts`, which the stages read too. The command that asks and copies
 is in `cli.py`; nothing here prints.
 
-**One file, named.** Never a folder, never a pattern, never a second file: the exception to the
-boundary is exactly as wide as one path somebody typed and confirmed.
+**One file, named.** Never a folder, never a pattern, never a second file, never a file on
+another machine: the exception to the boundary is exactly as wide as one path somebody typed and
+confirmed, on this machine (ADR-112).
 """
 
 from __future__ import annotations
@@ -37,15 +38,49 @@ class Brought(BaseModel):
     sha256: str
 
 
-def refusal(source: Path, inside: bool, size: int | None) -> str:
+def on_the_network(path: str) -> bool:
+    r"""Whether ``path`` names a share on another machine, by its shape alone (ADR-112).
+
+    `\\host\share\...`, `//host/share/...`, and the same through `\\?\UNC\` or `\\.\UNC\`.
+    Decided from the text, before anything is asked of the file system, because asking about
+    a share is what reaches its host. A local path in the long form - `\\?\C:\...` - is not
+    a share.
+    """
+    text = path.replace("/", "\\")
+    upper = text.upper()
+    if upper.startswith(("\\\\?\\UNC\\", "\\\\.\\UNC\\")):
+        return True
+    if upper.startswith(("\\\\?\\", "\\\\.\\")):
+        return False
+    return text.startswith("\\\\")
+
+
+def not_on_this_machine(path: str) -> str:
+    """The refusal for a file on another machine, however that was found out."""
+    return (
+        f"{path} is on another machine. bring reads files on this one: a configuration names "
+        "an engine and a registry, never a file share. Copy it to this machine first, and "
+        "bring the copy."
+    )
+
+
+def refusal(source: Path, inside: bool, size: int | None, *, exists: bool = True) -> str:
     """Why ``source`` cannot be brought, in a sentence, or empty when it can.
 
     ``inside`` is whether it already resolves inside the workspace, and ``size`` its size in
-    bytes - ``None`` when it is not a file at all. Decided before anything of it is read but
-    that: the preview is drawn from what this allows.
+    bytes - ``None`` when it is not a file at all. ``exists`` tells a folder from nothing at
+    all, which are refused for different reasons and said differently. Decided before anything
+    of it is read but that: the preview is drawn from what this allows.
     """
     if inside:
         return f"{source.name} is already in the workspace. Use it where it is."
+    if not exists:
+        if "*" in source.name or "?" in source.name:
+            return (
+                f"There is no file at {source}. bring reads one file by its exact name: "
+                "* and ? are not patterns here."
+            )
+        return f"There is no file at {source}."
     if size is None:
         return f"{source} is not a file. One file is brought at a time, never a folder."
     if source.suffix.lower() not in BRINGABLE:

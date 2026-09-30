@@ -4,11 +4,14 @@ A workspace is a validated contract around a root directory (ADR-003). Its core
 job is containment: `is_within` and `resolve_within` decide whether a candidate
 path stays inside the workspace, resolving `..` and symlinks first so the check
 cannot be tricked. Creation of the root is explicit (`ensure`), never a silent
-side effect of construction.
+side effect of construction. `named` turns what a person typed into the files it
+names, matching a pattern against the workspace and nowhere else (ADR-112).
 """
 
 from __future__ import annotations
 
+import glob
+from collections.abc import Sequence
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -91,6 +94,33 @@ class Workspace(BaseModel):
         if _unusable_shape(resolved) is not None:
             return False
         return resolved == self.root or self.root in resolved.parents
+
+    def named(self, names: Sequence[str | Path]) -> tuple[str, ...]:
+        """Each name as it was typed, or the files in the workspace a pattern names (ADR-112).
+
+        A name a file has is that file, whatever it holds: `[10] Hu 2020.md` is a name. A name
+        no file has, holding `*` or `?`, is matched against the workspace - never against the
+        folder the command runs in, and never outside the workspace - and replaced by the files
+        it matches, in order. `[` and `]` are always part of a name; there are no character
+        classes. A pattern that matches nothing is kept as typed, so the command says it is
+        not there.
+        """
+        found: list[str] = []
+        for name in names:
+            text = str(name)
+            typed = Path(text) if Path(text).is_absolute() else self.root / text
+            if not ("*" in text or "?" in text) or typed.exists():
+                found.append(text)
+                continue
+            pattern = text.replace("[", "[[]")
+            matches = sorted(
+                match
+                for match in glob.glob(pattern, root_dir=self.root, recursive=True)
+                if self.is_within(match)
+                and (Path(match) if Path(match).is_absolute() else self.root / match).is_file()
+            )
+            found.extend(matches or [text])
+        return tuple(found)
 
     def resolve_within(self, path: str | Path) -> Path:
         """Return the safe resolved path if inside the workspace, else raise.

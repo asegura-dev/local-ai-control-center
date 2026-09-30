@@ -65,8 +65,8 @@ aspirations.
 - **Nothing outside the workspace is touched.** Every path is resolved and checked
   against the workspace boundary before any access. Paths that escape it (via `..`,
   symlinks, absolute paths) are refused. Three exceptions, each named, each shown before
-  it happens and confirmed by a person: `lacc bring` reads the one file you name and
-  copies it in (ADR-111); the window's Configuration rewrites a configuration file, and
+  it happens and confirmed by a person: `lacc bring` reads the one file you name, as you
+  typed it and on this machine, and copies it in (ADR-111, ADR-112); the window's Configuration rewrites a configuration file, and
   its Workspaces creates a new configuration and folder (ADR-093, ADR-094). An exception
   that is not on this list is a defect.
 

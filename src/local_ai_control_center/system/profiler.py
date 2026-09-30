@@ -16,6 +16,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import PureWindowsPath
 
 import psutil
 from pydantic import BaseModel, ConfigDict, Field
@@ -285,6 +286,27 @@ def work_area() -> tuple[int, int, int, int] | None:
         return (rect.left, rect.top, rect.right, rect.bottom)
     except (AttributeError, OSError):
         return None
+
+
+def drive_is_remote(path: str) -> bool:
+    """Whether Windows says the drive letter ``path`` starts with is on another machine.
+
+    Asked of the letter alone, from the system's own table of drives: nothing on the drive is
+    read to answer (ADR-112). A path without a letter, anywhere but Windows, or a call that
+    fails is answered no - the shapes of a share are refused by name before this is asked.
+    """
+    if sys.platform != "win32":
+        return False
+    drive = PureWindowsPath(path).drive
+    if len(drive) != 2 or drive[1] != ":":
+        return False
+    try:
+        import ctypes
+
+        drive_remote = 4
+        return bool(ctypes.windll.kernel32.GetDriveTypeW(drive + "\\") == drive_remote)
+    except (AttributeError, OSError):
+        return False
 
 
 def _processor_name() -> str:

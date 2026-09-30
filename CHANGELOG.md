@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took: the first restart left the engine exactly as it was.
 
 ### Fixed
+- **The file `bring` read was not always the file named** (ADR-112). On Windows, Click - under
+  Typer - rewrote every argument before LACC saw it: `~` and `%VARIABLES%` expanded, and `*`,
+  `?` and `[...]` matched against the folder the command ran in. `bring "cap [1].md"`, beside
+  `cap 1.md`, proposed to read `cap 1.md`; `capit*.md` was taken for a name. Arguments now
+  reach LACC as typed. Patterns belong to LACC: `*` and `?` - never brackets, since the
+  papers here are called `[10] …` - matched inside the workspace, not against the repository
+  `run.ps1` runs in, which is what `collect *.md` had been handed. `bring` also refuses a share
+  on another machine before asking the file system anything (its size had been read with the
+  network off), calls a missing file missing rather than a folder, and shows a name with
+  `[v2]` in it as it is.
 - **Prepare froze the window** (ADR-110). Send has run on a worker since ADR-085; Prepare ranked
   on the window's own thread, and with an embedding model that is waiting for the engine - 4.5
   seconds for a question, as long as embedding the whole corpus the first time. It runs on a

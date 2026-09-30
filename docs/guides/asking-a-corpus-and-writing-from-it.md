@@ -19,8 +19,12 @@ bibliography changes; the asking is the daily work.
 
 ## Building the corpus
 
-    lacc collect extract_claims *.md --into corpus.md
+    lacc collect extract_claims "*.md" --into corpus.md
     lacc corpus corpus.md other.md --into everything.md
+
+A pattern is matched by LACC against the workspace, wherever you run it from - `*` and `?`,
+and never brackets, so `"[1*"` means every paper whose name starts with `[1`. Quoted, a
+shell on Linux or macOS leaves it to LACC (ADR-112).
 
 `collect` runs over each document alone, so one that is too large for the window is refused
 by name with its token count rather than silently half-read. **Read the refusals**, and then
@@ -193,7 +197,9 @@ LACC reads nothing there. Bring a copy in first:
 
 It shows the full path it would read and where the copy goes, and asks; no is the default.
 The copy lands in `drafts/`, named after the file and the day, and your file is never written
-to (ADR-111). Bring it again after you change it: each copy is kept, none replaced. Then:
+to (ADR-111). It reads the name exactly as you typed it, and only on this machine: a file on
+a network share is refused - copy it here first (ADR-112). Bring it again after you change
+it: each copy is kept, none replaced. Then:
 
     lacc review "drafts/03 Metodología (2026-09-29).md" --against everything.md --into chapter.review.md
 
@@ -218,7 +224,7 @@ Metadata comes from the registry that assigns DOIs, never from a model - a 14B a
 journal names invented twelve of twenty-four (ADR-047). Both switches have to be on in the
 configuration: `network_access: true` and `registry_url: https://api.crossref.org`.
 
-    lacc resolve papers/*.md --into bibliography.md
+    lacc resolve "papers/*.md" --into bibliography.md
     lacc identify "paper without a DOI.md"
     lacc bib bibliography.registry.json --into new.bib --adding-to yours.bib
 

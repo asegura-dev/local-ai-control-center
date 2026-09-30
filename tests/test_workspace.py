@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+from typer.testing import CliRunner
 
+from local_ai_control_center.cli import app
 from local_ai_control_center.core.config import Config
 from local_ai_control_center.core.workspace import (
     Workspace,
@@ -176,3 +178,53 @@ def test_a_synchronising_folder_is_reported_as_a_suspicion(tmp_path: Path) -> No
 def test_an_ordinary_folder_raises_no_suspicion(tmp_path: Path) -> None:
     """The heuristic must stay quiet where there is nothing to say."""
     assert sync_folder_suspicion(tmp_path / "projects" / "thesis") is None
+
+
+# --- what a person typed, as the files it names (ADR-112) ------------------------------------
+
+
+def _files(root: Path, *names: str) -> Workspace:
+    for name in names:
+        (root / name).write_text("x", encoding="utf-8")
+    return Workspace(root=root)
+
+
+def test_a_name_a_file_has_is_that_file_whatever_it_holds(tmp_path: Path) -> None:
+    workspace = _files(tmp_path, "[10] Hu 2020.md", "1 Hu 2020.md")
+    assert workspace.named(["[10] Hu 2020.md"]) == ("[10] Hu 2020.md",)
+
+
+def test_a_pattern_is_matched_inside_the_workspace_in_order(tmp_path: Path) -> None:
+    workspace = _files(tmp_path, "b.md", "a.md", "c.pdf")
+    (tmp_path / "drafts").mkdir()
+    assert workspace.named(["*.md"]) == ("a.md", "b.md")
+    assert workspace.named(["*"]) == ("a.md", "b.md", "c.pdf"), "a folder is not a document"
+
+
+def test_brackets_in_a_pattern_are_part_of_the_name(tmp_path: Path) -> None:
+    """The papers here are called `[10] ...`: a character class would make them unreachable."""
+    workspace = _files(tmp_path, "[10] Hu.md", "[11] Dou.md", "1 otro.md")
+    assert workspace.named(["[1*"]) == ("[10] Hu.md", "[11] Dou.md")
+
+
+def test_a_pattern_never_matches_outside_the_workspace(tmp_path: Path) -> None:
+    root = tmp_path / "ws"
+    root.mkdir()
+    (tmp_path / "outside.md").write_text("x", encoding="utf-8")
+    workspace = _files(root, "inside.md")
+    assert workspace.named(["../*.md"]) == ("../*.md",), "nothing inside: kept as typed"
+    outside = str(tmp_path / "*.md")
+    assert workspace.named([outside]) == (outside,)
+
+
+def test_a_command_matches_in_the_workspace_not_where_it_runs(tmp_path: Path) -> None:
+    """Before, Click matched `*.md` against the folder the command ran in - the repository."""
+    root = tmp_path / "ws"
+    root.mkdir()
+    _files(root, "a.md", "b.md")
+    config = tmp_path / "config.yaml"
+    config.write_text(f"workspace_root: {root}{chr(10)}", encoding="utf-8")
+    result = CliRunner().invoke(app, ["metadata", "*.md", "-c", str(config)])
+    assert result.exit_code == 0, result.stdout
+    assert "a.md" in result.stdout and "b.md" in result.stdout
+    assert "README.md" not in result.stdout

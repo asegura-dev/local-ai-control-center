@@ -34,16 +34,19 @@ What exists, by what it is for:
    anything before it asks (ADR-106); `review`, `resolve`, `identify` and `coverage` leave a
    record, as does a no (ADR-107), and so does every call to embed (ADR-108); two writers keep
    one chain (ADR-109); and Prepare no longer holds the window (ADR-110).
-2. **Measure the newer models on the old question - begun.** On 28 September extraction was
+2. **Close what the test of 29 September found - begun.** Twenty-six defects, two of them
+   against a principle, one record per cause; the first is ADR-112, the file named is the
+   file read.
+3. **Measure the newer models on the old question - begun.** On 28 September extraction was
    re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations
    are not in their document, against 38 of the 14B's 216, and the figure this project is
    cited by is 42 of 237 today, not 48 (chapter 04). Still to do: a second run of each, and the
    27B and a 32B at a full window once the second card is in.
-3. **Projects over one library**, one per paper, and a window section for writing, whose
+4. **Projects over one library**, one per paper, and a window section for writing, whose
    guardrails come from the blind rating of what the models changed in real paragraphs.
-4. **What fits the machine**: the models a pair of cards can hold, pulled from the window,
+5. **What fits the machine**: the models a pair of cards can hold, pulled from the window,
    against a list the person keeps.
-5. **v3.0.0**, as written at the end of this chapter: discovery with a whitelist, and running
+6. **v3.0.0**, as written at the end of this chapter: discovery with a whitelist, and running
    a skill that writes, from the window.
 
 ## Done, through v0.30.0

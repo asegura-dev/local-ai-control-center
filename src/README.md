@@ -66,7 +66,7 @@ record (ADR-008).
 | `run.py` | A unique, readable identifier for one execution, and its progress (ADR-002). |
 | `sections.py` | The sections a document numbers for itself (ADR-076). |
 | `skill.py` | Skills: named units of work whose `plan` is pure; effects happen in the cycle. |
-| `workspace.py` | The bounded area LACC may operate in, and the boundary that refuses `..`, links and absolute paths (ADR-003, ADR-017). |
+| `workspace.py` | The bounded area LACC may operate in, and the boundary that refuses `..`, links and absolute paths (ADR-003, ADR-017); what a typed name or pattern names inside it (ADR-112). |
 
 ## `ports/` - what LACC needs from the world
 
@@ -103,7 +103,7 @@ record (ADR-008).
 |---|---|
 | `__init__.py` | The layer. |
 | `audit.py` | The append-only, hash-chained trail of what LACC did, its anchor, and the walk that checks it (ADR-006, ADR-023, ADR-049, ADR-104). |
-| `profiler.py` | What the machine offers - memory, graphics, the work area - reported, never acted on. |
+| `profiler.py` | What the machine offers - memory, graphics, the work area, whether a drive is on the network - reported, never acted on. |
 
 ## `features/` - the decisions a view draws
 
@@ -113,7 +113,7 @@ record (ADR-008).
 | `ask.py` | Turning selected passages into what a question is asked against (ADR-085). |
 | `bibliography.py` | A bibliography in Markdown from what a registry said (ADR-067). |
 | `bibtex.py` | A bibliography LaTeX can cite from, from the same answers (ADR-102). |
-| `bring.py` | Whether one named file may be brought into the workspace, and what its copy is called (ADR-111). |
+| `bring.py` | Whether one named file may be brought into the workspace - never from another machine - and what its copy is called (ADR-111, ADR-112). |
 | `commands.py` | The commands, read from the application that registers them (ADR-072, ADR-103). |
 | `corpus.py` | Writing a corpus, and re-checking one written before (ADR-066). |
 | `coverage.py` | How far the nearest quotation is from each topic you name (ADR-088). |

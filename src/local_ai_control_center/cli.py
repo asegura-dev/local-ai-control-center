@@ -23,6 +23,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -124,7 +125,13 @@ from local_ai_control_center.features.ask import (
 )
 from local_ai_control_center.features.bibliography import as_entry, bibliography
 from local_ai_control_center.features.bibtex import Held, bibtex, held_in
-from local_ai_control_center.features.bring import copy_name, noted, refusal
+from local_ai_control_center.features.bring import (
+    copy_name,
+    not_on_this_machine,
+    noted,
+    on_the_network,
+    refusal,
+)
 from local_ai_control_center.features.commands import commands_of
 from local_ai_control_center.features.corpus import (
     assembled,
@@ -175,7 +182,11 @@ from local_ai_control_center.system.audit import (
     digest_of_file,
     walk,
 )
-from local_ai_control_center.system.profiler import SystemProfile, profile_system
+from local_ai_control_center.system.profiler import (
+    SystemProfile,
+    drive_is_remote,
+    profile_system,
+)
 
 DEFAULT_CONFIG_PATH = Path("configs/config.yaml")
 
@@ -461,6 +472,7 @@ def run(
     """Plan a skill, preview it, confirm, then execute and record it."""
     resolved = _resolve_skill(skill, config_path)
     config, workspace = _load(config_path)
+    requests = list(workspace.named(requests))
     audit = AuditLog(workspace, config)
 
     try:
@@ -932,6 +944,7 @@ def references(
     with (ADR-064).
     """
     _, workspace = _load(config_path)
+    sources = [Path(name) for name in workspace.named(sources)]
     cited_by: dict[str, set[str]] = {}
     what: dict[str, str] = {}
     held: set[str] = set()
@@ -1019,6 +1032,7 @@ def metadata(
     recollection. What a file does not carry is reported as missing, never guessed.
     """
     _, workspace = _load(config_path)
+    sources = [Path(name) for name in workspace.named(sources)]
     silent: list[str] = []
     for source in sources:
         try:
@@ -1077,6 +1091,7 @@ def resolve(
     bibliography can be rebuilt from what was actually received (ADR-067).
     """
     config, workspace = _load(config_path)
+    sources = [Path(name) for name in workspace.named(sources)]
     if not config.registry_url:
         _show(
             "[red]No registry is configured.[/red] Write `registry_url: https://api.crossref.org` "
@@ -1432,6 +1447,9 @@ def ingest(
     Each conversion is still its own run in the audit, and one that fails costs that
     document rather than the batch.
     """
+    config, workspace = _load(config_path)
+    # What a pattern matches is known only here, so --into is counted against the matches.
+    sources = [Path(name) for name in workspace.named(sources)]
     if destination is not None and len(sources) != 1:
         console.print(
             "[red]--into names one file, so it works with one document.[/red] Without it "
@@ -1439,7 +1457,6 @@ def ingest(
         )
         raise typer.Exit(code=1)
 
-    config, workspace = _load(config_path)
     audit = AuditLog(workspace, config)
 
     jobs: list[tuple[Path, Path, Converter]] = []
@@ -1811,6 +1828,7 @@ def collect(
     """
     resolved = _resolve_skill(skill, config_path)
     config, workspace = _load(config_path)
+    requests = list(workspace.named(requests))
     if not resolved.plan((requests[0],), config).verify_quotes:
         console.print(
             f"[red]{skill} does not check its quotations, so there is nothing to collect "
@@ -2315,6 +2333,7 @@ def corpus(
     and the ones they must not cite marked as such.
     """
     _, workspace = _load(config_path)
+    sources = [Path(name) for name in workspace.named(sources)]
     collected: list[CollectedClaim] = []
     for source in sources:
         try:
@@ -2994,17 +3013,27 @@ def bring(
     """Copy one file you name into the workspace, so LACC can read it (ADR-111).
 
     **The one command that reads outside the workspace, and only the file you name** - never a
-    folder, never a pattern. Before you say yes it reads nothing of the file but its size: the
+    folder, never a pattern, never a file on another machine (ADR-112). Before you say yes it
+    reads nothing of the file but its size: the
     preview shows the full path and where the copy goes, and no is the default. The copy lands
     in `drafts/` with the day in its name and never replaces anything; your file is never
     opened for writing. What was read and written is in the trail.
     """
     config, workspace = _load(config_path)
-    resolved = source.expanduser().resolve()
+    # A share is refused by its shape, before the file system is asked anything about it:
+    # asking is what reaches the other machine (ADR-112).
+    typed = source.expanduser().absolute()
+    if on_the_network(str(typed)) or drive_is_remote(str(typed)):
+        _show(f"[red]{escape(not_on_this_machine(str(typed)))}[/red]")
+        raise typer.Exit(code=1)
+    resolved = typed.resolve()
+    if on_the_network(str(resolved)):
+        _show(f"[red]{escape(not_on_this_machine(str(resolved)))}[/red]")
+        raise typer.Exit(code=1)
     size = resolved.stat().st_size if resolved.is_file() else None
-    why = refusal(resolved, workspace.is_within(resolved), size)
+    why = refusal(resolved, workspace.is_within(resolved), size, exists=resolved.exists())
     if why:
-        _show(f"[red]{why}[/red]")
+        _show(f"[red]{escape(why)}[/red]")
         raise typer.Exit(code=1)
 
     folder = workspace.resolve_within(Path(DRAFTS))
@@ -3013,9 +3042,10 @@ def bring(
     name = copy_name(resolved, taken, today)
     destination = workspace.resolve_within(Path(DRAFTS) / name)
     shown = f"{size / 1024:,.0f} KB" if size and size >= 1024 else f"{size} bytes"
-    _show(f"[bold]Would read[/bold]  {resolved}")
+    # Names are printed as text: Rich reads `[v2]` in a name as a style and drops it (ADR-112).
+    _show(f"[bold]Would read[/bold]  {escape(str(resolved))}")
     _show(f"            outside the workspace, {shown}")
-    _show(f"[bold]Copy to[/bold]     {DRAFTS}/{name}")
+    _show(f"[bold]Copy to[/bold]     {DRAFTS}/{escape(name)}")
     _show("[dim]Your file is read and never opened for writing.[/dim]")
     # Opened where it is about to ask, so a no is recorded too (ADR-107).
     audit = AuditLog(workspace, config)
@@ -3028,7 +3058,7 @@ def bring(
     try:
         content = resolved.read_bytes()
     except OSError as error:
-        _show(f"[red]Cannot read {resolved}: {error}[/red]")
+        _show(f"[red]Cannot read {escape(str(resolved))}: {escape(str(error))}[/red]")
         audit.record(
             run_id, "run_failed", "Could not read it", {"action": "bring", "error": str(error)}
         )
@@ -3046,7 +3076,7 @@ def bring(
         with destination.open("xb") as handle:
             handle.write(content)
     except OSError as error:
-        _show(f"[red]Cannot write {DRAFTS}/{name}: {error}[/red]")
+        _show(f"[red]Cannot write {DRAFTS}/{escape(name)}: {escape(str(error))}[/red]")
         audit.record(
             run_id, "run_failed", "Could not copy it", {"action": "bring", "error": str(error)}
         )
@@ -3056,11 +3086,11 @@ def bring(
     _write_or_exit(beside, noted(resolved, today, digest), (audit, run_id, "bring"))
     audit.record(run_id, "run_finished", "Finished bring", {"action": "bring"})
 
-    _show(f"[green]Brought[/green] -> {DRAFTS}/{name}")
+    _show(f"[green]Brought[/green] -> {DRAFTS}/{escape(name)}")
     if resolved.suffix.lower() in {".md", ".txt"}:
-        _show(f'[dim]Review it: lacc review "{DRAFTS}/{name}" --against <corpus>[/dim]')
+        _show(f'[dim]Review it: lacc review "{DRAFTS}/{escape(name)}" --against <corpus>[/dim]')
     else:
-        _show(f'[dim]Convert it first: lacc ingest "{DRAFTS}/{name}"[/dim]')
+        _show(f'[dim]Convert it first: lacc ingest "{DRAFTS}/{escape(name)}"[/dim]')
 
 
 @app.command()
@@ -3552,5 +3582,12 @@ def notify_test(
 
 
 def main() -> None:
-    """Entry point for the `lacc` console script."""
-    app()
+    """Entry point for the `lacc` console script.
+
+    Arguments reach LACC as they were typed. On Windows, Click - under Typer - otherwise treats
+    each one the way a Unix shell treats a word: `~` and `%VARIABLES%` expanded, and `*`, `?`
+    and `[...]` matched against the files in the folder. `lacc bring "cap [1].md"` proposed
+    `cap 1.md`, the file its brackets matched, and a question keeps its `%` and its `?` only
+    because this is off (ADR-112).
+    """
+    app(windows_expand_args=False)
