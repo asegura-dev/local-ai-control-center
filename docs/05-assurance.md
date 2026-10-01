@@ -72,7 +72,7 @@ row here is true on the day it was checked and needs re-checking like any other 
 
 | Promise | What holds it | Verdict |
 |---|---|---|
-| One failure costs one item, not the traverse | An unreachable judge returns `undecided` for that pair; a malformed page costs that page | **held by test** |
+| One failure costs one item, not the traverse | An unreachable judge returns `undecided` for that pair; a malformed page costs that page; a document `ingest` cannot convert, for any reason, costs that document - until ADR-122 an error nobody wrote a sentence for stopped the batch, and `lckd.pdf` left 25 documents unconverted | **held by test** |
 | An answer that was cut says so | `answer_truncated`, from the engine's own stop reason, reported by the CLI | **held by test** |
 | A cut answer still yields what arrived whole | Both formats, verified by truncating a valid answer at every character | **held by test** |
 | A prompt too large is refused, not truncated | Estimated against the window and refused before sending, when the configuration names the window (ADR-019) | **held by test** |

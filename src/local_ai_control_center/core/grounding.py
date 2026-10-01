@@ -67,6 +67,20 @@ difference was being reported as fabrication. Measured on one paper: sixteen of 
 hundred and sixty sentences could not be verified even when quoted perfectly (ADR-035).
 """
 
+_CITATION_MARKS = re.compile(
+    r"\[\s*\d+(?:\s*[-,]\s*\d+)*\s*\](?:\s*[-,]\s*\[\s*\d+(?:\s*[-,]\s*\d+)*\s*\])*"
+)
+"""A numbered citation in brackets, alone or in a run: `[7]`, `[7], [8]`, `[9]-[11]`, `[3, 5]`.
+
+The typesetter's apparatus, not the sentence. A model quoting a sentence leaves the marks out,
+as a reader does, and the check was refusing faithful quotations for it. Measured on the
+thesis's corpus: 52 of the 449 quotations refused were exact copies that lacked only these,
+and none of the 4,395 verified stopped verifying (ADR-123).
+
+Brackets only. A number in parentheses can be content - `(3)` patients, a `(1)` in a list -
+and allowing them as well recovered three more quotations, not enough to take that risk.
+"""
+
 _SHORTEST_CANDIDATE = 40
 """Below this a sentence is a heading, a caption or a stray line, not something a
 quotation was drawn from."""
@@ -284,11 +298,12 @@ the model had quoted correctly (ADR-081).
 def _normalized(text: str) -> str:
     """Reduce text to what a reader sees, so representation cannot hide a real quotation.
 
-    Five transformations, and every one of them removes a difference nobody can see: a
-    literal escape becomes the space it stands for, curly quotes and typographic dashes fold
-    to the ASCII a model writes, words the typesetter broke across a line are rejoined,
-    whitespace collapses, and case folds. None of them touches content - a changed word or a
-    changed number survives all five and still fails, which is the whole point (ADR-035).
+    Six transformations, and every one of them removes a difference nobody reads as the
+    sentence: a literal escape becomes the space it stands for, curly quotes and typographic
+    dashes fold to the ASCII a model writes, numbered citation marks in brackets are dropped
+    (ADR-123), words the typesetter broke across a line are rejoined, whitespace collapses,
+    and case folds. None of them touches content - a changed word or a changed number
+    survives all six and still fails, which is the whole point (ADR-035).
 
     Rejoining was added after a real paper produced two "fabrications" that were nothing of
     the kind. The model had quoted faithfully; the PDF held `sensi- tivity` and
@@ -303,7 +318,9 @@ def _normalized(text: str) -> str:
     """
     unescaped = _LITERAL_ESCAPE.sub(" ", text)
     folded = unescaped.translate(_LOOK_ALIKES)
-    joined = _HYPHEN_BETWEEN_LETTERS.sub(lambda m: m.group(1) + m.group(2), folded)
+    # After folding, so `[12–14]` has become `[12-14]` and one pattern covers both.
+    unmarked = _CITATION_MARKS.sub(" ", folded)
+    joined = _HYPHEN_BETWEEN_LETTERS.sub(lambda m: m.group(1) + m.group(2), unmarked)
     return _WHITESPACE.sub(" ", joined).casefold().strip()
 
 

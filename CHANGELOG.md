@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   once its text can be written. A conversion that fails in a way nobody wrote a sentence for
   ends its run with `ingestion_failed` and costs that document alone. Converted again,
   `lckd.pdf` took 4 seconds, with its 10 halves written as `�`.
+- **What the thesis's corpus showed the checker** (ADR-123). Of the 4,844 quotations taken
+  from the thesis's 65 references, 449 were refused.
+  - Most refusals in the two worst documents were copies the check did not recognise rather
+    than inventions. The largest single kind was bracketed citation marks the model left out,
+    such as `[7], [8]`.
+  - Numbered marks in brackets are now dropped on both sides; marks in parentheses are kept,
+    because `(3)` can be content.
+  - Rebuilt without a model, the corpus has **4,447 citable of 4,844, up from 4,395**, and
+    none of those verified before was lost.
+  - Two papers whose garbled formulas open a line with `!` are no longer filed as topics
+    lists, so `status` counts 65 documents, not 63.
+  - `collect` asks about "1 document", no longer "1 documents".
 
 ## [3.0.0] - 2026-09-30
 

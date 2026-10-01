@@ -2058,7 +2058,7 @@ def collect(
     _show_preview(preview)
     if not preview.allowed:
         _exit_refused()
-    if not _asked(f"Read {len(requests)} documents and write {into}?"):
+    if not _asked(f"Read {counted(len(requests), 'document')} and write {into}?"):
         console.print("[yellow]Declined.[/yellow] Nothing was run.")
         return
 

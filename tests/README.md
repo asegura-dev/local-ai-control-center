@@ -43,14 +43,14 @@ behaviour test caught were caught - or would have been - by one of these.
 | `test_declared.py` | Skills written in a file, and what a file may not decide (ADR-048). |
 | `test_run.py` | Run identifiers. |
 | `test_fence.py` | The fence: what it removes, what it only notices, and what it cannot do. |
-| `test_grounding.py` | Parsing claims, and checking quotations against the source. |
+| `test_grounding.py` | Parsing claims, and checking quotations against the source; a quotation without its bracketed citation marks is still the sentence (ADR-123). |
 | `test_seeded_corpus.py` | The quotation check graded against answers known before it ran (ADR-044). |
 | `test_passes.py` | Dividing a document into readings that fit the window. |
 | `test_headings.py` | Finding a document's sections so a person can choose one. |
 | `test_sections.py` | What a document numbers for itself, and what only looks numbered (ADR-076). |
 | `test_references.py` | Reading the reference list a document already carries (ADR-064). |
 | `test_corpus.py` | Reading back a collected corpus, and the round trip that makes that safe. |
-| `test_kinds.py` | What a file in a workspace is, decided once (ADR-090). |
+| `test_kinds.py` | What a file in a workspace is, decided once (ADR-090); a converted document is never a topics list (ADR-123). |
 
 ## The cycle, the trail and the machine
 

@@ -69,6 +69,20 @@ def test_a_paper_is_a_document(tmp_path: Path) -> None:
     assert kind_of(_written(tmp_path, "paper.md", text)) == "document"
 
 
+def test_a_converted_paper_with_a_garbled_formula_is_still_a_document(tmp_path: Path) -> None:
+    """`dkd.md` and `liu19.md` were counted as topics lists, and status said 63 of 65 (ADR-123)."""
+    formula = "<!-- page 1 -->\nDecoupled Knowledge Distillation\n\n" + chr(33) + '"#$$%&#"\nloss\n'
+    assert kind_of(_written(tmp_path, "dkd.md", formula)) == "document"
+    lone = "<!-- page 1 -->\nStructured distillation\n\n" + chr(33) + "\nthe pixel-wise loss\n"
+    assert kind_of(_written(tmp_path, "liu19.md", lone)) == "document"
+
+
+def test_a_mark_alone_on_its_line_is_not_a_control(tmp_path: Path) -> None:
+    """The rule crossed a line break, so a lone mark took the next line as its topic."""
+    text = "# notes\n\nnodal staging\n" + chr(33) + "\nsomething on the next line\n"
+    assert kind_of(_written(tmp_path, "notes.md", text)) == "document"
+
+
 def test_anything_that_is_not_markdown_is_not_read(tmp_path: Path) -> None:
     assert kind_of(_written(tmp_path, "a.pdf", "whatever")) == "other"
     assert kind_of(_written(tmp_path, "a.json", "{}")) == "other"

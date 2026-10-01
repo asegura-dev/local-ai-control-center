@@ -28,6 +28,38 @@ def _answer(claim: str, quote: str, page: str) -> str:
     return f"CLAIM: {claim}\nQUOTE: {quote}\nPAGE: {page}"
 
 
+def test_a_quotation_without_the_citation_marks_is_still_the_sentence() -> None:
+    """A model quoting a sentence leaves `[7], [8]` out, as a reader does (ADR-123).
+
+    52 faithful quotations of the thesis's corpus were refused for that alone.
+    """
+    source = (
+        _PAGE_ONE + "Joint learning from multimodal data improves segmentation [7], [8], "
+        "typically by concatenating modalities [9]-[11] as input channels."
+    )
+    quote = (
+        "Joint learning from multimodal data improves segmentation, typically by "
+        "concatenating modalities as input channels."
+    )
+    assert check_claim(Claim(claim="c", quote=quote, page=1), source).found
+
+
+def test_dropping_citation_marks_does_not_forgive_a_changed_number() -> None:
+    """The marks go; a figure in the sentence stays, and a wrong one still fails."""
+    source = _PAGE_ONE + "The Dice coefficient reached 0.846 in the prostate [26]."
+    wrong = Claim(claim="c", quote="The Dice coefficient reached 0.864 in the prostate", page=1)
+    assert not check_claim(wrong, source).found
+    marked_wrong = Claim(claim="c", quote="reached 0.846 in the prostate [27]", page=1)
+    assert check_claim(marked_wrong, source).found, "a citation number is not the content"
+
+
+def test_a_number_in_parentheses_is_kept() -> None:
+    """`(3)` can be content, so only bracketed marks are dropped."""
+    source = _PAGE_ONE + "Three groups (3) were compared over twelve months."
+    claim = Claim(claim="c", quote="Three groups were compared over twelve months", page=1)
+    assert not check_claim(claim, source).found
+
+
 def test_a_well_formed_block_parses() -> None:
     """The format a small model is asked for is read back as a claim."""
     claims = parse_claims(_answer("Three hospitals took part.", "across three hospitals", "1"))

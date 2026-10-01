@@ -749,6 +749,27 @@ def test_collect_previews_every_document_and_the_destination(tmp_path: Path) -> 
     assert "Read 2 documents and write out.md?" in result.stdout
 
 
+def test_collect_asks_about_one_document_in_the_singular(tmp_path: Path) -> None:
+    """`Read 1 documents and write corpus-lckd.md?` - asked for the 65th reference (ADR-123)."""
+    config = _library(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "collect",
+            "extract_claims",
+            "paper0.md",
+            "--into",
+            "out.md",
+            "-c",
+            str(config),
+            "--provider",
+            "mock",
+        ],
+        input="\n",
+    )
+    assert "Read 1 document and write out.md?" in result.stdout
+
+
 def test_collect_runs_once_per_document(tmp_path: Path) -> None:
     """A document each, so a quotation's source is a fact rather than a model's answer.
 

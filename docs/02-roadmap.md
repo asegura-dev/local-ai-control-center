@@ -10,9 +10,12 @@ actually arrived. **Where LACC is now, and what comes next, is the first section
 
 ## Where it stands - 1 October
 
-**v3.0.0**, released on 30 September. Since then, under *Unreleased* in the changelog:
-ADR-122, a document that cannot be written costs that document - found the next day, when the
-thesis's 65 references were converted and one of them stopped the batch.
+**v3.0.0**, released on 30 September. Since then, under *Unreleased* in the changelog, two
+records found the next day by putting the thesis's 65 references through it:
+- ADR-122, a document that cannot be written costs that document: one of them had stopped the
+  batch;
+- ADR-123, what the thesis's corpus showed the checker: faithful quotations refused for their
+  citation marks, and two papers filed as topics lists.
 
 What v3.0.0 brought since v2.10.0:
 - the window scrolls, opens where it can be seen, and keeps an answer that arrives while you

@@ -54,7 +54,7 @@ one of them. The first reading of this counted six documents "with no quotation"
 three were extracted sections and one was a page of the user's own notes (ADR-080).
 """
 
-_A_CONTROL_TOPIC = re.compile(r"(?m)^!\s*\S")
+_A_CONTROL_TOPIC = re.compile(r"(?m)^![ \t]*\S")
 """How a topics file is recognised: a line marked as the control.
 
 Not a heading, because a topics list has none worth requiring. The control marker is the one
@@ -63,6 +63,18 @@ one, and a line opening with `!` is not markdown for anything else.
 
 Looked for anywhere in the opening rather than on the first line, because a person writes the
 control **last** - it is the odd one out, and that is where an odd one out goes.
+
+Spaces and tabs only after the mark. `\\s` crosses a line break, so a `!` alone on its line
+counted as a control whenever any line followed it - which is how `liu19.md`, a paper, was
+filed as a topics list (ADR-123).
+"""
+
+_CONVERTED_OPENING = re.compile(r"\s*<!--\s*page\s+\d+\s*-->", re.IGNORECASE)
+"""How a document `ingest` converted opens: with its first page marker.
+
+A topics file is written by a person and never opens this way. A formula the extraction
+garbled can start a line with `!` - `dkd.md` has `!"#$$%&#"'(=*!'(+,−./` - and two of the
+thesis's papers were counted as topics lists until this was asked first (ADR-123).
 """
 
 
@@ -92,6 +104,8 @@ def kind_of(path: Path) -> str:
     first = opening.splitlines()[0] if opening.splitlines() else ""
     if _SECTION_OPENING.match(first):
         return "extract"
+    if _CONVERTED_OPENING.match(first):
+        return "document"
     if _A_CONTROL_TOPIC.search(more):
         return "topics"
     return "document"

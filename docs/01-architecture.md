@@ -517,6 +517,15 @@ discipline when a check rejects something is to look at what it rejected rather 
 record the rate - the rate said forty-three per cent fabrication for three releases, and the
 first look at an actual rejected quotation said otherwise.
 
+**The thesis's 65 papers showed one more, on 1 October.** Two of them had a third and a half of
+their quotations refused. Compared with the nearest sentence of their documents, most of
+those were copies the check did not recognise rather than inventions, and the largest single
+kind was the numbered citation marks a model leaves out when it quotes, as a reader does:
+`[7], [8]`. The check now drops bracketed marks on both sides. Measured before the change, that
+verifies 52 of the corpus's 449 refusals and unverifies none of its 4,395 (ADR-123). The other
+near-copies - a quotation cut with `...`, a caption that falls mid-sentence, `±` extracted as
+`6` - stay refused until each has its own measurement.
+
 ## Future direction
 
 The subpackage split this section used to anticipate has happened: `core/`, `ports/`,
