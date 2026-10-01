@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-09-30
+
+**What using it found, closed, and why the number is major.** A test on 25 September, a
+reading of the assurance chapter against the code on 27 September, and a tester on 29
+September found the program saying things that were not so, reaching the engine and the
+registry without a record, and reading a file other than the one named. This version closes
+what they found, one record per cause. A regression test on 30 September over the last nine
+records found nothing that blocks it; what it did find is ADR-121.
+
+Four of the changes alter what a script or a habit could rely on, which is what the major
+number says:
+
+- **Arguments reach LACC as typed** (ADR-112). On Windows, `~`, `%VARIABLES%`, `*`, `?` and
+  brackets were expanded before LACC saw them. Now `*` and `?` are matched inside the
+  workspace, and brackets never.
+- **Ranking by meaning asks first** (ADR-106). With `embedding_model` set, `ask`, `measure`
+  and `sections --about` ask `Rank by meaning? [y/N]` before anything is sent.
+- **Some exit codes changed.** A command that only reads ends with 1 for a workspace that does
+  not exist, and creates nothing (ADR-114). `review` ends with 1 when nothing was judged, and
+  with 0 when declined (ADR-115).
+- **A configuration the window writes says `network_access: false`** (ADR-119).
+
 ### Measured
 - **Three models on the same seventeen documents** (28-sep): `extract_claims` at 32k,
   temperature zero, `thinking: false`, each model entirely on the card, every quotation

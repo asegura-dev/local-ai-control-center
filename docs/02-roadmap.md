@@ -8,14 +8,23 @@ carries no dates.
 Most of it is history, kept on purpose: the plans that were overtaken stay beside what
 actually arrived. **Where LACC is now, and what comes next, is the first section.**
 
-## Where it stands - 27 September
+## Where it stands - 30 September
 
-**v2.10.0**, released on 23 September. Since then, in the changelog under *Unreleased*: the
-window scrolls, opens where it can be seen, and keeps an answer that arrives while you are
-elsewhere (ADR-095, ADR-096, ADR-099, ADR-100); a model that reasons is told whether to
-(ADR-098); a converted file says what its PDF says (ADR-101); `lacc bib` (ADR-102); six
-sentences the program said that were not so (ADR-103); the Audit section (ADR-104); and three
-promises the code had stopped keeping (ADR-105).
+**v3.0.0**, released on 30 September. Since v2.10.0:
+- the window scrolls, opens where it can be seen, and keeps an answer that arrives while you
+  are elsewhere (ADR-095, ADR-096, ADR-099, ADR-100);
+- a model that reasons is told whether to (ADR-098);
+- a converted file says what its PDF says (ADR-101);
+- `lacc bib` (ADR-102);
+- six sentences the program said that were not so (ADR-103);
+- the Audit section (ADR-104);
+- three promises the code had stopped keeping (ADR-105), kept again (ADR-106 to ADR-110);
+- `lacc bring`, a draft of yours copied in by name (ADR-111);
+- and what two testers found, closed (ADR-112 to ADR-121).
+
+**The number is major because some of it changes what a script or a habit relied on.**
+Arguments reach LACC as typed, ranking by meaning asks first, some exit codes changed, and a
+command that only reads no longer creates a workspace. The changelog names each.
 
 What exists, by what it is for:
 
@@ -63,8 +72,9 @@ What exists, by what it is for:
    guardrails come from the blind rating of what the models changed in real paragraphs.
 5. **What fits the machine**: the models a pair of cards can hold, pulled from the window,
    against a list the person keeps.
-6. **v3.0.0**, as written at the end of this chapter: discovery with a whitelist, and running
-   a skill that writes, from the window.
+6. **Discovery with a whitelist, and running a skill that writes, from the window.** This
+   chapter called these v3.0.0 until the number went to the release above; the section at
+   the end says so.
 
 ## Done, through v0.30.0
 
@@ -610,6 +620,9 @@ out of it (ADR-082).
 
 v3.0.0 keeps its meaning: what can happen without you typing.
 
+**It kept it until 30 September.** That day the number went to a release that changes what
+scripts relied on, and the section below says so rather than being edited to fit.
+
 ### v1.9.0 - the material becomes complete, and citable
 
 Two things, and neither is design work. **Reference metadata comes from an authority instead
@@ -755,7 +768,14 @@ The ordering argument is simple: **the coverage map is the first thing this proj
 that a terminal cannot show.** A gap is a shape. Before it exists, an interface would be a form
 that types commands for someone who already knows how to type them.
 
-### v3.0.0 - what can happen without you typing
+### What was to be v3.0.0 - what can happen without you typing
+
+**The number went elsewhere on 30 September.** v3.0.0 is the release that closed what testing
+the program, and reading it against its own record, found (ADR-105 to ADR-121). It is major because several of those changes alter what a
+script or a habit relied on: arguments reach LACC as typed, ranking by meaning asks first,
+some exit codes changed, and a command that only reads creates no workspace. The two
+directions below keep their meaning and lose their number. They wait for the version that
+brings them.
 
 The two remaining directions both change what is possible without a keystroke, which is why
 they share a major version and why that version is about one principle rather than two

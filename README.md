@@ -111,9 +111,9 @@ in [`docs/adr/`](docs/adr/) with its context, its trade-off and the alternative 
 
 ## Status
 
-v2.10.0, working end to end against a real local model and measured against a real
-bibliography rather than against documents written for the test. What has landed since
-is under *Unreleased* in the [changelog](CHANGELOG.md), and marked *(unreleased)* below.
+v3.0.0, working end to end against a real local model and measured against a real
+bibliography rather than against documents written for the test. What each version
+changed is in the [changelog](CHANGELOG.md).
 
 Every run takes the same shape: LACC plans the action, shows a preview, asks for
 confirmation defaulting to no, reads what it was pointed at inside the workspace
@@ -158,7 +158,7 @@ append-only, hash-chained audit log.
   actually is, instead of asking a model. It is the first destination in this program that
   is not your own machine, and it needs both `network_access` and a `registry_url` written
   in your configuration.
-- `lacc bib <answers> --into refs.bib` *(unreleased)* writes what the registry answered as
+- `lacc bib <answers> --into refs.bib` writes what the registry answered as
   BibTeX, for biber and pandoc, with no network. `--adding-to` names the `.bib` you already
   cite from: what it holds is left out and none of its keys is handed out again.
 - `lacc references <documents>` reports what more than one of your papers cites, and
@@ -184,14 +184,14 @@ append-only, hash-chained audit log.
   before the button that sends it exists, on a worker thread so the window never stops
   repainting, and asking again carries **the passages whose quotations were found** - never
   what the model said, because a conversation is how an invented quotation comes to verify
-  one turn later. **Audit** *(unreleased)* lists every run your workspace's trail holds,
+  one turn later. **Audit** lists every run your workspace's trail holds,
   checks the chain as it reads, and can change nothing.
 - `lacc preview` shows what would happen without doing it, `lacc profile` reports what
   the machine offers, `lacc verify` walks the audit chain, `lacc engine test` checks that
   the configured engine answers, and `lacc notify test` checks notification settings before
   you rely on them. `lacc outline` lists a document's sections with their pages, and
   `lacc measure` runs a skill several times and reports the spread rather than one number.
-- `thinking: false` in the configuration *(unreleased)* asks a model that reasons before
+- `thinking: false` in the configuration asks a model that reasons before
   answering not to: one sentence took 40 seconds on qwen3.5:9b with its reasoning, and half
   a second without.
 
