@@ -41,6 +41,7 @@ from local_ai_control_center.core.permissions import Capability, PermissionDenie
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
 from local_ai_control_center.core.run import Progress, ProgressFn
 from local_ai_control_center.core.skill import Skill, SkillPlan, grant_for
+from local_ai_control_center.core.surrogates import whole_characters
 from local_ai_control_center.core.workspace import Workspace
 from local_ai_control_center.features.ask import Asked, Prepared, readings_from
 from local_ai_control_center.ports.converter import ConversionError, Converter
@@ -172,6 +173,13 @@ class RunResult(BaseModel):
     Carried out to the caller so it can be shown beside the answer, which is when a person
     is deciding whether to trust it. Detection only: a model can obey something no pattern
     catches (ADR-038).
+    """
+
+    halves_replaced: int = 0
+    """Characters a conversion received in halves and wrote as U+FFFD (ADR-122).
+
+    Carried out so it is said where it happened. The converted text is what quotations are
+    checked against, and a change to it nobody was told about would be a silent edit.
     """
 
     @property
@@ -335,7 +343,19 @@ def write_new_file(path: Path, text: str) -> None:
     and translate the failure at a volatile boundary rather than pre-check a state that
     can change, and exclusive creation is also free of the race a check-then-write would
     leave open between them.
+
+    **Encoded before the file is created.** Text that cannot be written as UTF-8 used to be
+    found out after the creation, which left an empty file behind: `lckd.md`, 0 bytes, and a
+    retry refused because it existed (ADR-122). Encodability is not a volatile state, so
+    checking it first is not the race the paragraph above avoids.
     """
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise ConversionError(
+            f"Cannot write {path.name}: character {error.start:,} of its text cannot be written "
+            "as UTF-8. Nothing was written."
+        ) from error
     try:
         with path.open("x", encoding="utf-8") as handle:
             handle.write(text)
@@ -766,6 +786,9 @@ def run_conversion(
             # because a Word document has none, and the markers carry the document's own
             # numbering so a chapter taken from page 40 still cites as page 40 (ADR-046).
             text = only_pages(text, *pages)
+        # A character handed over in halves cannot be written as UTF-8. Made whole where it
+        # can be, replaced where it cannot, and counted either way (ADR-122).
+        text, halves = whole_characters(text)
         write_new_file(resolved_destination, text)
     except (ConversionError, PageRangeError) as error:
         audit.record(
@@ -775,6 +798,22 @@ def run_conversion(
             {"action": action.name, "source": str(resolved_source), "error": str(error)},
         )
         raise
+    except Exception as error:  # noqa: BLE001 - one document's surprise is its own failure
+        # Not a decision this code made, and still the end of this run: unrecorded, it left
+        # the run without an end and the batch without its other 25 documents (ADR-122).
+        problem = f"{type(error).__name__}: {error}"
+        audit.record(
+            run_id,
+            "ingestion_failed",
+            f"Could not ingest {resolved_source.name}",
+            {
+                "action": action.name,
+                "source": str(resolved_source),
+                "error": problem,
+                "unexpected": True,
+            },
+        )
+        raise ConversionError(f"Could not convert {resolved_source.name}: {problem}") from error
 
     audit.record(
         run_id,
@@ -795,11 +834,12 @@ def run_conversion(
             "furniture_dropped": getattr(converter, "furniture_dropped", 0),
             # Kept off the screen and counted instead; the record keeps the count (ADR-103).
             "fonts_read_in_part": getattr(converter, "fonts_read_in_part", 0),
+            "halves_replaced": halves,
         },
     )
     audit.record(run_id, "run_finished", f"Finished {action.name}", {"action": action.name})
 
-    return RunResult(preview=preview, outcome="completed")
+    return RunResult(preview=preview, outcome="completed", halves_replaced=halves)
 
 
 def _tell(progress: ProgressFn | None, where: Progress) -> None:

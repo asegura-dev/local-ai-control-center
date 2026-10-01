@@ -57,6 +57,7 @@ behaviour test caught were caught - or would have been - by one of these.
 | File | What it is |
 |---|---|
 | `test_cycle.py` | The execution cycle, end to end against a mock provider. |
+| `test_surrogates.py` | A document that cannot be written costs that document: characters delivered in halves joined or replaced and counted, no empty file left, the run ended, the batch going on (ADR-122). |
 | `test_running_in_passes.py` | Reading one document in several passes (ADR-045). |
 | `test_audit.py` | The audit log: record format, privacy levels, failure policy, and the chain. |
 | `test_anchor.py` | The sidecar that remembers how long a trail was (ADR-049). |

@@ -8,9 +8,13 @@ carries no dates.
 Most of it is history, kept on purpose: the plans that were overtaken stay beside what
 actually arrived. **Where LACC is now, and what comes next, is the first section.**
 
-## Where it stands - 30 September
+## Where it stands - 1 October
 
-**v3.0.0**, released on 30 September. Since v2.10.0:
+**v3.0.0**, released on 30 September. Since then, under *Unreleased* in the changelog:
+ADR-122, a document that cannot be written costs that document - found the next day, when the
+thesis's 65 references were converted and one of them stopped the batch.
+
+What v3.0.0 brought since v2.10.0:
 - the window scrolls, opens where it can be seen, and keeps an answer that arrives while you
   are elsewhere (ADR-095, ADR-096, ADR-099, ADR-100);
 - a model that reasons is told whether to (ADR-098);
@@ -63,16 +67,25 @@ What exists, by what it is for:
    - the corpus: reference titles kept as quotations, and a verifier that misses equations,
      which want measuring first;
    - a writer that waits out its turn under load.
-3. **Measure the newer models on the old question - begun.** On 28 September extraction was
+3. **The thesis's references, read for the thesis - begun on 1 October.**
+   - The 65 references of the protocol's second version have a workspace of their own. They
+     are converted, and 4,345 of the 4,792 quotations extracted from them were found in their
+     documents.
+   - Next, a note per reference built on those verified quotations, saying what each gives to
+     each part of the thesis (ADR-123, to write).
+   - Then the notes joined by chapter and hypothesis. A first trial with `assess_source`
+     showed why it needs its own skill: it asks whether a source is new, and the thesis's
+     context already summarises these.
+4. **Measure the newer models on the old question - begun.** On 28 September extraction was
    re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations
    are not in their document, against 38 of the 14B's 216, and the figure this project is
    cited by is 42 of 237 today, not 48 (chapter 04). Still to do: a second run of each, and the
    27B and a 32B at a full window once the second card is in.
-4. **Projects over one library**, one per paper, and a window section for writing, whose
+5. **Projects over one library**, one per paper, and a window section for writing, whose
    guardrails come from the blind rating of what the models changed in real paragraphs.
-5. **What fits the machine**: the models a pair of cards can hold, pulled from the window,
+6. **What fits the machine**: the models a pair of cards can hold, pulled from the window,
    against a list the person keeps.
-6. **Discovery with a whitelist, and running a skill that writes, from the window.** This
+7. **Discovery with a whitelist, and running a skill that writes, from the window.** This
    chapter called these v3.0.0 until the number went to the release above; the section at
    the end says so.
 

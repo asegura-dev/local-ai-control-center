@@ -1772,6 +1772,13 @@ def _report_ingestion(
                 f"[dim]pypdf read a font's encoding only in part {_plain(fonts_in_part)} times. "
                 "Measured, that changes spacing and not words (ADR-103).[/dim]"
             )
+        if result.halves_replaced:
+            # The text quotations are checked against changed, so it is said (ADR-122).
+            console.print(
+                f"[yellow]{counted(result.halves_replaced, 'character')} arrived in halves and "
+                f"{agreeing(result.halves_replaced, 'was', 'were')} written as �.[/yellow] "
+                "A quotation across one will not verify; search the text for � to find them."
+            )
         _report_hidden_text(hidden, fragments)
     elif result.outcome == "refused":
         _exit_refused()

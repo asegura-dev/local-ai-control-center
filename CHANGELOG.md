@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **One document cost the batch** (ADR-122). `ingest` over the 65 references of the thesis
+  stopped at the 40th, `lckd.pdf`, in a traceback. Its extracted text carried ten halves of
+  mathematical letters that UTF-8 cannot write.
+  - The 25 documents after it were never converted.
+  - The run was left without an end.
+  - An empty `lckd.md` was left behind, and it blocked the retry.
+
+  Now a character delivered in halves is joined when its pair is there, and written as `�`
+  when it is not; `ingest` says how many, and the run records it. A file is created only
+  once its text can be written. A conversion that fails in a way nobody wrote a sentence for
+  ends its run with `ingestion_failed` and costs that document alone. Converted again,
+  `lckd.pdf` took 4 seconds, with its 10 halves written as `�`.
+
 ## [3.0.0] - 2026-09-30
 
 **What using it found, closed, and why the number is major.** A test on 25 September, a
