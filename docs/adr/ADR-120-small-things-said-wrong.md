@@ -67,3 +67,9 @@ reads as a title keeps a line of prose from being taken in.
 
 **Only the counts named here were changed.** Others in the program will say *1 things* until
 somebody reads them there.
+
+**Amended by ADR-121 (30-sep-2026).** The trade-off above had already happened. Five headings
+were joined without their space (*Summaryof evidence*, *Repeatbiopsy*), and the limit kept
+seven cut. The space is now the PDF's, a single letter counts as broken, and the limit counts
+only what is printed with the number. Some sentences written here said *1 were*; the words
+after a count now agree with it too.

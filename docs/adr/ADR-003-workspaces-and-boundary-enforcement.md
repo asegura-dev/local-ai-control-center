@@ -74,5 +74,5 @@ and hiding a side effect behind a constructor.
 
 **Amended by ADR-114 (30-sep-2026).** The creation stays deliberate and is now also said: a
 command that writes prints that it created the workspace. A command that only reads -
-`status`, `verify`, `preview`, `references`, `metadata`, `outline`, `engine test` -
-refuses a workspace that does not exist and creates nothing.
+`status`, `verify`, `preview`, `references`, `metadata`, `outline`, `engine test`, and
+`sections` since ADR-121 - refuses a workspace that does not exist and creates nothing.

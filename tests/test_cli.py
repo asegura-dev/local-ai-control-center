@@ -469,6 +469,26 @@ def test_a_token_never_reaches_the_terminal(
     assert "NTFY_TOKEN" in result.stdout
 
 
+def test_notify_test_does_not_announce_a_sending_it_will_not_do(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With ntfy off it said `Sending to …`, then `No notifier configured` (ADR-121)."""
+    for name in ("NTFY_SERVER", "NTFY_TOPIC", "NTFY_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        f"workspace_root: {workspace}\nnotifier:\n  ntfy:\n    server_url: http://desk:8080\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["notify", "test", "-c", str(config)])
+    said = " ".join(result.stdout.split())
+    assert result.exit_code == 1
+    assert "No notifier configured" in said and "Sending to" not in said
+    assert "The configuration names http://desk:8080 as where notifications go" in said
+
+
 def test_missing_settings_say_which_ones_and_where_to_put_them(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1831,6 +1851,24 @@ def test_a_contact_address_goes_to_the_registry_and_never_into_the_trail(
     assert _detail(_run_of(tmp_path, "resolve"), "registry_asked")["identified"] is True
     trail = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8")
     assert "someone@example.org" not in trail
+
+
+def test_resolve_says_which_markdown_had_a_pdf_to_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_pdf: Callable[..., Path]
+) -> None:
+    """It said the PDF beside each was read, for a file with no PDF beside it (ADR-121)."""
+    config = _with_a_registry(tmp_path, monkeypatch)
+    (tmp_path / "ws" / "sheet.md").write_text("A statistics sheet." + chr(10), encoding="utf-8")
+    arguments = ["resolve", "sheet.md", "--into", "refs.md", "-c", str(config)]
+
+    alone = " ".join(runner.invoke(app, arguments, input="y\n").stdout.split())
+    assert "1 Markdown file, with no PDF of the same name beside it" in alone
+    assert "was read for a DOI" not in alone
+    assert "Name it with lacc identify" in alone and "what it cites instead" in alone
+
+    make_pdf("A statistics sheet.", name="ws/sheet.pdf")
+    beside = " ".join(runner.invoke(app, arguments, input="y\n").stdout.split())
+    assert "1 Markdown file: the PDF beside it was read for a DOI (ADR-101)" in beside
 
 
 def test_a_declined_resolve_is_recorded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

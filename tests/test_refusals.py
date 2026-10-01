@@ -123,7 +123,8 @@ def test_a_destination_outside_is_refused_before_any_work(tmp_path: Path) -> Non
         result = runner.invoke(app, [*arguments, "-c", str(config)], input="y\n")
         _refused(result)
         said = _said(result)
-        assert "escapes workspace boundary" in said and "Nothing was done" in said
+        # The path and the sentence after it were run together without a stop (ADR-121).
+        assert "escapes workspace boundary" in said and ". Nothing was done." in said
     assert not (tmp_path / "fuera.md").exists()
     assert not (workspace / "audit.jsonl").exists()
 
@@ -195,8 +196,9 @@ def test_bring_refuses_a_drafts_that_leads_outside_before_asking(tmp_path: Path)
 
 
 def test_a_command_that_only_reads_does_not_create_the_workspace(tmp_path: Path) -> None:
+    """`sections` lists, and created the workspace to list nothing in it (ADR-121)."""
     config = _config(tmp_path, workspace="no-existe/a/b")
-    for arguments in (["status"], ["verify"]):
+    for arguments in (["status"], ["verify"], ["sections", "guia.md"]):
         result = runner.invoke(app, [*arguments, "-c", str(config)])
         _refused(result)
         assert "does not exist" in _said(result)

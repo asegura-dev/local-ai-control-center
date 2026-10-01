@@ -32,6 +32,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   workspace.
 
 ### Fixed
+- **What the day's fixes said wrong** (ADR-121). Found by a regression test over ADR-112 to
+  ADR-120.
+  - `resolve` no longer says a PDF was read beside a Markdown file that has none.
+  - The words after a count agree with it: *1 was not judged*, *1 from 1 document*, *1
+    section taken out of it*.
+  - A refused path ends in a stop before *Nothing was done*.
+  - A share that leads back to this machine is refused as a network path, not as another
+    machine.
+  - A declined `review` says nothing was sent to the engine, not that nothing was read.
+  - A host off this machine is written in a comment whatever the source's switch said.
+  - `sections` no longer creates a workspace that does not exist.
+  - A silent engine on this machine is no longer told to listen on 0.0.0.0.
+  - `notify test` no longer announces a sending it does not do.
+  - `sections` reads whole the headings the PDF broke after one letter or past nine words.
+    It keeps the space of a heading broken between words: ADR-120's join wrote *Summaryof
+    evidence*. In the EAU guideline 21 titles change, and no section is gained or lost.
+  - `tools/measure.py` no longer reports the callback behind `--version` as logic the rule
+    does not excuse.
 - **Small things the terminal said wrong** (ADR-120).
   - Counts agree with their word, and verbs with their count: *1 section*, *1 of 6
     stages has*.

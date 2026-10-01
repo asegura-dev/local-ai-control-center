@@ -58,7 +58,7 @@ def test_a_section_taken_out_of_a_document_is_not_a_document(tmp_path: Path) -> 
     (tmp_path / "part.md").write_text("5.2.4\n Imag\ning\nThe body of it.\n", encoding="utf-8")
     by_name = {stage.name: stage for stage in stages_in(tmp_path).stages}
     assert "1 brought in" in by_name["Documents"].done
-    assert "sections taken out" in by_name["Documents"].done
+    assert "1 section taken out of it" in by_name["Documents"].done
 
 
 def test_a_document_with_no_quotation_is_named(tmp_path: Path) -> None:
@@ -113,7 +113,7 @@ def test_a_document_covered_through_its_extracts_is_covered(tmp_path: Path) -> N
     assert not by_name["Quotations"].missing, "the guideline is covered through its extract"
     # Covered through it, but not a file the quotation came from: "from 2 documents" of one
     # file was the 39 against the window's 38 (ADR-117).
-    assert by_name["Quotations"].done == "1 from 1 documents"
+    assert by_name["Quotations"].done == "1 from 1 document"
 
 
 def test_quotations_not_found_are_not_said_to_have_been_lost(tmp_path: Path) -> None:
@@ -122,7 +122,21 @@ def test_quotations_not_found_are_not_said_to_have_been_lost(tmp_path: Path) -> 
     corpus = _corpus("a.md").replace("p. 1 - verified", "page unknown - **NOT IN THE DOCUMENT**")
     (tmp_path / "corpus.md").write_text(corpus, encoding="utf-8")
     corpus_stage = {s.name: s for s in stages_in(tmp_path).stages}["Corpus"]
-    assert corpus_stage.missing == "1 were not found in their document"
+    assert corpus_stage.missing == "1 was not found in its document"
+
+
+def test_one_of_each_is_said_in_the_singular(tmp_path: Path) -> None:
+    """`1 sections taken out of them`, `1 number their references` (ADR-121)."""
+    import json
+
+    (tmp_path / "guideline.md").write_text("A guideline with no reference list.", encoding="utf-8")
+    (tmp_path / "part.md").write_text("5.8\n Staging\nThe body of it.\n", encoding="utf-8")
+    (tmp_path / "part.md.from.json").write_text(
+        json.dumps({"document": "guideline.md", "section": "5.8"}), encoding="utf-8"
+    )
+    by_name = {s.name: s for s in stages_in(tmp_path).stages}
+    assert by_name["Documents"].done == "1 brought in, 1 section taken out of it"
+    assert by_name["References"].missing == "1 numbers its references in a way this cannot read"
 
 
 # --- what `coverage` brought into the workspace, and what it reads (ADR-088) ---------------

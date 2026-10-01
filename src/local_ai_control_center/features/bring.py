@@ -55,12 +55,17 @@ def on_the_network(path: str) -> bool:
     return text.startswith("\\\\")
 
 
-def not_on_this_machine(path: str) -> str:
-    """The refusal for a file on another machine, however that was found out."""
+def through_a_share(path: str) -> str:
+    """The refusal for a path that goes through a network share, wherever it leads.
+
+    Not "on another machine": `//127.0.0.1/C$/...` leads back to this one, through the
+    network, and was told it was elsewhere (ADR-121). The refusal is the same either way.
+    """
     return (
-        f"{path} is on another machine. bring reads files on this one: a configuration names "
-        "an engine and a registry, never a file share. Copy it to this machine first, and "
-        "bring the copy."
+        f"{path} is a network path. bring reads a file by its own path on this machine, never "
+        "through a share: a configuration names an engine and a registry, not a file share. "
+        "If the file is on this machine, name it by its local path; if not, copy it here "
+        "first and bring the copy."
     )
 
 

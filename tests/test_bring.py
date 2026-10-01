@@ -24,10 +24,10 @@ from local_ai_control_center.core.drafts import BROUGHT, DRAFTS, drafts_in
 from local_ai_control_center.features.bring import (
     MOST_BYTES,
     copy_name,
-    not_on_this_machine,
     noted,
     on_the_network,
     refusal,
+    through_a_share,
 )
 from local_ai_control_center.features.stages import stages_in
 from local_ai_control_center.system.profiler import drive_is_remote
@@ -265,12 +265,19 @@ def test_a_share_is_refused_before_anything_asks_about_it(
         return resolve(self, strict)
 
     monkeypatch.setattr(Path, "resolve", watched)
-    for shared in (chr(92) * 2 + r"archivos.invalid\tesis\03.md", "//archivos.invalid/tesis/03.md"):
+    for shared in (
+        chr(92) * 2 + r"archivos.invalid\tesis\03.md",
+        "//archivos.invalid/tesis/03.md",
+        "//127.0.0.1/C$/tesis/03.md",
+    ):
         result = runner.invoke(app, ["bring", shared, "-c", str(config)], input="y\n")
         assert result.exit_code == 1
-        assert "is on another machine" in " ".join(result.stdout.split())
+        said = " ".join(result.stdout.split())
+        # A share that leads back to this machine is still a share, and was told it was on
+        # another one (ADR-121).
+        assert "is a network path" in said and "another machine" not in said
         assert "Bring it?" not in result.stdout
-    assert [path for path in asked if "archivos.invalid" in path] == []
+    assert [path for path in asked if "archivos.invalid" in path or "127.0.0.1" in path] == []
     assert _trail(workspace) == []
 
 
@@ -282,9 +289,9 @@ def test_a_drive_windows_calls_remote_is_refused(
     source = outside / "03 Metodología.md"
     result = runner.invoke(app, ["bring", str(source), "-c", str(config)], input="y\n")
     assert result.exit_code == 1
-    assert "is on another machine" in " ".join(result.stdout.split())
+    assert "is a network path" in " ".join(result.stdout.split())
     assert drafts_in(workspace) == ()
-    assert "never a file share" in not_on_this_machine("Z:/03.md")
+    assert "never through a share" in through_a_share("Z:/03.md")
 
 
 def test_a_missing_file_is_called_missing_and_a_folder_a_folder(tmp_path: Path) -> None:

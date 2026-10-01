@@ -12,10 +12,11 @@ separable and the preview can be shown before anything happens.
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict
 
-from local_ai_control_center.core.config import Config, load_config
+from local_ai_control_center.core.config import Config, is_loopback, load_config, normalized_host
 from local_ai_control_center.core.workspace import repository_above, sync_folder_suspicion
 
 CONFIGURATION_SUFFIX = ".yaml"
@@ -164,16 +165,21 @@ def as_yaml(root: Path, like: Config) -> str:
     if like.embedding_model:
         lines.append(f"embedding_model: {like.embedding_model}")
     lines += ["", "network_access: false"]
-    if like.engine_host and like.network_access:
+    host = like.engine_host or ""
+    local = bool(host) and is_loopback(urlparse(normalized_host(host)).hostname or "")
+    if host and not local:
+        # Named, never granted - whatever the source's own switch said. A remote host was
+        # written plainly from a source with the network off, against what this promised
+        # (ADR-121).
         lines += [
-            f"# The configuration this was made from reaches an engine at {like.engine_host}.",
-            "# To reach it from this workspace too, change the line above to true and remove",
-            "# the # below. The window does not grant it.",
-            f"# engine_host: {like.engine_host}",
+            f"# The configuration this was made from names an engine at {host}, on another",
+            "# machine. To reach it from this workspace, change the line above to true and",
+            "# remove the # below. The window does not grant it.",
+            f"# engine_host: {host}",
         ]
-    elif like.engine_host:
-        # Without the network, a host that works is one on this machine: carried as it is.
-        lines.append(f"engine_host: {like.engine_host}")
+    elif host:
+        # A host on this machine needs nothing granted: carried as it is.
+        lines.append(f"engine_host: {host}")
     if like.registry_url:
         lines.append(f"registry_url: {like.registry_url}")
     if like.audit_level == "full":

@@ -36,6 +36,16 @@ def test_a_timeout_is_not_told_to_start_the_engine() -> None:
     assert "ollama serve" not in message
 
 
+def test_a_silent_engine_on_this_machine_is_not_told_to_listen_on_the_network() -> None:
+    """Something on loopback took the connection and said nothing. The advice was to bind
+    the engine to 0.0.0.0, for a network there is none of (ADR-121)."""
+    for host in ("http://127.0.0.1:18081", "http://localhost:11434"):
+        message = unreachable_message(host, TimeoutError("slow"))
+        assert "timed out" in message
+        assert "Something on this machine accepted the connection" in message
+        assert "0.0.0.0" not in message
+
+
 def test_a_refusal_is_told_to_start_the_engine() -> None:
     message = unreachable_message(
         "http://127.0.0.1:11434", urllib.error.URLError(ConnectionRefusedError(61, "no"))

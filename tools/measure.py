@@ -130,7 +130,10 @@ def _view_logic() -> None:
             for k in functions:
                 if not reaches[k] and any(reaches[c] for c in calls[k]):
                     reaches[k] = changed = True
-        astray = sorted(k for k, v in reaches.items() if not v)
+        # A decorated function is a command, a callback or a property, and the rule asks only
+        # about plain ones. Without this, `_options` - the callback behind `--version` - was
+        # reported as not excused by a rule that excuses it (ADR-121).
+        astray = sorted(k for k, v in reaches.items() if not v and not functions[k].decorator_list)
         print(f"  {name:12} {len(functions):3} functions, {len(astray):2} never touch presentation")
         for found in astray:
             mark = "" if found in excused else "   <- not excused by the rule"

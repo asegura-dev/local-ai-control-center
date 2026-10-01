@@ -15,3 +15,11 @@ def counted(number: int, one: str, many: str = "") -> str:
     """
     word = one if number == 1 else (many or f"{one}s")
     return f"{number:,} {word}"
+
+
+def agreeing(number: int, one: str, many: str) -> str:
+    """The word that agrees with a count, on its own: `is` or `are`, `its` or `their` (ADR-121).
+
+    For the words that follow a number rather than sit beside it - *1 was not judged*, *3 were*.
+    """
+    return one if number == 1 else many

@@ -26,7 +26,7 @@ from local_ai_control_center.core.corpus import parse_corpus
 from local_ai_control_center.core.drafts import drafts_in
 from local_ai_control_center.core.kinds import kind_of
 from local_ai_control_center.core.references import references_in, without_truncations
-from local_ai_control_center.core.wording import counted
+from local_ai_control_center.core.wording import agreeing, counted
 
 RESOLVED_MARK = "## Resolved"
 """The heading a bibliography puts its resolved works under.
@@ -193,7 +193,8 @@ def stages_in(workspace: Path, context_file: str = "") -> Work:
                 done=(
                     f"{len(documents)} brought in"
                     + (
-                        f", {len(by_kind['extract'])} sections taken out of them"
+                        f", {counted(len(by_kind['extract']), 'section')} taken out of "
+                        f"{agreeing(len(documents), 'it', 'them')}"
                         if by_kind["extract"]
                         else ""
                     )
@@ -203,7 +204,9 @@ def stages_in(workspace: Path, context_file: str = "") -> Work:
             Stage(
                 name="Quotations",
                 command="lacc collect extract_claims <docs> --into corpus.md",
-                done=f"{len(claims):,} from {len(sources)} documents" if claims else "",
+                done=(
+                    f"{len(claims):,} from {counted(len(sources), 'document')}" if claims else ""
+                ),
                 missing=(
                     f"{len(uncovered)} with none: {', '.join(name[:34] for name in uncovered[:3])}"
                     if uncovered
@@ -220,7 +223,12 @@ def stages_in(workspace: Path, context_file: str = "") -> Work:
                 ),
                 # Found missing when collected or assembled: nothing says they were ever there.
                 # "No longer in their document" read as quotations lost since (ADR-117).
-                missing=(f"{refused:,} were not found in their document" if refused else ""),
+                missing=(
+                    f"{refused:,} {agreeing(refused, 'was', 'were')} not found in "
+                    f"{agreeing(refused, 'its', 'their')} document"
+                    if refused
+                    else ""
+                ),
             ),
             Stage(
                 name="References",
@@ -234,7 +242,9 @@ def stages_in(workspace: Path, context_file: str = "") -> Work:
                     else ""
                 ),
                 missing=(
-                    f"{len(documents) - parsed} number their references in a way this cannot read"
+                    f"{len(documents) - parsed} "
+                    f"{agreeing(len(documents) - parsed, 'numbers its', 'number their')} "
+                    "references in a way this cannot read"
                     if parsed < len(documents)
                     else ""
                 ),

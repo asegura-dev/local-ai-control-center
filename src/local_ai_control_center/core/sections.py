@@ -39,7 +39,10 @@ or a document with none, needs no special case.
 
 _LONGEST_TITLE = 9
 """Words. A section is named, not written - past this it is a sentence that starts with a
-number, which in these documents is usually a numbered finding or a figure caption."""
+number, which in these documents is usually a numbered finding or a figure caption.
+
+Counted on what is printed with the number. The line a broken heading goes on in is not
+counted: the EAU guideline names sections in up to thirteen words (ADR-121)."""
 
 
 def _pattern_under(top: str) -> re.Pattern[str]:
@@ -97,6 +100,30 @@ class Section(BaseModel):
     def top(self) -> str:
         """The first-level number this belongs under."""
         return self.number.split(".")[0]
+
+
+def _continued(title: str, after: str) -> str:
+    """A heading the PDF broke, joined to the line that goes on with it (ADR-120, ADR-121).
+
+    Broken means the title ends in a lowercase letter, or is a single letter, and the next
+    line goes on in lowercase. **Whether a space goes between them is the PDF's**: a line that
+    begins with one goes on after a whole word - `Summary` / ` of evidence for epidemiology` -
+    and a line that begins without one goes on inside a word - `T` / `reatment of
+    locally-advanced PCa`. ``after`` is that line untrimmed, for that reason: trimming it is
+    how the first version wrote `Summaryof evidence`.
+
+    **The whole line, however long.** Stopping at nine words left seven of the EAU
+    guideline's headings as `T`, `Me`, `Imp`, `Summary` and `Long-t`; that limit is for what
+    is printed with the number, where it tells a heading from a numbered sentence. What this
+    cannot tell apart is a title ending in a whole word from a body that begins in lowercase -
+    `Training` / `nnU-Net was trained` would be joined. A limit does not stop that either,
+    since a line of a two-column paper is about nine words (ADR-121).
+    """
+    going_on = after.strip()
+    broken = title[-1:].islower() or (len(title) == 1 and title.isalpha())
+    if not broken or not going_on[:1].islower():
+        return title
+    return f"{title} {going_on}" if after[:1].isspace() else title + going_on
 
 
 def _candidates(text: str) -> list[Section]:
@@ -170,22 +197,22 @@ def _under(top: Section, lines: list[str], ends_at: int) -> list[Section]:
         if not match:
             continue
         label, title = match.group(1), match.group(2)
-        if not title:
+        if title:
+            if len(title.split()) > _LONGEST_TITLE or not title[0].isupper():
+                continue
+            title = _continued(title, lines[number] if number < len(lines) else "")
+        else:
             at = next(
                 (n for n in range(number, min(number + 2, len(lines))) if lines[n].strip()),
                 None,
             )
             following = lines[at].strip() if at is not None else ""
-            after = lines[at + 1].strip() if at is not None and at + 1 < len(lines) else ""
-            # A heading the PDF broke mid-word goes on, in lowercase, on the next line:
-            # `Recommendat` / `ions for staging of prostate cancer` (ADR-120).
-            if following[-1:].islower() and after[:1].islower():
-                joined = following + after
-                if len(joined.split()) <= _LONGEST_TITLE:
-                    following = joined
-            title = following if len(following.split()) <= _LONGEST_TITLE else ""
-        if title and (len(title.split()) > _LONGEST_TITLE or not title[0].isupper()):
-            continue
+            if len(following.split()) > _LONGEST_TITLE:
+                following = ""
+            if following and not following[0].isupper():
+                continue
+            after = lines[at + 1] if at is not None and at + 1 < len(lines) else ""
+            title = _continued(following, after) if following else ""
         if _ENDS_IN_A_PAGE.search(title):
             continue
         found.append(Section(number=label, title=title, line=number))

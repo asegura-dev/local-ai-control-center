@@ -317,10 +317,20 @@ _ADVICE = {
 }
 
 
+_SILENT_HERE = (
+    "Something on this machine accepted the connection on that port and did not answer "
+    "in time: another program holding the port, or an engine still loading a model."
+)
+"""The advice for a timeout on this machine, where the remote advice - bind the engine to
+0.0.0.0 - is advice about a network there is none of (ADR-121)."""
+
+
 def unreachable_message(host: str, error: BaseException) -> str:
     """A message that says which fault it was, and what fixes that one."""
     fault = why_unreachable(error)
-    return f"Cannot reach Ollama at {host}: {fault}. {_ADVICE[fault]}"
+    here = is_loopback(urllib.parse.urlparse(normalized_host(host)).hostname or "")
+    advice = _SILENT_HERE if fault == "timed out" and here else _ADVICE[fault]
+    return f"Cannot reach Ollama at {host}: {fault}. {advice}"
 
 
 _PROBE_TIMEOUT = 8

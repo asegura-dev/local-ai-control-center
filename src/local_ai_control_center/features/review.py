@@ -17,6 +17,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from local_ai_control_center.core.wording import agreeing, counted
 from local_ai_control_center.ports.entailment import Judgement
 
 _FENCE = re.compile(r"^```")
@@ -225,11 +226,13 @@ def report(findings: list[Finding], draft: str, corpus: str, skipped: int) -> st
     lines = [
         f"# Review of {draft}",
         "",
-        f"{len(findings)} paragraphs read against {corpus}. "
-        f"{len(held)} are held up by a quotation in it, {len(against)} are contradicted by "
-        f"one, and {len(nothing)} are not covered by it either way."
+        f"{counted(len(findings), 'paragraph')} read against {corpus}. "
+        f"{len(held)} {agreeing(len(held), 'is', 'are')} held up by a quotation in it, "
+        f"{len(against)} {agreeing(len(against), 'is', 'are')} contradicted by one, and "
+        f"{len(nothing)} {agreeing(len(nothing), 'is', 'are')} not covered by it either way."
         + (
-            f" **{len(undecided)} were not judged**: the engine did not answer."
+            f" **{len(undecided)} {agreeing(len(undecided), 'was', 'were')} not judged**: "
+            "the engine did not answer."
             if undecided
             else ""
         ),

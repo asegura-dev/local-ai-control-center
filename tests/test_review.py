@@ -168,7 +168,16 @@ def test_the_counts_in_the_report_match_the_findings() -> None:
         Finding(paragraph=_para()),
     ]
     written = report(findings, "draft.md", "corpus.md", 0)
-    assert "1 are held up by a quotation in it, 1 are contradicted by one, and 1 are not" in written
+    assert "3 paragraphs read against corpus.md" in written
+    assert "1 is held up by a quotation in it, 1 is contradicted by one, and 1 is not" in written
+
+
+def test_one_paragraph_is_said_in_the_singular() -> None:
+    """`1 paragraphs read`, `1 were not judged` (ADR-121)."""
+    one = report([Finding(paragraph=_para(), verdict="undecided")], "draft.md", "corpus.md", 0)
+    assert "1 paragraph read against" in one and "**1 was not judged**" in one
+    two = [Finding(paragraph=_para()), Finding(paragraph=_para())]
+    assert "and 2 are not covered by it" in report(two, "draft.md", "corpus.md", 0)
 
 
 def test_a_long_paragraph_is_shortened_in_the_report_but_findable() -> None:
@@ -181,7 +190,7 @@ def test_a_long_paragraph_is_shortened_in_the_report_but_findable() -> None:
 def test_the_report_names_what_was_not_judged_apart_from_what_is_uncovered() -> None:
     findings = [Finding(paragraph=_para(), verdict="undecided"), Finding(paragraph=_para())]
     written = report(findings, "draft.md", "corpus.md", 0)
-    assert "and 1 are not covered by it either way. **1 were not judged**" in written
+    assert "and 1 is not covered by it either way. **1 was not judged**" in written
     assert written.index("Not judged: the engine did not answer") < written.index(
         "Not covered by your corpus"
     )
@@ -248,6 +257,7 @@ def test_an_engine_that_does_not_answer_is_not_reported_as_uncovered(tmp_path: P
     )
     said = " ".join(result.stdout.split())
     assert "1 not judged" in said and "0 not covered" in said
+    assert "nothing was concluded about it." in said
     assert result.exit_code == 1, "nothing at all was judged"
     reviewed = json.loads((tmp_path / "ws" / "r.findings.json").read_text(encoding="utf-8"))
     assert [finding["verdict"] for finding in reviewed["findings"]] == ["undecided"]
@@ -264,6 +274,17 @@ def test_a_configuration_without_a_model_is_refused_before_the_question(tmp_path
     assert "No model configured" in " ".join(result.stdout.split())
     assert "Read it?" not in result.stdout
     assert not (tmp_path / "ws" / "audit.jsonl").exists()
+
+
+def test_a_declined_review_says_what_did_not_happen(tmp_path: Path) -> None:
+    """`Nothing was read`, after the draft was read to count its paragraphs (ADR-121)."""
+    config = _review_setup(tmp_path, "model: qwen2.5:14b")
+    result = CliRunner().invoke(
+        app, ["review", "draft.md", "--against", "corpus.md", "-c", str(config)], input="n\n"
+    )
+    said = " ".join(result.stdout.split())
+    assert result.exit_code == 0
+    assert "Nothing was sent to the engine." in said and "Nothing was read" not in said
 
 
 def test_a_docx_brought_in_is_not_reviewed_as_text(tmp_path: Path) -> None:

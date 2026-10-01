@@ -94,7 +94,7 @@ from local_ai_control_center.core.skill import (
     SummarizeFileSkill,
     grant_for,
 )
-from local_ai_control_center.core.wording import counted
+from local_ai_control_center.core.wording import agreeing, counted
 from local_ai_control_center.core.workspace import (
     Workspace,
     WorkspaceExposed,
@@ -130,10 +130,10 @@ from local_ai_control_center.features.bibliography import as_entry, bibliography
 from local_ai_control_center.features.bibtex import Held, bibtex, held_in
 from local_ai_control_center.features.bring import (
     copy_name,
-    not_on_this_machine,
     noted,
     on_the_network,
     refusal,
+    through_a_share,
 )
 from local_ai_control_center.features.commands import commands_of
 from local_ai_control_center.features.corpus import (
@@ -836,7 +836,7 @@ def _destination_or_exit(workspace: Workspace, into: Path) -> Path:
     try:
         destination = workspace.resolve_within(into)
     except ValueError as error:
-        _show(f"[red]{_plain(error)}[/red] Nothing was done.")
+        _show(f"[red]{_plain(str(error).rstrip('.'))}.[/red] Nothing was done.")
         raise typer.Exit(code=1) from error
     if destination.exists():
         _show(
@@ -1274,15 +1274,39 @@ def resolve(
         # The first run of this found the reason the hard way: a document's own DOI lives in
         # the PDF's metadata, and a workspace holds the Markdown that was converted from it.
         # Saying "carries no DOI" was true and useless (ADR-067).
-        converted = sum(1 for source in sources if source.suffix == ".md")
+        markdown = [source for source in sources if source.suffix == ".md"]
+        # A Markdown file is read for a DOI only through the PDF of the same name beside
+        # it (ADR-101). It said each one's PDF had been read, PDF or not (ADR-121).
+        beside = sum(
+            1
+            for source in markdown
+            if workspace.resolve_within(source).with_suffix(".pdf").exists()
+        )
         _show("[yellow]No DOI to resolve.[/yellow] Nothing here will invent one.")
-        if converted and not cited:
+        if markdown and not cited:
+            if beside == len(markdown):
+                said = (
+                    f"{counted(beside, 'Markdown file')}: the PDF beside "
+                    f"{agreeing(beside, 'it', 'each')} was read for a DOI (ADR-101), and "
+                    "none carried one."
+                )
+            elif beside == 0:
+                said = (
+                    f"{counted(len(markdown), 'Markdown file')}, with no PDF of the same "
+                    f"name beside {agreeing(len(markdown), 'it', 'them')}: a document's own DOI "
+                    "is in a PDF's metadata, and there was none to read."
+                )
+            else:
+                without = len(markdown) - beside
+                said = (
+                    f"{counted(len(markdown), 'Markdown file')}: for {beside:,} of them the PDF "
+                    f"of the same name was read for a DOI and carried none, and {without:,} "
+                    f"{agreeing(without, 'has no PDF beside it', 'have no PDF beside them')}."
+                )
             _show(
-                f"[dim]{converted:,} of these "
-                f"{_plain('is' if converted == 1 else 'are')} Markdown. A document's own DOI "
-                "is in the PDF's metadata, and the PDF beside each was read for it (ADR-101): none "
-                "carried one. Name it with lacc identify, or add --cited to resolve what "
-                "they cite instead.[/dim]"
+                f"[dim]{_plain(said)} Name {agreeing(len(markdown), 'it', 'them')} with lacc "
+                "identify, or add --cited to resolve what "
+                f"{agreeing(len(markdown), 'it cites', 'they cite')} instead.[/dim]"
             )
         elif cited:
             _show(
@@ -2655,7 +2679,7 @@ def review(
     # sent a whole draft for judging (ADR-105).
     if not _asked("Read it?"):
         audit.record(run_id, "confirmation_declined", "Declined review", {"action": "review"})
-        _show("[yellow]Declined.[/yellow] Nothing was read.")
+        _show("[yellow]Declined.[/yellow] Nothing was sent to the engine.")
         return
 
     judge = AskingJudge(provider)
@@ -2746,7 +2770,8 @@ def review(
         # An engine that did not answer is not a corpus that did not hold it (ADR-115).
         _show(
             f"[yellow]{len(unjudged)} not judged:[/yellow] the engine did not answer, so "
-            "nothing was concluded about them. Review again once it answers."
+            f"nothing was concluded about {agreeing(len(unjudged), 'it', 'them')}. Review "
+            "again once it answers."
         )
     _show(
         "[dim]Not covered means nothing collected holds it - not that it is wrong. The "
@@ -3256,11 +3281,11 @@ def bring(
     # asking is what reaches the other machine (ADR-112).
     typed = source.expanduser().absolute()
     if on_the_network(str(typed)) or drive_is_remote(str(typed)):
-        _show(f"[red]{_plain(not_on_this_machine(str(typed)))}[/red]")
+        _show(f"[red]{_plain(through_a_share(str(typed)))}[/red]")
         raise typer.Exit(code=1)
     resolved = typed.resolve()
     if on_the_network(str(resolved)):
-        _show(f"[red]{_plain(not_on_this_machine(str(resolved)))}[/red]")
+        _show(f"[red]{_plain(through_a_share(str(resolved)))}[/red]")
         raise typer.Exit(code=1)
     size = resolved.stat().st_size if resolved.is_file() else None
     why = refusal(resolved, workspace.is_within(resolved), size, exists=resolved.exists())
@@ -3365,7 +3390,7 @@ def sections(
     reported rather than worked around. **Nothing is written into the document** - the
     quotations already checked against it stay checked (ADR-076).
     """
-    config, workspace = _load(config_path)
+    config, workspace = _load(config_path, create=False)
     # Only a section taken is written; --into without --take writes nothing.
     destination = (
         _destination_or_exit(workspace, into) if into is not None and take is not None else None
@@ -3799,7 +3824,8 @@ def _report_where_the_settings_came_from(config: Config, config_path: Path) -> N
     if settings.server_url:
         # The address, unlike the secrets, is safe to print: it is in the file already.
         console.print(
-            f"[dim]Sending to {_plain(settings.server_url)}, named in the configuration.[/dim]"
+            f"[dim]The configuration names {_plain(settings.server_url)} as where "
+            "notifications go.[/dim]"
         )
 
 

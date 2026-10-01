@@ -24,8 +24,9 @@ CLI = Path(cli.__file__)
 _PRINTERS = {"_show", "console.print", "Panel", "add_row"}
 _STYLES = {"colour", "style"}
 """Variables holding a style's name, put between brackets on purpose."""
-_NUMERIC_CALLS = {"len", "sum", "max", "min", "counted"}
-"""A number, or a number and a word the program wrote beside it (`counted`, ADR-120)."""
+_NUMERIC_CALLS = {"len", "sum", "max", "min", "counted", "agreeing"}
+"""A number, or a number and a word the program wrote beside it (`counted`, ADR-120), or the
+word the program wrote to agree with one (`agreeing`, ADR-121)."""
 _NUMERIC_SPEC = set("fdeg%,bxXo")
 _ESCAPED = {"_plain", "escape"}
 _RENDERABLES = {"table", "rendered"}
