@@ -164,7 +164,9 @@ append-only, hash-chained audit log.
 - `lacc repeats <files>` *(unreleased)* shows where your text states the same fact twice -
   sentences in different paragraphs or rows sharing the figures that make a fact, or most of
   their words - group by group, with file and line. No model and no network, and nothing is
-  called a fault: a table may repeat its prose on purpose.
+  called a fault: a table may repeat its prose on purpose. `--propose` asks a model, one
+  group at a time, where the fact should stay and how the rest could read; each proposal is
+  headed as the model's and checked, and your files are never written.
 - `lacc resolve <documents>` asks the registry that assigns DOIs what each reference
   actually is, instead of asking a model. It is the first destination in this program that
   is not your own machine, and it needs both `network_access` and a `registry_url` written

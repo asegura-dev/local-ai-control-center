@@ -51,12 +51,22 @@ MAX_INPUT_BYTES_DEFAULT = 32 * 1024 * 1024
 that meeting it says something rather than merely being a nuisance."""
 
 JUDGE = "judge"
-"""What `models` calls the judge's model: `models: {judge: gpt-oss:20b}`.
+"""What `models` calls the judge's model: `models: {judge: qwen3.5:9b}`.
 
 Not a skill - a judge says whether a quotation supports a reading - but routed through the same
 table, so which model judges is one line somebody wrote. Unnamed, the judge is `model`, as it
 always was. The first pilot of the notes found qwen2.5:14b calling "contradicts" what a
-quotation merely did not mention, against its own instructions (ADR-124).
+quotation merely did not mention, against its own instructions; of five models tried on the
+same pairs, none yet gave verdicts worth reading, and gpt-oss:20b answered none in the shape
+asked (ADR-124).
+"""
+
+EDITOR = "edit_repetition"
+"""What `models` calls the model that proposes how a repeated fact is said once (ADR-125).
+
+Like the judge, a model asked one narrow thing outside the cycle - one group of sentences at a
+time - and named in the same table, so which model proposes is one line somebody wrote.
+Unnamed, it is `model`.
 """
 
 
@@ -221,7 +231,8 @@ class Config(BaseModel):
             "more faithful to what it is handed, the smaller one more productive. "
             "Running one for everything takes the worse half of both trades. The "
             "routing is a rule you wrote, never a choice a model makes (ADR-051). The "
-            "judge that `review` and `notes` ask is named `judge` here (ADR-124)."
+            "judge that `review` and `notes` ask is named `judge` here (ADR-124), and the "
+            "model `repeats --propose` asks is named `edit_repetition` (ADR-125)."
         ),
     )
     embedding_model: str = Field(

@@ -37,7 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **A first rule had counted the numbers in a tracer's name as figures**: 33 of its 64
     pairs shared nothing but `[68Ga]PSMA-11`.
 
-  Proposals of what to do with each group, a model's narrow task, come next.
+  **`--propose`** asks a model, one group at a time and carrying only that group's
+  sentences, where the fact stays whole and how the rest read. The model is named
+  `edit_repetition` in `models`. Each proposal goes in the report under its group, headed
+  as the model's and checked without one: a number brought in, a citation mark dropped, a
+  language changed. Nothing of yours is written. Piloted with qwen2.5:14b on the protocol's
+  21 groups: one proposal usable as given, and seven that lose something no sentence of the
+  group still says, which the checks did not see as losses. The record has the check that
+  would.
+- **The preview says what goes when it is not what was read.** `IntendedAction.sends`:
+  `repeats --propose` reads whole chapters and sends only the groups' sentences.
 
 ### Changed
 - `review` asks for its judge by the name `judge`, so a configuration that names one changes

@@ -1,15 +1,30 @@
-"""`lacc repeats`: where a text states the same fact twice, with no model (ADR-125)."""
+"""`lacc repeats`: where a text states the same fact twice, and a model's proposal (ADR-125).
+
+Finding is tested with no engine at all. Proposing is tested against an engine stand-in that
+answers what a model might: a wording that brings in a number and drops a citation, one in
+another language, a place that is not in the group - each of which the checks must name.
+"""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
+import pytest
 from typer.testing import CliRunner
 
 from local_ai_control_center.cli import app
-from local_ai_control_center.core.repetition import repetitions, stated_in
-from local_ai_control_center.features.repeats import report_text
+from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction
+from local_ai_control_center.core.repetition import Repetition, Stated, repetitions, stated_in
+from local_ai_control_center.features.repeats import (
+    UNCHANGED,
+    places_of,
+    proposal_from,
+    proposal_schema,
+    report_text,
+)
+from local_ai_control_center.ports.provider import Completion, Provider
 
 runner = CliRunner()
 
@@ -92,6 +107,201 @@ def test_a_file_that_is_not_there_is_named(tmp_path: Path) -> None:
     result = runner.invoke(app, ["repeats", "drafts/04_nada.md", "-c", str(config)])
     assert result.exit_code == 1
     assert "Not in the workspace: drafts/04_nada.md" in " ".join(result.stdout.split())
+
+
+def test_the_preview_says_what_is_sent_when_it_is_not_what_was_read() -> None:
+    """Whole chapters are read and only a group's sentences go: "the contents read above"
+    would have said more than is so."""
+    action = IntendedAction(
+        name="repeats",
+        summary="Propose",
+        targets=(Path("drafts/02_intro.md"),),
+        sends="the sentences of each group, 2 sentences in all",
+    )
+    shown = ExecutionPreview(action=action, allowed=True, sends_to="http://server:11434").render()
+    assert "Sends:   the sentences of each group, 2 sentences in all, to http" in shown
+
+
+_PROPOSED = json.dumps(
+    {
+        "keep": "03_antecedentes.md:5",
+        "others": [
+            {
+                "at": "02_intro.md:3",
+                "reads": "Un estudio previo: un clasificador desde CT alcanzó un AUC de "
+                "0.99 (ver antecedentes).",
+            }
+        ],
+    }
+)
+
+
+class _Editor(Provider):
+    """Answers every group with one proposal, and keeps the shape it was asked for."""
+
+    def __init__(self, answer: str = _PROPOSED, fails: bool = False) -> None:
+        self.answer = answer
+        self.fails = fails
+        self.schemas: list[dict[str, Any] | None] = []
+
+    @property
+    def name(self) -> str:
+        return "editor"
+
+    def complete(
+        self, prompt: str, temperature: float = 0.0, schema: dict[str, Any] | None = None
+    ) -> Completion:
+        self.schemas.append(schema)
+        if self.fails:
+            raise RuntimeError("the engine went away")
+        return Completion(text=self.answer, provider="editor")
+
+
+def _with(editor: _Editor, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    asked_for: list[str] = []
+
+    def built(choice: object, config: object, skill: str = "") -> Provider:
+        asked_for.append(skill)
+        return editor
+
+    monkeypatch.setattr("local_ai_control_center.cli._build_provider", built)
+    return asked_for
+
+
+_PROPOSE = ["repeats", "drafts/0*.md", "--propose", "--into", "repeats.md"]
+
+
+def _kinds(tmp_path: Path) -> list[str]:
+    lines = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    return [json.loads(line)["kind"] for line in lines]
+
+
+def test_propose_needs_somewhere_to_write(tmp_path: Path) -> None:
+    config = _workspace(tmp_path)
+    result = runner.invoke(app, ["repeats", "drafts/0*.md", "--propose", "-c", str(config)])
+    assert result.exit_code == 1
+    assert "Name where the proposals go with --into." in " ".join(result.stdout.split())
+    assert not (tmp_path / "ws" / "audit.jsonl").exists()
+
+
+def test_a_proposal_is_written_under_its_group_with_what_the_checks_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _workspace(tmp_path)
+    editor = _Editor()
+    asked_for = _with(editor, monkeypatch)
+    result = runner.invoke(app, [*_PROPOSE, "-c", str(config)], input="y\n")
+    assert result.exit_code == 0, result.stdout
+    assert asked_for == ["edit_repetition"], "the editor is asked for by its own name"
+    schema = editor.schemas[0]
+    assert schema is not None
+    assert schema["properties"]["keep"]["enum"] == ["02_intro.md:3", "03_antecedentes.md:5"]
+    written = (tmp_path / "ws" / "repeats.md").read_text(encoding="utf-8")
+    assert "**The model's proposal** (editor)" in written
+    assert "- keep whole: **03_antecedentes.md:5**" in written
+    assert "*Checks: adds 0.99; drops [12].*" in written
+    said = " ".join(result.stdout.split())
+    assert "1 proposal in the report; the checks found something to look at in 1." in said
+
+
+def test_the_trail_keeps_digests_and_leaves_the_words_to_full(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _workspace(tmp_path)
+    _with(_Editor(), monkeypatch)
+    runner.invoke(app, [*_PROPOSE, "-c", str(config)], input="y\n")
+    assert _kinds(tmp_path) == [
+        "run_started",
+        "files_read",
+        "edits_proposed",
+        "file_written",
+        "run_finished",
+    ]
+    lines = (tmp_path / "ws" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    proposed = json.loads(lines[2])["detail"]
+    assert proposed["rows"][0]["keep"] == "03_antecedentes.md:5"
+    assert len(proposed["rows"][0]["asked_sha256"]) == 64
+    assert "prompt" not in proposed and "completion" not in proposed, "words only under full"
+
+
+def test_a_no_sends_nothing_and_is_recorded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _workspace(tmp_path)
+    editor = _Editor()
+    _with(editor, monkeypatch)
+    result = runner.invoke(app, [*_PROPOSE, "-c", str(config)], input="n\n")
+    assert result.exit_code == 0
+    assert "Nothing was sent to the engine." in " ".join(result.stdout.split())
+    assert editor.schemas == [], "nothing was asked"
+    assert not (tmp_path / "ws" / "repeats.md").exists()
+    assert _kinds(tmp_path) == ["run_started", "files_read", "confirmation_declined"]
+
+
+def test_an_engine_that_does_not_answer_costs_its_group_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _workspace(tmp_path)
+    _with(_Editor(fails=True), monkeypatch)
+    result = runner.invoke(app, [*_PROPOSE, "-c", str(config)], input="y\n")
+    assert result.exit_code == 0, result.stdout
+    written = (tmp_path / "ws" / "repeats.md").read_text(encoding="utf-8")
+    assert "*Not usable as given:* The engine did not answer: the engine went away" in written
+
+
+def _group() -> Repetition:
+    found = stated_in(_INTRO, "02_intro.md") + stated_in(_BACKGROUND, "03_antecedentes.md")
+    return repetitions(found)[0]
+
+
+def test_a_proposal_in_another_language_is_named() -> None:
+    answer = json.dumps(
+        {
+            "keep": "03_antecedentes.md:5",
+            "others": [
+                {
+                    "at": "02_intro.md:3",
+                    "reads": "A previous study: a classifier trained on CT alone did well, as "
+                    "the background shows [12].",
+                }
+            ],
+        }
+    )
+    edit = proposal_from(_group(), answer).edits[0]
+    assert edit.other_language and not edit.added and not edit.dropped
+
+
+def test_unchanged_is_a_proposal_and_needs_no_check() -> None:
+    answer = json.dumps(
+        {"keep": "02_intro.md:3", "others": [{"at": "03_antecedentes.md:5", "reads": "unchanged"}]}
+    )
+    proposal = proposal_from(_group(), answer)
+    assert proposal.edits[0].reads == UNCHANGED
+    assert proposal.edits[0].unchanged and not proposal.flagged
+
+
+def test_an_answer_out_of_shape_is_said_and_never_mended() -> None:
+    group = _group()
+    assert proposal_from(group, "Keep the table.").problems == (
+        "The answer is not in the shape asked.",
+    )
+    stray = proposal_from(group, json.dumps({"keep": "05_otro.md:1", "others": []}))
+    assert stray.keep == "" and "not one of this group's" in stray.problems[0]
+    silent = proposal_from(group, json.dumps({"keep": "02_intro.md:3", "others": []}))
+    assert silent.problems == ("It says nothing of 03_antecedentes.md:5.",)
+
+
+def test_two_sentences_of_one_paragraph_get_places_apart() -> None:
+    """Joined to a group through a third, they still have to be told apart by the model."""
+    group = Repetition(
+        sentences=(
+            Stated(source="a.md", line=3, text="primera"),
+            Stated(source="a.md", line=3, text="segunda"),
+            Stated(source="b.md", line=9, text="tercera"),
+        )
+    )
+    assert places_of(group) == ("a.md:3", "a.md:3 (2)", "b.md:9")
+    assert proposal_schema(group)["properties"]["keep"]["enum"] == list(places_of(group))
 
 
 def test_the_report_says_its_rule_and_calls_nothing_a_fault() -> None:

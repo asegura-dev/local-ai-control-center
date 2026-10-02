@@ -39,11 +39,13 @@ model: qwen2.5:3b
 # handed, the smaller more productive, and running one for everything takes the worse
 # half of both. The routing is a rule you write, never a choice a model makes (ADR-051).
 # The judge - which says whether a quotation supports a reading, in `review` and `notes` -
-# is named here too, as `judge`, though it is not a skill (ADR-124).
+# is named here too, as `judge`, though it is not a skill (ADR-124); and so is the model
+# `repeats --propose` asks, as `edit_repetition` (ADR-125).
 # models:
 #   extract_claims: qwen2.5:14b
 #   ask_corpus: qwen2.5:32b
 #   judge: qwen2.5:14b
+#   edit_repetition: qwen2.5:14b
 
 # Skills whose output shape the engine is made to produce, named one per line.
 # Empty by default, which means nothing is constrained. Constraining decoding stops

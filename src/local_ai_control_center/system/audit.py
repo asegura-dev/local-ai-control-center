@@ -89,11 +89,13 @@ EventKind = Literal[
     "texts_embedded",
     "file_written",
     "run_failed",
+    "edits_proposed",
 ]
 """The closed set of events recorded today. It grows as real events appear.
 
-The last four arrived with ADR-107, when `review`, `resolve`, `identify` and `coverage` began
-to record what they reach and what they write."""
+`registry_asked`, `texts_embedded`, `file_written` and `run_failed` arrived with ADR-107, when
+`review`, `resolve`, `identify` and `coverage` began to record what they reach and what they
+write. `edits_proposed` arrived with ADR-125: what `repeats --propose` asked of a model."""
 
 GENESIS_DIGEST = "0" * 64
 """What the first record folds in, since there is no record before it."""

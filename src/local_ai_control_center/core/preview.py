@@ -45,6 +45,14 @@ class IntendedAction(BaseModel):
             "about to be created cannot be."
         ),
     )
+    sends: str = Field(
+        default="",
+        description=(
+            "What goes to the engine, when it is not what was read. `repeats --propose` reads "
+            "whole chapters and sends only the sentences of each group (ADR-125); a preview "
+            "that said it sends the contents read above would say more than is so."
+        ),
+    )
 
 
 class ExecutionPreview(BaseModel):
@@ -82,7 +90,9 @@ class ExecutionPreview(BaseModel):
         if self.sends_to:
             # "Read above" only when something is listed above: a question to a corpus reads
             # its passages through a ranking, not as targets, and nothing was there (ADR-117).
-            what = "the contents read above" if self.action.targets else "the prompt this builds"
+            what = self.action.sends or (
+                "the contents read above" if self.action.targets else "the prompt this builds"
+            )
             lines.append(f"Sends:   {what}, to {self.sends_to}")
         if self.allowed:
             lines.append("Status:  would run")

@@ -209,6 +209,16 @@ def specific_figures(text: str) -> frozenset[str]:
     return frozenset(found)
 
 
+def numbers(text: str) -> frozenset[str]:
+    """Every number standing alone in ``text``, round ones and years included.
+
+    What a rewritten sentence is checked against: a proposal may not bring in a number its
+    original lacked, and a round one is as much an addition as any other (ADR-125). A number
+    inside a name, `PSMA-11`, or a citation mark, `[12]`, is not one.
+    """
+    return frozenset(_NUMBER.findall(text))
+
+
 def content_words(text: str) -> frozenset[str]:
     """The words of ``text`` that can carry a fact: four letters or more, or holding a digit."""
     return frozenset(

@@ -18,8 +18,8 @@ records from putting the thesis and its 65 references through it:
   citation marks, and two papers filed as topics lists;
 - ADR-124, a note per reference: built and piloted on three references. The notes are
   written as designed; no judge on the server gave verdicts worth reading yet;
-- ADR-125, what a text says twice: the finder is built, with no model, and a model's
-  proposal for each group comes next.
+- ADR-125, what a text says twice: the finder, with no model, and a model's proposal for
+  each group, piloted.
 
 What v3.0.0 brought since v2.10.0:
 - the window scrolls, opens where it can be seen, and keeps an answer that arrives while you
@@ -84,8 +84,9 @@ What exists, by what it is for:
      readings that keep to their document.
    - An editor's pass over what the protocol says twice, by the user's choice on 2 October:
      read pair by pair, 11 of the compact version's 132 sentences and 27 of the extended
-     version's 372 restate a fact said elsewhere. ADR-125: the finder, `lacc repeats`, is
-     built, with no model; next, a model's proposal for each group, one group at a time.
+     version's 372 restate a fact said elsewhere. ADR-125: the finder, `lacc repeats`, with
+     no model, and `--propose`, a model's proposal per group. The 14B's proposals lost things
+     the checks did not see; a check for what a rewrite drops is measured and waits.
    - Then the notes joined by chapter and hypothesis.
 4. **Measure the newer models on the old question - begun.** On 28 September extraction was
    re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations

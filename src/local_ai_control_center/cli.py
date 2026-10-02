@@ -60,6 +60,7 @@ from local_ai_control_center.core.budget import (
 )
 from local_ai_control_center.core.config import (
     DOTENV_FILENAME,
+    EDITOR,
     JUDGE,
     Config,
     load_config,
@@ -177,7 +178,15 @@ from local_ai_control_center.features.measure import spread
 from local_ai_control_center.features.navigate import ranked, sections_would_send
 from local_ai_control_center.features.notes import NOTES_FOLDER, Cited, Reading, note_text
 from local_ai_control_center.features.prompts import prompts_of
-from local_ai_control_center.features.repeats import RULE, opening, report_text, shared_label
+from local_ai_control_center.features.repeats import (
+    RULE,
+    Proposal,
+    opening,
+    places_of,
+    proposed,
+    report_text,
+    shared_label,
+)
 from local_ai_control_center.features.review import (
     FINDINGS_SUFFIX,
     Finding,
@@ -2830,9 +2839,19 @@ def repeats(
     into: Annotated[
         Path | None, typer.Option("--into", help="Write the groups here as a report.")
     ] = None,
+    propose: Annotated[
+        bool,
+        typer.Option(
+            "--propose",
+            help="Ask a model, one group at a time, where each fact stays and how the rest read.",
+        ),
+    ] = False,
     config_path: Annotated[
         Path, typer.Option("--config", "-c", help="Path to the configuration file.")
     ] = DEFAULT_CONFIG_PATH,
+    provider_choice: Annotated[
+        ProviderChoice, typer.Option("--provider", help="Which provider proposes, with --propose.")
+    ] = ProviderChoice.ollama,
 ) -> None:
     """Show where these files state the same fact twice. No model and no network.
 
@@ -2843,7 +2862,14 @@ def repeats(
 
     The files are read as one text, so name the chapters of one version together - two
     versions of one document repeat each other by design.
+
+    With `--propose`, a model is asked one group at a time, carrying only that group's
+    sentences, where the fact stays whole and how the others read. Each proposal goes in the
+    report, headed as the model's and checked without a model; your files are never written.
     """
+    if propose and into is None:
+        _show("[red]Name where the proposals go with --into.[/red] Nothing was done.")
+        raise typer.Exit(code=1)
     config, workspace = _load(config_path, create=False)
     destination = _destination_or_exit(workspace, into) if into else None
     try:
@@ -2882,6 +2908,36 @@ def repeats(
     if destination is None:
         return
 
+    provider: Provider | None = None
+    if propose and groups:
+        try:
+            provider = _build_provider(provider_choice, config, EDITOR)
+        except ProviderError as error:
+            _show(f"[red]{_plain(error)}[/red] Nothing was sent.")
+            raise typer.Exit(code=1) from error
+        action = IntendedAction(
+            name="repeats",
+            summary=f"Propose an edit for {counted(len(groups), 'group')}, written into {into}",
+            required=frozenset({"read_files", "write_files"}),
+            targets=tuple(Path(name) for name in paths),
+            writes=(destination,),
+            # Whole chapters are read; only each group's sentences go (ADR-125).
+            sends=f"the sentences of each group, {counted(within, 'sentence')} in all",
+        )
+        preview = preview_action(
+            action, grant(action.required, config), config, workspace, config.remote_engine
+        )
+        _show_preview(preview)
+        if not preview.allowed:
+            _exit_refused()
+        _show(
+            f"[bold]{counted(len(groups), 'group')}[/bold]: one call each, carrying only that "
+            "group's sentences, each a few seconds or more."
+        )
+        _say_which_model(config, EDITOR)
+    elif propose:
+        _show("Nothing to propose: no group was found.")
+
     # Recorded because it writes: what was read, with its digests, and what was left.
     audit = AuditLog(workspace, config)
     run_id = audit.opened("repeats")
@@ -2896,9 +2952,60 @@ def repeats(
             ],
         },
     )
+    proposals: tuple[Proposal, ...] = ()
+    if provider is not None:
+        if not _asked(f"Propose edits for {counted(len(groups), 'group')}?"):
+            audit.record(run_id, "confirmation_declined", "Declined repeats", {"action": "repeats"})
+            _show("[yellow]Declined.[/yellow] Nothing was sent to the engine.")
+            return
+        asked: list[str] = []
+        answers: list[str] = []
+        found: list[Proposal] = []
+        with console.status("Proposing...") as status:
+            for number, group in enumerate(groups, start=1):
+                status.update(f"Group {number:,} of {len(groups):,}...")
+                sent, answer, proposal = proposed(provider, group)
+                asked.append(sent)
+                answers.append(answer)
+                found.append(proposal)
+        proposals = tuple(found)
+        # Digests always; the prompts and answers themselves only under `full` (ADR-023).
+        audit.record(
+            run_id,
+            "edits_proposed",
+            f"Proposed edits for {counted(len(groups), 'group')}",
+            {
+                "action": "repeats",
+                "model": provider.name,
+                "groups": len(groups),
+                "flagged": sum(proposal.flagged for proposal in proposals),
+                "rows": [
+                    {
+                        "group": number,
+                        "places": list(places_of(group)),
+                        "keep": proposal.keep,
+                        "asked_sha256": digest_of(sent),
+                        "answer_sha256": digest_of(answer),
+                        "edits": len(proposal.edits),
+                        "problems": len(proposal.problems),
+                    }
+                    for number, (group, sent, answer, proposal) in enumerate(
+                        zip(groups, asked, answers, proposals, strict=True), start=1
+                    )
+                ],
+                "prompt": asked,
+                "completion": answers,
+            },
+        )
     _write_or_exit(
         destination,
-        report_text(groups, tuple(Path(name).name for name in paths), len(stated)),
+        report_text(
+            groups,
+            tuple(Path(name).name for name in paths),
+            len(stated),
+            proposals,
+            provider.name if provider is not None else "",
+        ),
         (audit, run_id, "repeats"),
     )
     audit.record(
@@ -2907,6 +3014,12 @@ def repeats(
         "Finished repeats",
         {"action": "repeats", "groups": len(groups), "sentences": within},
     )
+    if proposals:
+        flagged = sum(proposal.flagged for proposal in proposals)
+        _show(
+            f"[bold]{counted(len(proposals), 'proposal')}[/bold] in the report; the checks "
+            f"found something to look at in {flagged:,}."
+        )
     _show(f"-> {_plain(into)}")
 
 

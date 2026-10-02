@@ -2,8 +2,10 @@
 
 ## Status
 
-Accepted on 2 October 2026. **The finder is built** (`lacc repeats`, points 1 and 2 below);
-the proposals (`--propose`, point 3) wait for the user to read what the finder shows.
+Accepted on 2 October 2026, and built the same day in two parts: **the finder** (`lacc
+repeats`, points 1 and 2 below) and, after the user read what it found, **the proposals**
+(`--propose`, point 3). The proposals were piloted on the protocol's 21 groups; what that
+showed, and the check it calls for, is the last section.
 
 **What the finder showed, on the protocol's own chapters** (2 October, no model, no network):
 - the compact version: 5 groups holding 11 of its 132 sentences, read in 4.7 seconds;
@@ -102,6 +104,40 @@ is a narrow task, and a model does it one group at a time. Deciding is the write
    - the time;
    - **the user's reading of each proposal**, which is the measurement that matters.
 
+## What the proposals showed
+
+**The pilot**, on 2 October: `repeats --propose` with qwen2.5:14b, the model `tesis.yaml`
+names, over the protocol's 21 groups. The compact version took 0.7 minutes and the extended
+1.3, one call per group carrying only that group's sentences.
+
+**Read one by one, the 14B's proposals are not yet an editor's.**
+- **One is usable as given:** an objective that now points to the method for its pilot.
+- **Seven lose something no sentence of the group says any longer:** the conclusion a
+  background paragraph draws, a dataset's mean age, a sentence on what a metric cannot
+  measure, the reason given for an expected result.
+- **Six point to a place by its file or line,** as "ver línea 29" or a file name with its
+  line, two of them among the seven. The model took the labels it was given for its answer as
+  references a reader could follow.
+- **Several only reword the repeated sentence** and keep its figures, so the repetition stays.
+- **One invents:** it names a "sección 8.2" the protocol does not have.
+
+**What the checks saw.** They flagged 10 of the 21. Every pointer by line number was
+flagged, because the line was a number its original lacked, and so was one dropped citation
+mark. **They did not see the losses as losses.** Of the seven, one was flagged for the
+citation mark it dropped and two only for a pointer the same proposal carried; four were not
+flagged at all. Checking what a proposal adds cannot see what it takes away.
+
+**The check this calls for, measured but not built:** what a rewrite drops must still be
+said by some sentence of the group, once the proposal is applied. Run over the pilot's 21
+answers, kept under `full`, it flags 13:
+- all seven losses read above;
+- two more the reading had missed, both remarks a table carried on what a work showed;
+- four rewordings of one or two words, such as "alcanzó" for "mostró".
+
+It shows the words lost, so a synonym is dismissed at a glance. Adding it, and telling the
+model which chapter each place is in rather than letting it cite a line, is a change to this
+record, for the user to decide.
+
 ## Alternatives rejected
 
 - **A model finding the repetition in a chapter.** That is the broad task ADR-124 measured
@@ -122,9 +158,17 @@ is a narrow task, and a model does it one group at a time. Deciding is the write
   - `core/repetition.py`, pure - built;
   - the two reading helpers of `core/protocol.py`, made public as `units` and
     `sentences_in` - built;
-  - `features/repeats.py`, which assembles the report - built - and will run the checks;
-  - the command, `lacc repeats` - built, without `--propose`;
-  - the `edit_repetition` skill - with the proposals.
+  - `features/repeats.py`, which assembles the report, asks for one group's proposal through
+    the provider port, and checks it - built;
+  - the command, `lacc repeats`, with `--propose` - built;
+  - `edit_repetition`, the name `models` gives the proposing model (`EDITOR` in
+    `core/config.py`). It is not a skill in the cycle, as the judge is not: a model asked one
+    narrow thing, one group at a time;
+  - `sends` on `IntendedAction`: the preview says "the sentences of each group", not "the
+    contents read above", because whole chapters are read and only sentences go;
+  - `edits_proposed` in the trail, with a row per group: its places, the place kept, and the
+    digests of what was asked and answered. The prompts and answers themselves are kept only
+    under `full`.
 - Tests built from the protocol's own shapes: tracers' names, `RTX 5080`, `sección 3.4`, a
   percentage, a year, a citation mark, a display formula, and a table row repeating a
   paragraph (`tests/test_repetition.py`, `tests/test_repeats.py`). With the proposals: one
@@ -133,14 +177,13 @@ is a narrow task, and a model does it one group at a time. Deciding is the write
 - `repeats` refuses a PDF or a `.docx` with the sentence `review` already says (ADR-115).
   That sentence ended "review the .md it writes", which named the wrong command for
   `repeats`; it now ends "use the .md it writes".
-- Documented with the finder:
+- Documented with it:
   - the CHANGELOG;
-  - chapter 05: what is written and what is audited;
+  - chapter 05: what is written, what is audited, what asks first, what reaches the engine,
+    and one failure costing one item;
   - `docs/stack/files-on-disk.md`;
   - the INDEX and the ADR index;
-  - the READMEs and the roadmap.
-
-  With the proposals: chapter 05's rows on what asks first and what reaches the engine.
+  - the READMEs, `config.example.yaml` and the roadmap.
 - **Found while documenting it.** Chapter 05 said `measure` records nothing when its preview
   is refused, and that stopped being so with ADR-116, released in v3.0.0. The chapter's own
   row on every run having an end said the opposite. The row now says what is so.

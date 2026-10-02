@@ -23,7 +23,7 @@ results only to new files."*
 | `lacc corpus` | The quotations of one or more collected corpora, each checked again against its document and marked when it is not there | `--into` |
 | `lacc run revise_file` | The revision, after you approve its diff - beside the original, never over it (ADR-025) | a sibling of the document |
 | `lacc review --into` | The report, and the findings as data for the window | `--into`, and `<into>.findings.json` |
-| `lacc repeats --into` | Where the files given state the same fact twice, group by group (ADR-125) | `--into` |
+| `lacc repeats --into` | Where the files given state the same fact twice, group by group, and with `--propose` a model's proposal under each group, checked; the files themselves are never written (ADR-125) | `--into` |
 | `lacc coverage --into` | The report | `--into` (and see below for its numbers) |
 | `lacc resolve --into` | The bibliography, as Markdown | `--into` |
 | `lacc bib --into` | The bibliography, as BibTeX | `--into`, which must end in `.bib` |

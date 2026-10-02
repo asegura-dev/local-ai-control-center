@@ -282,6 +282,8 @@ def test_the_pairing_check_notices_a_site_that_forgets() -> None:
 REACHES_THE_ENGINE = {
     ("cycle.py", "_ask"): "records provider_called, with the estimate beside the measurement",
     ("asking.py", "judge"): "reports what it asked, and the caller records the digest",
+    ("repeats.py", "proposed"): "the caller records edits_proposed: the digests of what each "
+    "group asked and got back, the text only under full (ADR-125)",
     ("ollama.py", "check_engine"): "a fixed probe string holding nothing of the user's",
 }
 """Every place the source calls an engine, and what writes it down.

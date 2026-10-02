@@ -129,7 +129,7 @@ record (ADR-008).
 | `overview.py` | What can be known about a workspace without running anything (ADR-069). |
 | `prompts.py` | What each skill asks the model, before anything is asked (ADR-074). |
 | `reading.py` | Reading this project's own documentation inside the window (ADR-070). |
-| `repeats.py` | A report of what a text says twice, for the writer to edit from; nothing in it is called a fault (ADR-125). |
+| `repeats.py` | A report of what a text says twice, for the writer to edit from, and a model's proposal for each group - asked through the provider port, one group at a time, and checked; nothing in it is called a fault (ADR-125). |
 | `review.py` | Reading a draft against the sources its writer collected (ADR-068). |
 | `stages.py` | Where the work stands, stage by stage (ADR-080). |
 | `status.py` | What is true about a workspace right now, for the line along the bottom (ADR-077). |
