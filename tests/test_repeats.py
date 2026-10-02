@@ -19,8 +19,10 @@ from local_ai_control_center.core.preview import ExecutionPreview, IntendedActio
 from local_ai_control_center.core.repetition import Repetition, Stated, repetitions, stated_in
 from local_ai_control_center.features.repeats import (
     UNCHANGED,
+    chapter_of,
     places_of,
     proposal_from,
+    proposal_prompt,
     proposal_schema,
     report_text,
 )
@@ -199,7 +201,9 @@ def test_a_proposal_is_written_under_its_group_with_what_the_checks_found(
     written = (tmp_path / "ws" / "repeats.md").read_text(encoding="utf-8")
     assert "**The model's proposal** (editor)" in written
     assert "- keep whole: **03_antecedentes.md:5**" in written
-    assert "*Checks: adds 0.99; drops [12].*" in written
+    assert (
+        "*Checks: adds 0.99; drops [12]; loses what the group no longer says: frente.*" in written
+    ), "a synonym the table uses instead - contra - is shown as lost, to be dismissed at a glance"
     said = " ".join(result.stdout.split())
     assert "1 proposal in the report; the checks found something to look at in 1." in said
 
@@ -289,6 +293,55 @@ def test_an_answer_out_of_shape_is_said_and_never_mended() -> None:
     assert stray.keep == "" and "not one of this group's" in stray.problems[0]
     silent = proposal_from(group, json.dumps({"keep": "02_intro.md:3", "others": []}))
     assert silent.problems == ("It says nothing of 03_antecedentes.md:5.",)
+
+
+_DATASET = Repetition(
+    sentences=(
+        Stated(
+            source="03_antecedentes (2026-10-01).md",
+            line=45,
+            text="Smith et al. 2024 [29] - Conjunto de 412 estudios de 205 pacientes.",
+        ),
+        Stated(
+            source="08_metodologia (2026-10-01).md",
+            line=23,
+            text="Estudios y pacientes - 412 estudios de 205 pacientes; edad media de 64 años.",
+        ),
+    )
+)
+
+
+def _rewriting(reads: str) -> str:
+    return json.dumps(
+        {
+            "keep": "03_antecedentes (2026-10-01).md:45",
+            "others": [{"at": "08_metodologia (2026-10-01).md:23", "reads": reads}],
+        }
+    )
+
+
+def test_what_a_rewrite_takes_out_that_nothing_else_says_is_named() -> None:
+    """The pilot's 14B dropped the mean age; the kept sentence never had it."""
+    edit = proposal_from(_DATASET, _rewriting("Estudios y pacientes: véase antecedentes.")).edits[0]
+    assert {"64", "edad", "media", "años"} <= set(edit.lost)
+    assert "412" not in edit.lost, "the kept sentence still says it"
+
+
+def test_a_rewrite_that_points_by_file_or_line_is_named() -> None:
+    for reads in ("Véase la línea 45.", "Detalles en 03_antecedentes (2026-10-01).md:45."):
+        edit = proposal_from(_DATASET, _rewriting(reads)).edits[0]
+        assert edit.names_a_place, reads
+    plain = proposal_from(_DATASET, _rewriting("Edad media de 64 años; véase antecedentes."))
+    assert not plain.edits[0].names_a_place and not plain.edits[0].lost
+
+
+def test_each_place_carries_its_chapter_in_words() -> None:
+    assert chapter_of("03_antecedentes (2026-10-01).md") == "antecedentes"
+    assert chapter_of("compacto_04_estado_del_arte (2026-10-01).md") == "estado del arte"
+    assert chapter_of("draft.md") == "draft"
+    asked = proposal_prompt(_DATASET)
+    assert "03_antecedentes (2026-10-01).md:45 (chapter: antecedentes): Smith" in asked
+    assert "never write a file name or a line" in asked
 
 
 def test_two_sentences_of_one_paragraph_get_places_apart() -> None:

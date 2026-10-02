@@ -2,10 +2,10 @@
 
 ## Status
 
-Accepted on 2 October 2026, and built the same day in two parts: **the finder** (`lacc
-repeats`, points 1 and 2 below) and, after the user read what it found, **the proposals**
-(`--propose`, point 3). The proposals were piloted on the protocol's 21 groups; what that
-showed, and the check it calls for, is the last section.
+Accepted on 2 October 2026, and built the same day in three steps: **the finder** (`lacc
+repeats`, points 1 and 2 below); after the user read what it found, **the proposals**
+(`--propose`, point 3); and, after their pilot, **two more checks and a pointer by chapter**,
+which the user chose. Both pilots are in the section on what the proposals showed.
 
 **What the finder showed, on the protocol's own chapters** (2 October, no model, no network):
 - the compact version: 5 groups holding 11 of its 132 sentences, read in 4.7 seconds;
@@ -88,7 +88,9 @@ is a narrow task, and a model does it one group at a time. Deciding is the write
      - KEEP and every place named are the group's own;
      - a rewritten sentence adds no figure its original lacked;
      - it keeps its citation marks, or the report names the ones it dropped;
-     - it is written in its original's language, judged by its function words.
+     - it is written in its original's language, judged by its function words;
+     - added after the first pilot: it takes out nothing that no sentence of the group still
+       says, and it writes no file and no line into the text.
    - **Each proposal is headed as the model's**, under the sentences it would change. The
      user's files are never written: the report is what the writer edits from, in the vault.
    - **One preview and one question** before anything is sent. They say how many groups, and
@@ -137,6 +139,35 @@ answers, kept under `full`, it flags 13:
 It shows the words lost, so a synonym is dismissed at a glance. Adding it, and telling the
 model which chapter each place is in rather than letting it cite a line, is a change to this
 record, for the user to decide.
+
+**Decided by the user the same day, as an amendment to point 3:**
+- **a fifth check:** a rewrite loses nothing - no content word, no number - that no
+  sentence of the group still says once the proposal is applied. What it loses is listed;
+- **a sixth:** a rewrite names no file and no line, which a reader of the text cannot follow;
+- **the prompt gives each place its chapter in words**, from its file name
+  (`03_antecedentes` is "antecedentes"), and asks for a pointer to name the chapter, never
+  the file or the line.
+
+Then the same 21 groups again, to compare.
+
+**The second pilot**, the same model on the same groups, took 0.4 and 0.7 minutes. Read one by
+one:
+- **No proposal points by file or line** any longer; they say "véase antecedentes" or "el
+  capítulo objetivos". The first pilot had six.
+- **Nine lose something no sentence of the group still says, and the checks name all nine**,
+  with the words lost. Most are the column a table keeps for what a work means to the thesis,
+  such as a note that a work is the nearest precedent, taken out as if it were the
+  repetition. The checks also name both citation marks a proposal dropped.
+- **Two are usable as given**, a table cell that now points to the prose for Ben-Cohen's 28%
+  and a plan said once; two more need only their grammar mended.
+- **Six flags are synonyms or inflections**, such as "definido" for "definida", which the
+  listed words let a reader dismiss.
+- **Two pointers were written in square brackets**, a section and its chapter, which a reader
+  takes for citation marks. Not checked.
+
+**What this leaves.** The proposals are safe to read: nothing a proposal loses goes unsaid in
+the report. They are not yet worth applying unread; the 14B still takes the meaning column
+for repetition. A larger model, on the second card, is the next thing to measure.
 
 ## Alternatives rejected
 

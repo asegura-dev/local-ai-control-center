@@ -85,8 +85,9 @@ What exists, by what it is for:
    - An editor's pass over what the protocol says twice, by the user's choice on 2 October:
      read pair by pair, 11 of the compact version's 132 sentences and 27 of the extended
      version's 372 restate a fact said elsewhere. ADR-125: the finder, `lacc repeats`, with
-     no model, and `--propose`, a model's proposal per group. The 14B's proposals lost things
-     the checks did not see; a check for what a rewrite drops is measured and waits.
+     no model, and `--propose`, a model's proposal per group, every loss now named by a
+     check. The 14B's proposals are safe to read and not yet worth applying unread; a larger
+     model, on the second card, is next to measure.
    - Then the notes joined by chapter and hypothesis.
 4. **Measure the newer models on the old question - begun.** On 28 September extraction was
    re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations

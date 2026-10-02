@@ -43,8 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as the model's and checked without one: a number brought in, a citation mark dropped, a
   language changed. Nothing of yours is written. Piloted with qwen2.5:14b on the protocol's
   21 groups: one proposal usable as given, and seven that lose something no sentence of the
-  group still says, which the checks did not see as losses. The record has the check that
-  would.
+  group still says, which those checks did not see as losses. So two more were added:
+  - **what a rewrite takes out must still be said by some sentence of the group**, and the
+    words it loses are listed;
+  - **no file and no line is written into the text.** The model is now told each place's
+    chapter, and points by it.
+
+  Piloted again: no pointer by file or line (six before), and all nine losses named with
+  their words.
 - **The preview says what goes when it is not what was read.** `IntendedAction.sends`:
   `repeats --propose` reads whole chapters and sends only the groups' sentences.
 

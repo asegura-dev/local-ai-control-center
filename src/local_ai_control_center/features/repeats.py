@@ -20,7 +20,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from local_ai_control_center.core.protocol import CITATION, numbers_in
-from local_ai_control_center.core.repetition import Repetition, numbers
+from local_ai_control_center.core.repetition import Repetition, content_words, numbers
 from local_ai_control_center.core.wording import counted
 from local_ai_control_center.ports.provider import Provider
 
@@ -39,7 +39,8 @@ EDIT_TEMPERATURE = 0.0
 warmed engine (chapter 05, "The same prompt gives the same answer")."""
 
 _ASKED = """You are an editor. The sentences below come from one text, and they state the same
-fact, or nearly. Each is given with its place: a file and a line.
+fact, or nearly. Each is given with its place - a file and a line, for your answer only - and
+the chapter it is in.
 
 {sentences}
 
@@ -49,8 +50,13 @@ kept, or "UNCHANGED" when the repetition earns its place - a table that summaris
 may be worth keeping as it is.
 
 Write each sentence in the language it is written in. Do not add a number, a name or a claim
-the sentence does not have. Keep every citation mark in square brackets, such as [12], in the
-sentence that has it."""
+the sentence does not have, and do not take out anything the sentence kept says nowhere else.
+Keep every citation mark in square brackets, such as [12], in the sentence that has it. To
+point to the place kept, name its chapter as the text would; never write a file name or a line
+number into a sentence - a reader of the text cannot follow them."""
+
+_NAMES_A_PLACE = re.compile(r"\.md\b|\b(?:línea|linea|line|líneas|lines)\s+\d+", re.IGNORECASE)
+"""A file or a line written into a sentence: the pilot found six, such as `ver línea 29`."""
 
 _SPANISH = frozenset(
     {"el", "la", "los", "las", "de", "del", "que", "en", "y", "para", "con", "por", "una", "un"}
@@ -86,10 +92,26 @@ def places_of(group: Repetition) -> tuple[str, ...]:
     return tuple(labels)
 
 
+def chapter_of(source: str) -> str:
+    """The chapter a file holds, in words, from its name: `03_antecedentes (2026-10-01).md` is
+    "antecedentes", `compacto_04_estado_del_arte.md` is "estado del arte".
+
+    What a pointer can name: the pilot's model, given only file and line, wrote "ver línea 29"
+    into the text, which no reader can follow (ADR-125).
+    """
+    stem = re.sub(r"\s*\([^)]*\)\s*$", "", source.rsplit(".", 1)[0] if "." in source else source)
+    words = [word for word in re.split(r"[_\s]+", stem) if word]
+    numbered = [index for index, word in enumerate(words) if word.isdigit()]
+    if numbered and numbered[0] + 1 < len(words):
+        words = words[numbered[0] + 1 :]
+    return " ".join(words) or source
+
+
 def proposal_prompt(group: Repetition) -> str:
-    """What one group's call asks: the group's sentences and their places, nothing else."""
+    """What one group's call asks: the group's sentences, their places and their chapters."""
     listed = "\n".join(
-        f"{label}: {one.text}" for label, one in zip(places_of(group), group.sentences, strict=True)
+        f"{label} (chapter: {chapter_of(one.source)}): {one.text}"
+        for label, one in zip(places_of(group), group.sentences, strict=True)
     )
     return _ASKED.format(sentences=listed)
 
@@ -139,6 +161,14 @@ class Edit(BaseModel):
     """Whether the proposal is written in another language than its original, judged by
     their function words."""
 
+    lost: tuple[str, ...] = ()
+    """Words and numbers of the original that no sentence of the group says any longer, once
+    the proposal is applied. What the pilot's checks could not see: they looked at what a
+    proposal adds, and seven of 21 took out what nothing else said (ADR-125)."""
+
+    names_a_place: bool = False
+    """Whether it writes a file or a line into the text, which a reader cannot follow."""
+
     @property
     def unchanged(self) -> bool:
         """Whether the model would leave this sentence as it is."""
@@ -162,7 +192,8 @@ class Proposal(BaseModel):
     def flagged(self) -> bool:
         """Whether any check found something to look at before using it."""
         return bool(self.problems) or any(
-            edit.added or edit.dropped or edit.other_language for edit in self.edits
+            edit.added or edit.dropped or edit.other_language or edit.lost or edit.names_a_place
+            for edit in self.edits
         )
 
 
@@ -179,8 +210,25 @@ def _marks(text: str) -> set[int]:
     return {number for found in CITATION.finditer(text) for number in numbers_in(found.group(1))}
 
 
-def checked(original: str, at: str, reads: str) -> Edit:
-    """One proposed wording, with what can be checked without a model."""
+def _said(text: str) -> frozenset[str]:
+    """What a sentence says, as far as words can tell: its content words and its numbers."""
+    plain = CITATION.sub("", text)
+    return content_words(plain) | numbers(plain)
+
+
+def checked(
+    original: str,
+    at: str,
+    reads: str,
+    still: frozenset[str] = frozenset(),
+    files: tuple[str, ...] = (),
+) -> Edit:
+    """One proposed wording, with what can be checked without a model.
+
+    ``still`` is what the group says once the proposal is applied, every sentence of it;
+    ``files`` are the names of the files the group's sentences come from, which no sentence
+    of the text should carry.
+    """
     if reads.strip().upper() == UNCHANGED:
         return Edit(at=at, reads=UNCHANGED)
     added = numbers(CITATION.sub("", reads)) - numbers(CITATION.sub("", original))
@@ -192,6 +240,8 @@ def checked(original: str, at: str, reads: str) -> Edit:
         added=tuple(sorted(added)),
         dropped=tuple(f"[{number}]" for number in sorted(dropped)),
         other_language=bool(before and after and before != after),
+        lost=tuple(sorted(_said(original) - still)),
+        names_a_place=bool(_NAMES_A_PLACE.search(reads)) or any(name in reads for name in files),
     )
 
 
@@ -210,7 +260,7 @@ def proposal_from(group: Repetition, answer: str) -> Proposal:
     if keep not in originals:
         problems.append(f"It keeps {keep or 'no place'}, which is not one of this group's.")
         keep = ""
-    edits: list[Edit] = []
+    proposed_for: dict[str, str] = {}
     for item in said.get("others") or []:
         if not isinstance(item, dict):
             continue
@@ -219,14 +269,37 @@ def proposal_from(group: Repetition, answer: str) -> Proposal:
             problems.append(f"It rewrites {at or 'no place'}, which is not one of this group's.")
         elif at == keep:
             problems.append(f"It both keeps and rewrites {at}.")
-        elif any(edit.at == at for edit in edits):
+        elif at in proposed_for:
             problems.append(f"It rewrites {at} twice; the first is shown.")
         else:
-            edits.append(checked(originals[at], at, reads))
-    missing = [label for label in labels if label != keep and all(e.at != label for e in edits)]
+            proposed_for[at] = reads
+    # What the group still says once every proposal is applied: a rewrite may take out what
+    # another sentence of the group keeps saying, and nothing else (ADR-125).
+    applied = {
+        label: (
+            proposed_for[label]
+            if label in proposed_for and proposed_for[label].upper() != UNCHANGED
+            else text
+        )
+        for label, text in originals.items()
+    }
+    still = frozenset().union(*(_said(text) for text in applied.values()))
+    # A file's name counts only when no sentence would say it by chance: `07_hipotesis` is a
+    # file, `draft` could be a word.
+    files = tuple(
+        sorted(
+            stem
+            for stem in {one.source.split(" (")[0].rsplit(".", 1)[0] for one in group.sentences}
+            if "_" in stem or any(character.isdigit() for character in stem)
+        )
+    )
+    edits = tuple(
+        checked(originals[at], at, reads, still, files) for at, reads in proposed_for.items()
+    )
+    missing = [label for label in labels if label != keep and label not in proposed_for]
     if keep and missing:
         problems.append(f"It says nothing of {', '.join(missing)}.")
-    return Proposal(keep=keep, edits=tuple(edits), problems=tuple(problems))
+    return Proposal(keep=keep, edits=edits, problems=tuple(problems))
 
 
 def proposed(provider: Provider, group: Repetition) -> tuple[str, str, Proposal]:
@@ -253,7 +326,13 @@ def _checks(edit: Edit) -> str:
         found.append(f"drops {', '.join(edit.dropped)}")
     if edit.other_language:
         found.append("is written in another language than its original")
-    return "; ".join(found) if found else "adds no number, keeps its citation marks"
+    if edit.lost:
+        found.append(f"loses what the group no longer says: {', '.join(edit.lost)}")
+    if edit.names_a_place:
+        found.append("writes a file or a line into the text")
+    if found:
+        return "; ".join(found)
+    return "adds no number, keeps its citation marks, loses nothing the group stops saying"
 
 
 def _proposal_lines(proposal: Proposal, model: str) -> list[str]:
