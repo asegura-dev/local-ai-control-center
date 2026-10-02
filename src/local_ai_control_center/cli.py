@@ -94,6 +94,7 @@ from local_ai_control_center.core.references import (
     shortened,
     without_truncations,
 )
+from local_ai_control_center.core.repetition import Stated, repetitions, stated_in
 from local_ai_control_center.core.run import Progress, ProgressFn, new_run_id
 from local_ai_control_center.core.sections import section_of, sections_in
 from local_ai_control_center.core.skill import (
@@ -176,6 +177,7 @@ from local_ai_control_center.features.measure import spread
 from local_ai_control_center.features.navigate import ranked, sections_would_send
 from local_ai_control_center.features.notes import NOTES_FOLDER, Cited, Reading, note_text
 from local_ai_control_center.features.prompts import prompts_of
+from local_ai_control_center.features.repeats import RULE, opening, report_text, shared_label
 from local_ai_control_center.features.review import (
     FINDINGS_SUFFIX,
     Finding,
@@ -2817,6 +2819,95 @@ def review(
     audit.record(run_id, "run_finished", "Finished review", {"action": "review"})
     if unjudged and len(unjudged) == len(findings):
         raise typer.Exit(code=1)
+
+
+@app.command()
+def repeats(
+    sources: Annotated[
+        list[str],
+        typer.Argument(help="Text files in the workspace, read as one text, or a pattern."),
+    ],
+    into: Annotated[
+        Path | None, typer.Option("--into", help="Write the groups here as a report.")
+    ] = None,
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Show where these files state the same fact twice. No model and no network.
+
+    Two sentences in different paragraphs or rows state the same fact when they share two
+    specific figures - a Dice of 0.517, 549 patients - or one figure and a fifth of their
+    words, or half their words. **Nothing is called a fault**: a table may repeat its prose on
+    purpose. This says where the same fact is, and you decide (ADR-125).
+
+    The files are read as one text, so name the chapters of one version together - two
+    versions of one document repeat each other by design.
+    """
+    config, workspace = _load(config_path, create=False)
+    destination = _destination_or_exit(workspace, into) if into else None
+    try:
+        paths = {name: workspace.resolve_within(name) for name in workspace.named(sources)}
+    except ValueError as error:
+        _show(f"[red]{_plain(str(error).rstrip('.'))}.[/red] Nothing was done.")
+        raise typer.Exit(code=1) from error
+    absent = [name for name, path in paths.items() if not path.is_file()]
+    if absent:
+        _show(f"[red]Not in the workspace:[/red] {_plain(', '.join(absent))}. Nothing was done.")
+        raise typer.Exit(code=1)
+
+    stated: list[Stated] = []
+    for name, path in paths.items():
+        try:
+            # Refused rather than read as text: a PDF or a .docx is not prose (ADR-115).
+            text = draft_text(name, path.read_bytes())
+        except ValueError as error:
+            _show(f"[red]{_plain(error)}[/red] Nothing was done.")
+            raise typer.Exit(code=1) from error
+        stated.extend(stated_in(text, Path(name).name))
+    groups = repetitions(stated)
+    within = sum(len(group.sentences) for group in groups)
+
+    _show(f"[dim]{_plain(RULE)}[/dim]")
+    _show(
+        f"[bold]{counted(len(groups), 'group')}[/bold], holding {counted(within, 'sentence')} "
+        f"of {len(stated):,} read in {counted(len(paths), 'file')}."
+    )
+    for number, group in enumerate(groups, start=1):
+        _show(f"[bold]{number:,}[/bold]  [dim]{_plain(shared_label(group))}[/dim]")
+        for one in group.sentences:
+            _show(f"    {_plain(one.place)}  {_plain(opening(one.text))}")
+    if not groups:
+        _show("Nothing in them is said twice, by this rule.")
+    if destination is None:
+        return
+
+    # Recorded because it writes: what was read, with its digests, and what was left.
+    audit = AuditLog(workspace, config)
+    run_id = audit.opened("repeats")
+    audit.record(
+        run_id,
+        "files_read",
+        f"Read {counted(len(paths), 'file')} for repeats",
+        {
+            "action": "repeats",
+            "files": [
+                {"path": str(path), "sha256": digest_of_file(path)} for path in paths.values()
+            ],
+        },
+    )
+    _write_or_exit(
+        destination,
+        report_text(groups, tuple(Path(name).name for name in paths), len(stated)),
+        (audit, run_id, "repeats"),
+    )
+    audit.record(
+        run_id,
+        "run_finished",
+        "Finished repeats",
+        {"action": "repeats", "groups": len(groups), "sentences": within},
+    )
+    _show(f"-> {_plain(into)}")
 
 
 _VERSIONS: tuple[Version, ...] = ("compact", "extended")

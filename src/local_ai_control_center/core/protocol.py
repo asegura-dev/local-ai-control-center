@@ -113,53 +113,62 @@ _TABLE_RULE = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 _LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d{1,2}[.)])\s+")
 
 
-def _units(text: str) -> list[tuple[int, str]]:
+def units(text: str) -> list[tuple[int, str]]:
     """Paragraphs, list items and table rows, each with the line it starts on.
 
     A table row is a unit of its own: the state-of-the-art table says in one row what a work
     contributes, and joining rows would attribute one work's sentence to another. **So is a
     list item.** The protocol's objectives are a list with no blank lines between them, and read
     as one paragraph they became a single "sentence" citing ten works, judged against each of
-    them (ADR-124's pilot).
+    them (ADR-124's pilot). Shared with the search for what a text says twice (ADR-125), so a
+    protocol is read one way.
     """
-    units: list[tuple[int, str]] = []
+    found: list[tuple[int, str]] = []
     block: list[str] = []
     start = 0
     for number, line in enumerate(text.splitlines(), start=1):
         stripped = line.strip()
         if _LIST_ITEM.match(line) and block:
-            units.append((start, " ".join(block)))
+            found.append((start, " ".join(block)))
             block = []
         if stripped.startswith("|"):
             if block:
-                units.append((start, " ".join(block)))
+                found.append((start, " ".join(block)))
                 block = []
             if not _TABLE_RULE.match(stripped):
                 cells = [cell.strip() for cell in stripped.strip("|").split("|")]
-                units.append((number, " - ".join(cell for cell in cells if cell)))
+                found.append((number, " - ".join(cell for cell in cells if cell)))
             continue
         if not stripped or _HEADING.match(line):
             if block:
-                units.append((start, " ".join(block)))
+                found.append((start, " ".join(block)))
                 block = []
             continue
         if not block:
             start = number
         block.append(_LIST_ITEM.sub("", stripped, count=1))
     if block:
-        units.append((start, " ".join(block)))
-    return units
+        found.append((start, " ".join(block)))
+    return found
+
+
+def sentences_in(unit: str) -> list[str]:
+    """The sentences of one unit.
+
+    A sentence ends at a stop followed by a capital, which leaves `et al. 2020` and `p. ej.`
+    whole.
+    """
+    return _SENTENCE_END.split(unit)
 
 
 def citing_sentences(text: str, source: str) -> tuple[CitingSentence, ...]:
     """Every sentence of ``text`` that cites a number, with the numbers it cites.
 
-    Sentences end at a stop followed by a capital, which leaves `et al. 2020` and `p. ej.`
-    whole. A sentence that cites several works is returned once and belongs to each of them.
+    A sentence that cites several works is returned once and belongs to each of them.
     """
     found: list[CitingSentence] = []
-    for line, unit in _units(text):
-        for sentence in _SENTENCE_END.split(unit):
+    for line, unit in units(text):
+        for sentence in sentences_in(unit):
             numbers = tuple(
                 number
                 for match in CITATION.finditer(sentence)

@@ -87,6 +87,8 @@ behaviour test caught were caught - or would have been - by one of these.
 | `test_asking.py` | Asking from the window: what is prepared, and what never raises (ADR-085). |
 | `test_thread.py` | A thread of questions, and the one thing it must never carry (ADR-091). |
 | `test_review.py` | Reading a draft against a corpus (ADR-068); what could not be judged or read, said apart (ADR-115). |
+| `test_repetition.py` | What a text says twice, by the rule measured on the thesis protocol: a tracer's name, a card's model, a section number, a year and a round number are not figures; a table row repeating its paragraph is one group (ADR-125). |
+| `test_repeats.py` | `lacc repeats`: groups shown with where they are, a report written and its run recorded, a report already there or a PDF refused before anything is read (ADR-125). |
 | `test_notes.py` | A note per reference: what was assembled, judged and read, each marked as what it is; a note never replaced; a no recorded; the judge's model asked for and said by its own name, never as a skill (ADR-124). |
 | `test_coverage.py` | How far the nearest quotation is from a topic (ADR-088). |
 | `test_identity.py` | Which work a document is, and a DOI established for either of its files (ADR-087, ADR-103). |

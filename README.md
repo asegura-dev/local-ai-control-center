@@ -161,6 +161,10 @@ append-only, hash-chained audit log.
   and its verified quotations - each part marked as what it is. Piloted on three references:
   the judges tried so far do not give verdicts worth reading yet, and each verdict says whose
   it is.
+- `lacc repeats <files>` *(unreleased)* shows where your text states the same fact twice -
+  sentences in different paragraphs or rows sharing the figures that make a fact, or most of
+  their words - group by group, with file and line. No model and no network, and nothing is
+  called a fault: a table may repeat its prose on purpose.
 - `lacc resolve <documents>` asks the registry that assigns DOIs what each reference
   actually is, instead of asking a model. It is the first destination in this program that
   is not your own machine, and it needs both `network_access` and a `registry_url` written

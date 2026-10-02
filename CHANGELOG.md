@@ -27,17 +27,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answered nothing in the shape asked. The record has the table.
 - **The judge's model is a line of configuration:** `models: {judge: ...}`, falling back to
   `model`. The line before the question names it when it differs.
+- **Where a text says the same thing twice** (ADR-125). `lacc repeats <files>` finds, with no
+  model and no network, the sentences in different paragraphs or rows that share two
+  specific figures, one figure and a fifth of their words, or half their words, and shows them
+  group by group with their file and line. `--into` writes the groups as a report.
+  - **Nothing is called a fault:** a table may repeat its prose on purpose.
+  - **The rule was measured before it was built.** On the thesis's protocol, read pair by
+    pair, it finds 29 pairs: 21 the same fact, 8 arguable, none a different fact.
+  - **A first rule had counted the numbers in a tracer's name as figures**: 33 of its 64
+    pairs shared nothing but `[68Ga]PSMA-11`.
+
+  Proposals of what to do with each group, a model's narrow task, come next.
 
 ### Changed
 - `review` asks for its judge by the name `judge`, so a configuration that names one changes
   `review`'s judge too. One that names none changes nothing.
+- A PDF or a `.docx` given where text is wanted is refused with a sentence that now ends "use
+  the .md it writes", not "review the .md it writes": `repeats` says it too.
 
 ### Fixed
-- **Two lines of the assurance chapter were not so.** The list of every place LACC writes
-  lacked `corpus`, whose output is a new file like any other. The chapter's count of those
-  places had not moved since `bring` arrived. Read again from the source, with `notes`: eleven
-  commands write a new file for you, LACC keeps seven files for itself, and two writes go
-  outside the workspace, both from the window.
+- **Three lines of the assurance chapter were not so.**
+  - The list of every place LACC writes lacked `corpus`, whose output is a new file like any
+    other.
+  - The chapter's count of those places had not moved since `bring` arrived. Read again from
+    the source, with `notes` and `repeats`: twelve commands write a new file for you, LACC
+    keeps seven files for itself, and two writes go outside the workspace, both from the
+    window.
+  - It said `measure` records nothing when its preview is refused, which stopped being so with
+    ADR-116.
 - **One document cost the batch** (ADR-122). `ingest` over the 65 references of the thesis
   stopped at the 40th, `lckd.pdf`, in a traceback. Its extracted text carried ten halves of
   mathematical letters that UTF-8 cannot write.

@@ -198,7 +198,7 @@ def draft_text(name: str, data: bytes) -> str:
     if suffix in NOT_TEXT:
         raise ValueError(
             f"{name} is a {suffix} file, not text. Convert it first - "
-            f'lacc ingest "{name}" - and review the .md it writes.'
+            f'lacc ingest "{name}" - and use the .md it writes.'
         )
     if b"\x00" in data[:4096]:
         raise ValueError(f"{name} is not text: it holds bytes no text file does.")

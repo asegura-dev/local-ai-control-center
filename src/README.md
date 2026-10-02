@@ -64,6 +64,7 @@ record (ADR-008).
 | `preview.py` | Describing an intended action before it runs, with no effect of its own (ADR-007). |
 | `protocol.py` | What a thesis protocol cites, and where: the master list's keys and numbers, and every sentence that cites one (ADR-124). |
 | `references.py` | Reading the reference list a document already carries (ADR-064). |
+| `repetition.py` | What a text says twice, found without a model: sentences that share the figures that make a fact, or most of their words (ADR-125). |
 | `run.py` | A unique, readable identifier for one execution, and its progress (ADR-002). |
 | `sections.py` | The sections a document numbers for itself (ADR-076). |
 | `skill.py` | Skills: named units of work whose `plan` is pure; effects happen in the cycle. |
@@ -128,6 +129,7 @@ record (ADR-008).
 | `overview.py` | What can be known about a workspace without running anything (ADR-069). |
 | `prompts.py` | What each skill asks the model, before anything is asked (ADR-074). |
 | `reading.py` | Reading this project's own documentation inside the window (ADR-070). |
+| `repeats.py` | A report of what a text says twice, for the writer to edit from; nothing in it is called a fault (ADR-125). |
 | `review.py` | Reading a draft against the sources its writer collected (ADR-068). |
 | `stages.py` | Where the work stands, stage by stage (ADR-080). |
 | `status.py` | What is true about a workspace right now, for the line along the bottom (ADR-077). |
