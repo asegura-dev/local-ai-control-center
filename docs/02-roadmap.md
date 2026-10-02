@@ -81,8 +81,8 @@ What exists, by what it is for:
      judge worth reading - twenty pairs labelled blind will measure the five tried - and
      readings that keep to their document.
    - Next, by the user's choice on 2 October, an editor's pass over what the protocol says
-     twice: at least 13 of the compact version's 132 sentences and 44 of the extended
-     version's 372 restate a fact said elsewhere.
+     twice: read pair by pair, 11 of the compact version's 132 sentences and 27 of the
+     extended version's 372 restate a fact said elsewhere.
    - Then the notes joined by chapter and hypothesis.
 4. **Measure the newer models on the old question - begun.** On 28 September extraction was
    re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations

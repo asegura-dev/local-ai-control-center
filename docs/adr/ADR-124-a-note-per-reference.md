@@ -186,11 +186,14 @@ quotation were identical in all five runs.
 
 **What the pairs showed about the protocol.** Its sentences often carry several claims, and a
 table row carries three: what a work did, its figures, and what it means for the thesis. One
-quotation can hold one of them. And the protocol repeats itself. Measured without a model on 2
-October, at least 13 of the compact version's 132 sentences and 44 of the extended version's
-372 restate a fact said in another paragraph - sharing two figures, or half their words, with
-a sentence there - mostly a summary table repeating the prose. A paraphrase with no figures
-escapes that count, so it is a floor. Both are for later records: judging a sentence by its claims, and
+quotation can hold one of them. And the protocol repeats itself. Read pair by pair on 2
+October, 11 of the compact version's 132 sentences and 27 of the extended version's 372
+restate a fact said in another paragraph, mostly a summary table repeating the prose; 14 more
+of the extended are arguable, such as a hypothesis restated among the expected results. The
+pairs came from two rules, neither using a model. **The first rule's count, 13 and 44, was
+wrong:** 33 of its 64 pairs shared nothing but the numbers in a tracer's name, such as
+`[68Ga]PSMA-11`. A paraphrase that shares no figure and few words reaches neither rule, so
+these counts are a floor. Both are for later records: judging a sentence by its claims, and
 an editor's pass over what the protocol says twice.
 
 ## Consequences
