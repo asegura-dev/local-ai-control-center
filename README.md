@@ -113,7 +113,8 @@ in [`docs/adr/`](docs/adr/) with its context, its trade-off and the alternative 
 
 v3.0.0, working end to end against a real local model and measured against a real
 bibliography rather than against documents written for the test. What each version
-changed is in the [changelog](CHANGELOG.md).
+changed is in the [changelog](CHANGELOG.md); what has landed since v3.0.0 is under
+*Unreleased* there, and marked *(unreleased)* below.
 
 Every run takes the same shape: LACC plans the action, shows a preview, asks for
 confirmation defaulting to no, reads what it was pointed at inside the workspace
@@ -154,6 +155,12 @@ append-only, hash-chained audit log.
   **your** sources and says, paragraph by paragraph, what your corpus holds up, what it
   contradicts and what it does not cover - with *not covered* stated as not covered rather
   than as wrong.
+- `lacc notes <references> --master <list> --against <corpus>` *(unreleased)* writes a note
+  per reference of a thesis, for an Obsidian vault: where the protocol cites it and what a
+  judge said of each of those sentences, what a model read in it for each part of the thesis,
+  and its verified quotations - each part marked as what it is. Piloted on three references:
+  the judges tried so far do not give verdicts worth reading yet, and each verdict says whose
+  it is.
 - `lacc resolve <documents>` asks the registry that assigns DOIs what each reference
   actually is, instead of asking a model. It is the first destination in this program that
   is not your own machine, and it needs both `network_access` and a `registry_url` written

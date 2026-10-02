@@ -102,6 +102,13 @@ class Claim(BaseModel):
     claim: str
     quote: str
     page: int | None = None
+    labels: tuple[tuple[str, str], ...] = ()
+    """The block's other labelled lines, as the model wrote them, in the order given.
+
+    For a skill whose answer says more than one thing about each quotation: which part of the
+    thesis a reading is for, and the reading itself (ADR-124). Prose for a person, like the
+    claim - only the quotation is checked.
+    """
 
 
 class CheckedClaim(BaseModel):
@@ -224,6 +231,11 @@ def _from_json(text: str, fields: tuple[str, ...], quote_field: str) -> tuple[Cl
                 claim=said,
                 quote=quoted.strip("\"'" + chr(0x201C) + chr(0x201D)),
                 page=int(digits) if digits else None,
+                labels=tuple(
+                    (name, str(entry[name]).strip())
+                    for name in fields
+                    if name not in (describes, quote_field, "page") and entry.get(name)
+                ),
             )
         )
     return tuple(claims)
@@ -264,6 +276,11 @@ def parse_claims(
                     claim=current[describes],
                     quote=current[quote_field].strip("\"'“”"),
                     page=int(digits) if digits else None,
+                    labels=tuple(
+                        (name, current[name])
+                        for name in fields
+                        if name not in (describes, quote_field, "page") and name in current
+                    ),
                 )
             )
         current.clear()

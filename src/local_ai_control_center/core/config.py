@@ -50,6 +50,15 @@ MAX_INPUT_BYTES_DEFAULT = 32 * 1024 * 1024
 """32 MiB: large enough that an ordinary research document never meets it, small enough
 that meeting it says something rather than merely being a nuisance."""
 
+JUDGE = "judge"
+"""What `models` calls the judge's model: `models: {judge: gpt-oss:20b}`.
+
+Not a skill - a judge says whether a quotation supports a reading - but routed through the same
+table, so which model judges is one line somebody wrote. Unnamed, the judge is `model`, as it
+always was. The first pilot of the notes found qwen2.5:14b calling "contradicts" what a
+quotation merely did not mention, against its own instructions (ADR-124).
+"""
+
 
 class NtfySettings(BaseModel):
     """How to reach an ntfy server: the destination written down, the secrets named.
@@ -211,7 +220,8 @@ class Config(BaseModel):
             "models measured on the same material differed in kind: the larger one is "
             "more faithful to what it is handed, the smaller one more productive. "
             "Running one for everything takes the worse half of both trades. The "
-            "routing is a rule you wrote, never a choice a model makes (ADR-051)."
+            "routing is a rule you wrote, never a choice a model makes (ADR-051). The "
+            "judge that `review` and `notes` ask is named `judge` here (ADR-124)."
         ),
     )
     embedding_model: str = Field(

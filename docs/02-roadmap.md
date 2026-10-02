@@ -8,14 +8,16 @@ carries no dates.
 Most of it is history, kept on purpose: the plans that were overtaken stay beside what
 actually arrived. **Where LACC is now, and what comes next, is the first section.**
 
-## Where it stands - 1 October
+## Where it stands - 2 October
 
-**v3.0.0**, released on 30 September. Since then, under *Unreleased* in the changelog, two
-records found the next day by putting the thesis's 65 references through it:
+**v3.0.0**, released on 30 September. Since then, under *Unreleased* in the changelog, three
+records from putting the thesis's 65 references through it:
 - ADR-122, a document that cannot be written costs that document: one of them had stopped the
   batch;
 - ADR-123, what the thesis's corpus showed the checker: faithful quotations refused for their
-  citation marks, and two papers filed as topics lists.
+  citation marks, and two papers filed as topics lists;
+- ADR-124, a note per reference: built and piloted on three references. The notes are
+  written as designed; no judge on the server gave verdicts worth reading yet.
 
 What v3.0.0 brought since v2.10.0:
 - the window scrolls, opens where it can be seen, and keeps an answer that arrives while you
@@ -39,7 +41,7 @@ What exists, by what it is for:
 |---|---|
 | reading a library | `ingest`, `sections` to take one part of a document, `references`, `metadata`, `identify`, `resolve`, `bib` |
 | checking what a model says | `run extract_claims`, `collect` and `corpus`, every quotation checked against its document; `--in-passes`; `ask` over a corpus, with `--judge` |
-| checking what you wrote | `bring` - one draft of yours copied in, by name; `review` - that draft against your sources |
+| checking what you wrote | `bring` - one draft of yours copied in, by name; `review` - that draft against your sources; `notes` - a note per reference, with the protocol's sentences that cite it judged against its quotations |
 | seeing the whole | `status`, stage by stage with what each is missing; `coverage`, how far each topic is from its nearest quotation |
 | a window on all of it | fourteen sections in three groups; four act, only when asked and each shown first |
 | the record | a hash-chained trail per workspace, `verify`, and the Audit section to read it |
@@ -74,11 +76,14 @@ What exists, by what it is for:
    - The 65 references of the protocol's second version have a workspace of their own. They
      are converted, and 4,345 of the 4,792 quotations extracted from them were found in their
      documents.
-   - Next, a note per reference built on those verified quotations, saying what each gives to
-     each part of the thesis (ADR-123, to write).
-   - Then the notes joined by chapter and hypothesis. A first trial with `assess_source`
-     showed why it needs its own skill: it asks whether a source is new, and the thesis's
-     context already summarises these.
+   - A note per reference built on those verified quotations, saying what each gives to each
+     part of the thesis: ADR-124, piloted on three references on 1 October. Before the 65, a
+     judge worth reading - twenty pairs labelled blind will measure the five tried - and
+     readings that keep to their document.
+   - Next, by the user's choice on 2 October, an editor's pass over what the protocol says
+     twice: at least 13 of the compact version's 132 sentences and 44 of the extended
+     version's 372 restate a fact said elsewhere.
+   - Then the notes joined by chapter and hypothesis.
 4. **Measure the newer models on the old question - begun.** On 28 September extraction was
    re-run on the seventeen documents the figure came from: 43 of qwen3.5:9b's 834 quotations
    are not in their document, against 38 of the 14B's 216, and the figure this project is

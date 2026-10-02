@@ -49,6 +49,7 @@ behaviour test caught were caught - or would have been - by one of these.
 | `test_headings.py` | Finding a document's sections so a person can choose one. |
 | `test_sections.py` | What a document numbers for itself, and what only looks numbered (ADR-076). |
 | `test_references.py` | Reading the reference list a document already carries (ADR-064). |
+| `test_protocol.py` | What a thesis protocol cites and where: the master list's keys and numbers, lists and ranges, table rows, tracers in brackets that are not citations (ADR-124). |
 | `test_corpus.py` | Reading back a collected corpus, and the round trip that makes that safe. |
 | `test_kinds.py` | What a file in a workspace is, decided once (ADR-090); a converted document is never a topics list (ADR-123). |
 
@@ -86,6 +87,7 @@ behaviour test caught were caught - or would have been - by one of these.
 | `test_asking.py` | Asking from the window: what is prepared, and what never raises (ADR-085). |
 | `test_thread.py` | A thread of questions, and the one thing it must never carry (ADR-091). |
 | `test_review.py` | Reading a draft against a corpus (ADR-068); what could not be judged or read, said apart (ADR-115). |
+| `test_notes.py` | A note per reference: what was assembled, judged and read, each marked as what it is; a note never replaced; a no recorded; the judge's model asked for and said by its own name, never as a skill (ADR-124). |
 | `test_coverage.py` | How far the nearest quotation is from a topic (ADR-088). |
 | `test_identity.py` | Which work a document is, and a DOI established for either of its files (ADR-087, ADR-103). |
 | `test_bibtex.py` | BibTeX written from what a registry said, and nothing else (ADR-102). |

@@ -6,7 +6,8 @@ it rewrites; and outside the workspace it writes two things, both only from the 
 after showing what it would do.
 
 Read on 27-sep from every place the source writes (`write_text`, `write_bytes`, `open` with
-`"w"`, `"a"` or `"x"`, `mkdir`, `safe_dump`).
+`"w"`, `"a"` or `"x"`, `mkdir`, `safe_dump`), and read again on 2-oct, which found `corpus`
+missing from the first table.
 
 ## What a command writes for you - never over anything
 
@@ -19,6 +20,7 @@ results only to new files."*
 |---|---|---|
 | `lacc ingest` | The document's text, page by page | `<document>.md` beside it, or `--into` |
 | `lacc collect` | A corpus of checked quotations | `--into` |
+| `lacc corpus` | The quotations of one or more collected corpora, each checked again against its document and marked when it is not there | `--into` |
 | `lacc run revise_file` | The revision, after you approve its diff - beside the original, never over it (ADR-025) | a sibling of the document |
 | `lacc review --into` | The report, and the findings as data for the window | `--into`, and `<into>.findings.json` |
 | `lacc coverage --into` | The report | `--into` (and see below for its numbers) |
@@ -26,6 +28,7 @@ results only to new files."*
 | `lacc bib --into` | The bibliography, as BibTeX | `--into`, which must end in `.bib` |
 | `lacc sections --take --into` | One numbered section of a document, and where it came from | `--into`, and `<into>.from.json` |
 | `lacc bring` | A copy of one file you named outside the workspace, and where it came from (ADR-111) | `drafts/<name> (<day>)<suffix>`, and `<copy>.brought.json` beside it |
+| `lacc notes` | A note per reference: where the protocol cites it and what a judge said, the model's reading, its verified quotations (ADR-124). A note already there is refused before anything is asked | `notes/<key>.md`, or `<into>/<key>.md` |
 
 One exception, by the letter: coverage's numbers, `<into>.reaches.json`, are written with a
 plain write after the report. The report is refused if it exists, so the numbers are only ever
@@ -66,6 +69,7 @@ only place LACC reads outside the workspace.
 - **The trail, by the window.** The Audit section reads it and has no control that writes
   (ADR-104).
 - **The model's answer, into the next question.** A thread of questions carries the passages
-  whose quotations were found, never the model's prose (ADR-091). The one place a model's words
-  do go back to an engine is `--judge`, which sends each reading beside its quotation to be
-  judged, and says that it is a model judging a model (ADR-053).
+  whose quotations were found, never the model's prose (ADR-091). A model's words go back to
+  an engine in two places, both to be judged: `--judge`, which sends each reading beside its
+  quotation and says that it is a model judging a model (ADR-053), and `notes`, which does the
+  same with the reading of each reference (ADR-124).

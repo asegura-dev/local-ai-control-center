@@ -489,6 +489,101 @@ class AssessSourceSkill(Skill):
         )
 
 
+READING_FIELDS = ("part", "reading", "quote", "page", "use")
+"""What `read_for_thesis` answers in, per block. PART opens a block; QUOTE is what is checked;
+USE, how the thesis might use it, is optional and never judged."""
+
+FORMULA_PART = "Formula"
+"""The PART a block names when its READING is a formula, so it is shown as a reconstruction."""
+
+
+class ReadForThesisSkill(Skill):
+    """What one reference gives each part of a thesis, quotation by quotation (ADR-124).
+
+    Where `assess_source` asks what a document adds to what is already known, this asks which
+    parts of the thesis it bears on and what it gives each. Its pilot showed why the two
+    differ: the thesis's context already summarises its own references, so asking what is new
+    answers "it overlaps" (ADR-124).
+
+    The reading is prose and cannot be checked. The quotation under it is checked like every
+    other, and the note judges whether it supports the reading - two controls that make a
+    reading safer to use, never true.
+    """
+
+    @property
+    def name(self) -> str:
+        """Identify this skill."""
+        return "read_for_thesis"
+
+    @property
+    def required(self) -> frozenset[Capability]:
+        """Reading a document for the thesis needs to read it, and nothing else."""
+        return frozenset({"read_files"})
+
+    def plan(self, requests: tuple[str, ...], config: Config) -> SkillPlan:
+        """Plan to read the document at ``request`` for the thesis the context describes."""
+        action = IntendedAction(
+            name=self.name,
+            summary=f"Read {chr(44).join(requests)} for the thesis in the standing context",
+            required=self.required,
+            targets=tuple(Path(item) for item in requests),
+        )
+        line = chr(10)
+        # READING is about the document and nothing else, so its quotation can establish it.
+        # The pilot's readings said why a paper mattered to the thesis, which no quotation of
+        # the paper can support, and not one of seven was judged to follow (ADR-124).
+        shape = (
+            "PART: the label the standing context gives that part - a hypothesis such as H1 or "
+            "H2, a design choice, a phase, or a gap it lists"
+            + line
+            + "READING: what the document itself states that bears on that part, in one or two "
+            "sentences - a statement about the document, which the QUOTE establishes, and "
+            "nothing about the thesis"
+            + line
+            + "QUOTE: the document's own words that establish the READING"
+            + line
+            + "PAGE: the page number"
+            + line
+            + "USE: optionally, one sentence on how the thesis could use it"
+        )
+        prompt_template = (
+            "You are reading one document for a thesis described in the standing context: its "
+            "objectives, hypotheses, chapters and the decisions it records."
+            + line * 2
+            + f"Write in {config.output_language}."
+            + line * 2
+            + "For each part of the thesis this document bears on, write one block:"
+            + line * 2
+            + shape
+            + line * 2
+            + "A part the document does not bear on gets no block. Where the thesis would need "
+            f"a formula from this document, write a block with PART: {FORMULA_PART}, READING: "
+            "the formula in LaTeX, and QUOTE: the line of the document it comes from, exactly "
+            "as the text shows it, even when the extraction garbled it."
+            + line * 2
+            + fenced_context()
+            + line * 2
+            + fenced_documents(requests)
+            + line * 2
+            # Restated after the document, where it is still being attended to (ADR-037).
+            + "Answer now in blocks, one per point, separated by a blank line:"
+            + line * 2
+            + shape
+            + line * 2
+            + "Copy every QUOTE character for character: a quotation you adjust is no longer a "
+            "quotation, and every one is checked against the document."
+        )
+        return SkillPlan(
+            action=action,
+            prompt_template=prompt_template,
+            uses_context=True,
+            verify_quotes=True,
+            fields=READING_FIELDS,
+            quote_field="quote",
+            enforce_shape=config.enforces_shape(self.name),
+        )
+
+
 class ReviseFileSkill(Skill):
     """Propose a clearer version of a document, written beside it and never over it.
 

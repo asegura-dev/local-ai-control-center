@@ -298,7 +298,8 @@ the point: the argument for how it is recorded happens before it ships, not afte
 
 REACHES_THE_EMBEDDER = {
     ("dense.py", "_ranked"): "the question: every ranking by meaning is a run of its own, "
-    "rank_by_meaning (ADR-108), except review's, recorded in review's run (ADR-107)",
+    "rank_by_meaning (ADR-108), except review's and notes', recorded in their own run "
+    "(ADR-107, ADR-124)",
     ("dense.py", "vectors_for"): "quotations never embedded: counted by would_send before "
     "they go, and recorded with the question or topics that sent them",
     ("coverage.py", "reach_of"): "the topics: coverage records texts_embedded (ADR-107)",

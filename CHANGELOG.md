@@ -7,7 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A note per reference** (ADR-124). `lacc notes` writes a Markdown note for each reference
+  of a thesis, in the markup an Obsidian vault reads, and marks each part as what it is:
+  - **what LACC assembled, with no model:** the master list's entry, `[@key]`, every sentence
+    of the protocol's two versions that cites the work by number, and the work's verified
+    quotations;
+  - **what a judge decided** about each of those sentences, against the three nearest
+    quotations of that work alone, showing the quotations it judged when none held the
+    sentence up;
+  - **what a model read** in the work for each part of the thesis, through a new skill,
+    `read_for_thesis`. Its quotations are checked and its readings judged; a formula is kept
+    as the model's reconstruction beside the line it comes from.
+
+  One preview and one question; one run for the notes and one for each reading, all in the
+  trail. Piloted on three references with five judges: the notes are written as designed, and
+  **no judge on the server gave verdicts worth reading yet**. One agreed with nearly
+  everything, two found nearly nothing either way, one called silence a contradiction, and one
+  answered nothing in the shape asked. The record has the table.
+- **The judge's model is a line of configuration:** `models: {judge: ...}`, falling back to
+  `model`. The line before the question names it when it differs.
+
+### Changed
+- `review` asks for its judge by the name `judge`, so a configuration that names one changes
+  `review`'s judge too. One that names none changes nothing.
+
 ### Fixed
+- **Two lines of the assurance chapter were not so.** The list of every place LACC writes
+  lacked `corpus`, whose output is a new file like any other. The chapter's count of those
+  places had not moved since `bring` arrived. Read again from the source, with `notes`: eleven
+  commands write a new file for you, LACC keeps seven files for itself, and two writes go
+  outside the workspace, both from the window.
 - **One document cost the batch** (ADR-122). `ingest` over the 65 references of the thesis
   stopped at the 40th, `lckd.pdf`, in a traceback. Its extracted text carried ten halves of
   mathematical letters that UTF-8 cannot write.

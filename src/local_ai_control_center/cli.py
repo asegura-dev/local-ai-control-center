@@ -58,7 +58,13 @@ from local_ai_control_center.core.budget import (
     answer_reserve,
     estimate_tokens,
 )
-from local_ai_control_center.core.config import DOTENV_FILENAME, Config, load_config, load_dotenv
+from local_ai_control_center.core.config import (
+    DOTENV_FILENAME,
+    JUDGE,
+    Config,
+    load_config,
+    load_dotenv,
+)
 from local_ai_control_center.core.corpus import CollectedClaim, about, parse_corpus
 from local_ai_control_center.core.declared import (
     DeclarationError,
@@ -75,6 +81,13 @@ from local_ai_control_center.core.headings import headings_in, matching
 from local_ai_control_center.core.passes import PageRangeError
 from local_ai_control_center.core.permissions import grant
 from local_ai_control_center.core.preview import ExecutionPreview, IntendedAction, preview_action
+from local_ai_control_center.core.protocol import (
+    MasterEntry,
+    Version,
+    citing,
+    citing_sentences,
+    master_entries,
+)
 from local_ai_control_center.core.references import (
     as_one_line,
     references_in,
@@ -88,6 +101,7 @@ from local_ai_control_center.core.skill import (
     AssessSourceSkill,
     CritiqueFileSkill,
     ExtractClaimsSkill,
+    ReadForThesisSkill,
     ReviseFileSkill,
     Skill,
     SkillPlan,
@@ -160,10 +174,12 @@ from local_ai_control_center.features.identity import (
 )
 from local_ai_control_center.features.measure import spread
 from local_ai_control_center.features.navigate import ranked, sections_would_send
+from local_ai_control_center.features.notes import NOTES_FOLDER, Cited, Reading, note_text
 from local_ai_control_center.features.prompts import prompts_of
 from local_ai_control_center.features.review import (
     FINDINGS_SUFFIX,
     Finding,
+    Paragraph,
     Reviewed,
     concluded,
     draft_text,
@@ -210,6 +226,7 @@ _SKILLS: dict[str, Skill] = {
     "revise_file": ReviseFileSkill(),
     "extract_claims": ExtractClaimsSkill(),
     "assess_source": AssessSourceSkill(),
+    "read_for_thesis": ReadForThesisSkill(),
 }
 
 
@@ -889,17 +906,18 @@ def _build_provider(choice: ProviderChoice, config: Config, skill: str = "") -> 
 
 
 def _say_which_model(config: Config, skill: str) -> None:
-    """Say when a skill runs on a model other than the configured default.
+    """Say when a skill, or the judge, runs on a model other than the configured default.
 
     A run whose model came from a table is a run whose model the person should be told
-    about, at the moment they are deciding whether to start it.
+    about, at the moment they are deciding whether to start it. The judge is named in the
+    same table without being a skill (ADR-124), so the line does not call it one.
     """
     chosen = config.model_for(skill)
     if chosen and chosen != config.model:
         console.print(
             f"[yellow]{_plain(skill)} runs on {_plain(chosen)}[/yellow], not "
             f"{_plain(config.model or 'the default')} - "
-            "your configuration names a model for this skill."
+            "your configuration names a model for it."
         )
 
 
@@ -2675,10 +2693,12 @@ def review(
     # Built before the question: a configuration naming no model was a traceback after the
     # yes, with a run left open (ADR-115).
     try:
-        provider = _build_provider(ProviderChoice.ollama, config)
+        # The judge's own model when the configuration names one (ADR-124).
+        provider = _build_provider(ProviderChoice.ollama, config, JUDGE)
     except ProviderError as error:
         _show(f"[red]{_plain(error)}[/red] Nothing was sent.")
         raise typer.Exit(code=1) from error
+    _say_which_model(config, JUDGE)
     # Opened where it is about to ask, so a no is recorded too (ADR-107).
     audit = AuditLog(workspace, config)
     run_id = audit.opened("review")
@@ -2796,6 +2816,344 @@ def review(
         _show(f"-> {_plain(into)}")
     audit.record(run_id, "run_finished", "Finished review", {"action": "review"})
     if unjudged and len(unjudged) == len(findings):
+        raise typer.Exit(code=1)
+
+
+_VERSIONS: tuple[Version, ...] = ("compact", "extended")
+
+
+@app.command()
+def notes(
+    documents: Annotated[
+        list[str],
+        typer.Argument(help="The references to write a note for, in the workspace, or a pattern."),
+    ],
+    master: Annotated[
+        Path,
+        typer.Option("--master", help="The master list: each key, its numbers, its reference."),
+    ],
+    against: Annotated[
+        Path, typer.Option("--against", help="A corpus from `corpus`, for each note's quotations.")
+    ],
+    compact: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--compact", help="A chapter of the compact version: repeat it, or a pattern."
+        ),
+    ] = None,
+    extended: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--extended", help="A chapter of the extended version: repeat it, or a pattern."
+        ),
+    ] = None,
+    into: Annotated[
+        Path, typer.Option("--into", help="The folder the notes are written in, one per reference.")
+    ] = Path(NOTES_FOLDER),
+    config_path: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ] = DEFAULT_CONFIG_PATH,
+    provider_choice: Annotated[
+        ProviderChoice, typer.Option("--provider", help="Which provider to run against.")
+    ] = ProviderChoice.ollama,
+) -> None:
+    """A note per reference: where the protocol cites it, whether it says so, what it gives.
+
+    **Three layers, each marked as what it is** (ADR-124). LACC assembles the reference, the
+    sentences of the protocol that cite it and its verified quotations. A judge decides whether
+    each of those sentences is held up by the reference itself. A model reads the reference for
+    each part of the thesis; its quotations are checked and its readings judged, and it is still
+    headed as a reading.
+
+    A note is a new file: one already there is never replaced.
+    """
+    config, workspace = _load(config_path)
+    skill = _SKILLS["read_for_thesis"]
+    chapters: dict[Version, list[str]] = {
+        "compact": list(workspace.named(tuple(compact or ()))),
+        "extended": list(workspace.named(tuple(extended or ()))),
+    }
+    named = list(workspace.named(documents))
+    read = [*named, *chapters["compact"], *chapters["extended"], str(master), str(against)]
+    try:
+        paths = {name: workspace.resolve_within(Path(name)) for name in read}
+        folder = workspace.resolve_within(into)
+    except ValueError as error:
+        _show(f"[red]{_plain(str(error).rstrip('.'))}.[/red] Nothing was done.")
+        raise typer.Exit(code=1) from error
+    absent = [name for name, path in paths.items() if not path.is_file()]
+    if absent:
+        _show(f"[red]Not in the workspace:[/red] {_plain(', '.join(absent))}. Nothing was done.")
+        raise typer.Exit(code=1)
+    if folder.exists() and not folder.is_dir():
+        _show(f"[red]{_plain(into)} is a file, and notes go in a folder of that name.[/red]")
+        raise typer.Exit(code=1)
+
+    entries = {
+        entry.key: entry
+        for entry in master_entries(
+            paths[str(master)].read_text(encoding="utf-8", errors="replace")
+        )
+    }
+    if not entries:
+        _show(
+            f"[red]{_plain(master)} names no reference.[/red] A master list gives each work as a "
+            "bullet with its key in bold, and its reference on the next line."
+        )
+        raise typer.Exit(code=1)
+    sentences = {
+        version: tuple(
+            sentence
+            for name in names
+            for sentence in citing_sentences(
+                paths[name].read_text(encoding="utf-8", errors="replace"), Path(name).name
+            )
+        )
+        for version, names in chapters.items()
+    }
+    citable = [
+        c
+        for c in parse_corpus(paths[str(against)].read_text(encoding="utf-8", errors="replace"))
+        if "NOT IN THE DOCUMENT" not in c.recorded_verdict
+    ]
+    wanted: list[tuple[str, MasterEntry]] = []
+    unlisted: list[str] = []
+    for name in named:
+        entry = entries.get(Path(name).stem)
+        if entry is None:
+            unlisted.append(Path(name).name)
+        else:
+            wanted.append((name, entry))
+    if not wanted:
+        _show(
+            "[red]None of these has an entry in the master list.[/red] A note is named by its key."
+        )
+        raise typer.Exit(code=1)
+    taken = [entry.key for _, entry in wanted if (folder / f"{entry.key}.md").exists()]
+    if taken:
+        _show(
+            f"[red]{_plain(', '.join(taken))}: already in {_plain(into)}.[/red] Notes are only "
+            "written as new files - move them, or name another folder with --into."
+        )
+        raise typer.Exit(code=1)
+
+    passages = {
+        name: tuple(
+            Passage(text=c.quote, source=c.document, note=c.claim, page=c.page)
+            for c in citable
+            if c.document == Path(name).name
+        )
+        for name, _ in wanted
+    }
+    to_judge = sum(
+        len(citing(entry, sentences[version], version))
+        for _, entry in wanted
+        for version in _VERSIONS
+    )
+    retriever = _retriever_or_exit(config, paths[str(against)])
+    every = tuple(passage for group in passages.values() for passage in group)
+    outgoing = retriever.would_send(every) if every else None
+    try:
+        provider = _build_provider(provider_choice, config, skill.name)
+        judge = AskingJudge(_build_provider(provider_choice, config, JUDGE))
+    except ProviderError as error:
+        _show(f"[red]{_plain(error)}[/red] Nothing was sent.")
+        raise typer.Exit(code=1) from error
+
+    action = IntendedAction(
+        name="notes",
+        summary=f"Write {counted(len(wanted), 'note')} into {into}",
+        required=frozenset({"read_files", "write_files"}),
+        targets=tuple(Path(name) for name in read),
+        writes=tuple(Path(into) / f"{entry.key}.md" for _, entry in wanted),
+    )
+    preview = preview_action(
+        action, grant(action.required, config), config, workspace, config.remote_engine
+    )
+    _show_preview(preview)
+    if not preview.allowed:
+        _exit_refused()
+    _show(
+        f"[bold]{counted(len(wanted), 'reference')}[/bold]: {counted(to_judge, 'sentence')} of "
+        f"the protocol to judge, about {to_judge * CANDIDATES_PER_PARAGRAPH:,} judgements, and "
+        "a reading of each reference, each of them a few seconds or more."
+    )
+    if unlisted:
+        _show(
+            "[yellow]No entry in the master list, so no note:[/yellow] "
+            f"{_plain(', '.join(unlisted))}"
+        )
+    if outgoing is not None:
+        # Ranking a Spanish sentence against English quotations wants meaning, and sends the
+        # sentence and every quotation never embedded - said before the question (ADR-106).
+        _show(ranking_would_send(outgoing, reaching(config), sends="each sentence"), markup=False)
+    _say_which_model(config, skill.name)
+    _say_which_model(config, JUDGE)
+    audit = AuditLog(workspace, config)
+    run_id = audit.opened("notes")
+    if not _asked(f"Write {counted(len(wanted), 'note')}?"):
+        audit.record(run_id, "confirmation_declined", "Declined notes", {"action": "notes"})
+        _show("[yellow]Declined.[/yellow] Nothing was sent to the engine.")
+        return
+
+    folder.mkdir(exist_ok=True)
+    rows: list[dict[str, object]] = []
+    reasons: list[dict[str, str]] = []
+    tally = {"supported": 0, "contradicted": 0, "nothing": 0, "undecided": 0}
+    readings_seen = readings_found = readings_followed = 0
+    written: list[Path] = []
+    failed: list[str] = []
+    try:
+        with console.status("Writing notes...") as status:
+            for index, (name, entry) in enumerate(wanted, start=1):
+                status.update(f"{entry.key} ({index} of {len(wanted)})...")
+                group = passages[name]
+                whole = sum(estimate_tokens(p.text) + estimate_tokens(p.note) for p in group)
+                cited: list[Cited] = []
+                for version in _VERSIONS:
+                    for sentence in citing(entry, sentences[version], version):
+                        claim = sentence.without_marks
+                        nearest = retriever.select(claim, group, whole + len(group)).chosen
+                        judged = [
+                            (p.source, p.text, judge.judge(claim, p.text))
+                            for p in nearest[:CANDIDATES_PER_PARAGRAPH]
+                        ]
+                        for _, quoted, verdict in judged:
+                            rows.append(
+                                {
+                                    "key": entry.key,
+                                    "of": "sentence",
+                                    "line": sentence.line,
+                                    "quote_sha256": digest_of(quoted),
+                                    "asked_sha256": digest_of(verdict.asked),
+                                    "verdict": verdict.verdict,
+                                }
+                            )
+                            reasons.append({"verdict": verdict.verdict, "why": verdict.detail})
+                        finding = concluded(Paragraph(text=claim, line=sentence.line), judged)
+                        tally[finding.verdict] += 1
+                        cited.append(
+                            Cited(
+                                sentence=sentence,
+                                version=version,
+                                verdict=finding.verdict,  # type: ignore[arg-type]
+                                quote=finding.quote,
+                                page=next(
+                                    (p.page for p in nearest if p.text == finding.quote), None
+                                ),
+                                detail=finding.detail,
+                                considered=tuple(
+                                    (p.text, p.page) for p in nearest[:CANDIDATES_PER_PARAGRAPH]
+                                ),
+                            )
+                        )
+                readings: list[Reading] = []
+                try:
+                    # Its own run, as `collect` reads a document, and in passes when the window
+                    # is known: a long reference is read whole instead of refused, and the
+                    # trail shows each reading (ADR-124). Passes need the window to divide by.
+                    result: RunResult | None = _do_run(
+                        skill,
+                        (name,),
+                        config,
+                        workspace,
+                        provider,
+                        audit,
+                        new_run_id(),
+                        config.context_tokens is not None,
+                    )
+                except (ProviderError, ReadError, PromptTooLargeError, CannotReadInPasses) as error:
+                    failed.append(f"{entry.key}: not read - {error}")
+                    result = None
+                for checked in result.checked_claims if result is not None else ():
+                    labels = dict(checked.claim.labels)
+                    reading = Reading(
+                        part=checked.claim.claim,
+                        reading=labels.get("reading", ""),
+                        quote=checked.claim.quote,
+                        page=checked.found_on_page,
+                        found=checked.found,
+                        use=labels.get("use", ""),
+                    )
+                    if reading.found and reading.reading and not reading.formula:
+                        verdict = judge.judge(reading.reading, reading.quote)
+                        rows.append(
+                            {
+                                "key": entry.key,
+                                "of": "reading",
+                                "quote_sha256": digest_of(reading.quote),
+                                "asked_sha256": digest_of(verdict.asked),
+                                "verdict": verdict.verdict,
+                            }
+                        )
+                        reasons.append({"verdict": verdict.verdict, "why": verdict.detail})
+                        reading = reading.model_copy(update={"verdict": verdict.verdict})
+                        readings_followed += verdict.verdict == "follows"
+                    readings_seen += 1
+                    readings_found += reading.found
+                    readings.append(reading)
+                target = folder / f"{entry.key}.md"
+                own = tuple(c for c in citable if c.document == Path(name).name)
+                try:
+                    write_new_file(target, note_text(entry, tuple(cited), tuple(readings), own))
+                except ConversionError as error:
+                    failed.append(f"{entry.key}: {error}")
+                    continue
+                audit.wrote(run_id, "notes", target)
+                written.append(target)
+    except EmbeddingError as error:
+        # The judge turns an engine that went away into "not judged"; the ranking cannot, and
+        # a run that stopped here would otherwise have no end (ADR-107).
+        _show(f"[red]{_plain(error)}[/red]")
+        audit.record(
+            run_id, "run_failed", "Could not rank", {"action": "notes", "error": str(error)}
+        )
+        raise typer.Exit(code=1) from error
+
+    if outgoing is not None:
+        host = resolve_engine_host(config.engine_host, config.network_access)
+        audit.embedded(
+            run_id,
+            "notes",
+            outgoing.model,
+            host,
+            {"sentences": to_judge, "quotations": outgoing.unembedded},
+        )
+    audit.record(
+        run_id,
+        "readings_judged",
+        f"Judged {to_judge} sentences and {readings_seen} readings for {len(wanted)} references",
+        {
+            "action": "notes",
+            "judge": judge.name,
+            "references": len(wanted),
+            "sentences": to_judge,
+            "held": tally["supported"],
+            "contradicted": tally["contradicted"],
+            "not_covered": tally["nothing"],
+            "not_judged": tally["undecided"],
+            "readings": readings_seen,
+            "readings_found": readings_found,
+            "readings_followed": readings_followed,
+            "judged": len(rows),
+            "judged_readings": rows,
+            "completion": reasons,
+        },
+    )
+    audit.record(run_id, "run_finished", "Finished notes", {"action": "notes"})
+    _show(f"[bold]{counted(len(written), 'note')}[/bold] written to {_plain(into)}.")
+    _show(
+        f"Sentences of the protocol: [green]{tally['supported']:,} held up[/green], "
+        f"[red]{tally['contradicted']:,} contradicted[/red], "
+        f"[yellow]{tally['nothing']:,} not covered[/yellow], {tally['undecided']:,} not judged."
+    )
+    _show(
+        f"Readings: {readings_found:,} of {counted(readings_seen, 'quotation')} in their "
+        f"document, {readings_followed:,} judged to support what was read in them."
+    )
+    for problem in failed:
+        _show(f"[yellow]{_plain(problem)}[/yellow]")
+    if not written:
         raise typer.Exit(code=1)
 
 
