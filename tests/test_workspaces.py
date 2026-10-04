@@ -156,7 +156,7 @@ def test_a_host_on_this_machine_is_carried_as_it_is(tmp_path: Path) -> None:
 def test_a_host_off_this_machine_is_named_whatever_the_source_allowed(tmp_path: Path) -> None:
     """From a configuration with the network off, a remote host was written as a working line,
     which is what `carried as it is` promised only for a host on this machine (ADR-121)."""
-    remote = "http://100.76.182.73:11434"
+    remote = "http://100.101.102.103:11434"
     written = as_yaml(tmp_path, _config(network_access=False, engine_host=remote))
     assert f"# engine_host: {remote}" in written
     assert f"{chr(10)}engine_host: {remote}" not in written

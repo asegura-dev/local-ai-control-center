@@ -32,10 +32,10 @@ machine, the host is written as a comment beside the switch:
 
 ```yaml
 network_access: false
-# The configuration this was made from reaches an engine at http://100.76.182.73:11434.
+# The configuration this was made from reaches an engine at http://100.101.102.103:11434.
 # To reach it from this workspace too, change the line above to true and remove
 # the # below. The window does not grant it.
-# engine_host: http://100.76.182.73:11434
+# engine_host: http://100.101.102.103:11434
 ```
 
 Granting it is two edits a person makes in the file, which is where every other grant is made.

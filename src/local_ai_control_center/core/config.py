@@ -28,7 +28,7 @@ _ENVIRONMENT_VARIABLE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 """What a name in a `*_env` field has to look like: a variable name, not a value.
 
 **Upper case is required, and that is the point rather than fussiness.** Checking only
-the shape of an identifier is not enough: `tk_f0yn7rfgs48l94eq41y5u7ddh2irw` is a
+the shape of an identifier is not enough: `tk_q8v3k1m7x2c9b4n6z0p5w8r2y7d1h` is a
 perfectly valid identifier, so a token pasted into `token_env` passes a shape check
 while being exactly the thing this field exists to keep out of files. The upper-case
 convention is the only thing that reliably separates the name of a variable from the

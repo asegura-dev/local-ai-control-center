@@ -53,7 +53,7 @@ gone. So the line is drawn at what the value *is*, not at where it is stored.
 
 **A `*_env` field must look like the name of a variable, in upper case.** This is the check
 that would have caught the original mistake, and the upper case is not fussiness: a shape
-check alone accepts `tk_f0yn7rfgs48l94eq41y5u7ddh2irw`, which is a valid identifier and
+check alone accepts `tk_q8v3k1m7x2c9b4n6z0p5w8r2y7d1h`, which is a valid identifier and
 also exactly the thing being guarded against. Case is what separates the name of a variable
 from the value of one. The refusal names the field, shows what was given, and says what to
 put there instead.

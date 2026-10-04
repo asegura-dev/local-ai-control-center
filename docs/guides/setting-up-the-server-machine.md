@@ -172,7 +172,7 @@ says so:
 
 ```
 `token_env` names an environment variable; it does not hold the value.
-Got 'tk_f0yn...', which is not the name of one - they are written in upper
+Got 'tk_q8v3...', which is not the name of one - they are written in upper
 case, like `NTFY_TOKEN`. Put that name here and the value in your environment.
 ```
 

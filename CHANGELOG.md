@@ -2907,7 +2907,7 @@ ntfy, and a real seven-page paper from a real bibliography.
   variable exists to prevent. The `.env` removes the step; the validation catches the
   misreading.
 - **Requiring upper case is what makes the validation work.** A shape check alone accepts
-  `tk_f0yn7rfgs48l94eq41y5u7ddh2irw`, which is a valid identifier and also precisely the
+  `tk_q8v3k1m7x2c9b4n6z0p5w8r2y7d1h`, which is a valid identifier and also precisely the
   thing being guarded against. Case is the only thing that reliably separates the name of
   a variable from the value of one.
 - **A `.env` cannot redirect your documents.** It supplies secrets; `network_access` and

@@ -461,7 +461,7 @@ def test_a_token_never_reaches_the_terminal(
     """
     for name in ("NTFY_SERVER", "NTFY_TOPIC", "NTFY_TOKEN"):
         monkeypatch.delenv(name, raising=False)
-    secret = "tk_f0yn7rfgs48l94eq41y5u7"
+    secret = "tk_q8v3k1m7x2c9b4n6z0p5w8"
     config = _config_with_dotenv(tmp_path, secret)
     _install_notifier(monkeypatch, _CapturingNotifier())
     result = runner.invoke(app, ["notify", "test", "-c", str(config)])

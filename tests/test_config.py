@@ -180,14 +180,14 @@ def test_a_value_written_where_a_variable_name_belongs_is_refused(tmp_path: Path
 def test_a_token_shaped_like_an_identifier_is_still_refused(tmp_path: Path) -> None:
     """The case a shape check misses, and the one that matters most.
 
-    `tk_f0yn7rfgs48l94eq41y5u7ddh2irw` is a valid identifier, so requiring "looks like a
+    `tk_q8v3k1m7x2c9b4n6z0p5w8r2y7d1h` is a valid identifier, so requiring "looks like a
     name" would accept the very thing this field exists to keep out of files. Upper case
     is what separates the name of a variable from the value of one.
     """
     with pytest.raises(ValidationError):
         Config(
             workspace_root=tmp_path,
-            notifier={"ntfy": {"enabled": True, "token_env": "tk_f0yn7rfgs48l94eq41y5u7"}},
+            notifier={"ntfy": {"enabled": True, "token_env": "tk_q8v3k1m7x2c9b4n6z0p5w8"}},
         )
 
 

@@ -17,7 +17,7 @@ preview did not show it:
   - `lacc bring "cap [1].md"`, beside a file called `cap 1.md`, proposed to read `cap 1.md`:
     the brackets were read as a pattern, and the pattern matched the other file.
   - `capit*.md` was accepted as if it were a name.
-  - `nota-%USERNAME%.md` became `nota-Aleja.md`.
+  - `nota-%USERNAME%.md` became `nota-ana.md`.
   - A pattern that matched several files was refused, by an error that listed every one of
     them, in a folder outside the workspace.
 
@@ -82,7 +82,7 @@ Measured through the real entry point, with the tester's own inputs:
 |---|---|---|
 | `cap [1].md`, beside `cap 1.md` | would read `cap 1.md` | would read `cap [1].md` |
 | `capit*.md` | would read `capitulo.md` | no file there, and `*` is not a pattern here |
-| `nota-%USERNAME%.md` | would read `nota-Aleja.md` | would read `nota-%USERNAME%.md` |
+| `nota-%USERNAME%.md` | would read `nota-ana.md` | would read `nota-%USERNAME%.md` |
 | `Metodología [v2] ñ.md` | shown as `Metodología  ñ.md` | shown as typed |
 | `no-existe.md` | "never a folder" | "There is no file at …" |
 | `\\archivos.invalid\tesis\03.md` | size read over the network | refused before any file-system call |

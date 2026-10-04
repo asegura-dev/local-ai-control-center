@@ -241,8 +241,8 @@ def test_the_shapes_of_a_share_are_known_by_their_text() -> None:
     assert on_the_network("//archivos/tesis/03.md")
     assert on_the_network(chr(92) * 2 + r"?\UNC\archivos\tesis\03.md")
     assert on_the_network(chr(92) * 2 + r".\unc\archivos\tesis\03.md")
-    assert not on_the_network(r"C:\Users\Aleja\tesis\03.md")
-    assert not on_the_network(chr(92) * 2 + r"?\C:\Users\Aleja\tesis\03.md")
+    assert not on_the_network(r"C:\Users\ana\tesis\03.md")
+    assert not on_the_network(chr(92) * 2 + r"?\C:\Users\ana\tesis\03.md")
     assert not on_the_network("tesis/03.md")
 
 
