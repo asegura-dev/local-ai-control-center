@@ -165,7 +165,9 @@ that actually matters to you.
 `extract_claims` checks every quotation against the source and reports how many held. So
 run one of your own papers through it with a small model, then with the larger one the new
 hardware allows, and compare how many quotations came back **verified** rather than **not
-found**. Time both runs while you are there.
+found**. Time both runs while you are there, and run each more than once - `lacc measure
+extract_claims paper.md --runs 4` reports the spread, because one run of each is a story,
+not a comparison.
 
 A model that fabricates fewer quotations is better at this job for a reason you can point
 at, measured on your sources rather than somebody else's benchmark. If the bigger model

@@ -52,7 +52,7 @@ because this project's most frequent defect is a true sentence that aged.
     core/       decides things, imports nothing outside itself
     ports/      abstract classes and the contracts that cross them
     adapters/   implements a port: Ollama, Crossref, ntfy, documents
-    features/   one capability each: corpus, review, sections, prompts...
+    features/   one capability each: corpus, review, coverage, prompts...
     views/      the window's fourteen sections - draws, never decides
     system/     the machine, not behind a port: the audit trail, the profiler
     cli.py      the driving adapter          window.py  the second one

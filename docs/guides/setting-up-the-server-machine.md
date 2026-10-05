@@ -33,12 +33,17 @@ Three pieces on the server, a few lines of configuration on your laptop:
 
 ### What a notification carries
 
-It says **which skill ran, how it ended, and how long it took**. That is the whole message:
+It says **which skill ran, how it ended, and how long it took** - and, once the trail has
+an anchor, how many records the trail holds and the first eight characters of how it
+ends, so a copy of the trail's length lives on a device other than the laptop (ADR-049):
 
 ```
 Title: LACC: extract_claims completed
-Body:  extract_claims completed after 1284s
+Body:  extract_claims completed after 1284s [trail: 1723 records, 3f9a2c1b]
 ```
+
+`collect` says counts instead of a time alone: how many documents of how many, how many
+quotations were found in their source, and the minutes it took.
 
 Never a prompt, an answer, a file path, or the text of anything read - not even an error
 message. The destination is a machine you named, and that is still not a reason to send it
@@ -54,8 +59,8 @@ you are working, on what, and at what hour is **information about your research*
 the body says. Sending that to a company every day discloses your working pattern and your
 subject to somebody who keeps it. A server you run has no such party in it.
 
-Once configured there is nothing to operate: every `lacc run` that completes, is refused or
-fails sends one notification, and each is written to the audit trail as `notification_sent`
+Once configured there is nothing to operate: every `lacc run`, `ask` or `collect` that
+completes, is refused or fails sends one notification, and each is written to the audit trail as `notification_sent`
 or `notification_failed` under the same run id as the run it reports. A run you decline
 sends nothing - you were at the prompt, so there is nobody to tell.
 
@@ -100,8 +105,11 @@ what it read, and sends *that* to the engine. The PDF never leaves your laptop; 
 text inside the prompt travels, and only for as long as the request takes. Your workspace,
 your converted Markdown and your audit trail all live here.
 
-This is why the preview says "the contents read above" rather than naming a file. It is
-also why `workspace_root` is a path on this machine and the server needs no workspace at
+This is why the preview's *Sends* line says what goes - the contents read above, the
+prompt a question builds, or for `repeats --propose` the sentences of each group - rather
+than naming a file. With `embedding_model` set, a question and any quotation never
+embedded also go, to be embedded, and that is said before the question that asks
+(ADR-106). It is also why `workspace_root` is a path on this machine and the server needs no workspace at
 all - the server holds models, and nothing of yours.
 
 ### 2.1 Configuration
@@ -198,7 +206,17 @@ curl http://100.101.102.103:11434/api/tags
 You should get a block of JSON listing the models on the server. If `qwen2.5:7b` is not in
 it, you pulled it on the wrong machine.
 
-**3.3 Notifications arrive:**
+**3.3 LACC reaches it, with your configuration:**
+
+```
+uv run lacc engine test
+```
+
+This asks the host your configuration names, with its `network_access`, whether the model
+you named is installed there and answers. It exits non-zero when a run would not get an
+answer, and it is the check that uses LACC's settings rather than your typing.
+
+**3.4 Notifications arrive:**
 
 ```
 uv run lacc notify test
@@ -206,7 +224,7 @@ uv run lacc notify test
 
 Your phone should buzz.
 
-**3.4 The whole thing:**
+**3.5 The whole thing:**
 
 ```
 uv run lacc run summarize_file paper.md
@@ -226,10 +244,10 @@ goes; on a **Windows** server, watch the Ollama tray icon's log window.
 | ntfy answers but the engine does not           | A firewall rule exists for one port and not the other. Docker adds its own when it publishes a port; the Ollama installer does not, because by default it needs none. |
 | `curl` says connection refused                 | Ollama is not running, or a firewall is blocking it.                                                                                                                  |
 | `model not found`                              | The model is on your laptop, not on the server. Pull it there.                                                                                                        |
-| `No notifier configured`                       | One of three things: `network_access: true`, `enabled: true`, or the environment variables not being set in *this* terminal window.                                   |
+| `No notifier configured`                       | One of four things: `network_access: true`, `enabled: true`, a `server_url`, or the variables the configuration names - which come from `configs/.env` (2.2). |
 | Test says sent, phone silent                   | The phone is not on the tailnet, or is subscribed to a different topic.                                                                                               |
 | Answers are slow and the graphics card is idle | Ollama fell back to the processor. Check `nvidia-smi` while a run is in progress.                                                                                     |
-| A run is refused for prompt size               | The document is larger than the context window. Raise `context_tokens`, at a cost in memory.                                                                          |
+| A run is refused for prompt size               | The document is larger than the context window. Read it in passes (`--in-passes`), take one section of it (`lacc sections --take`), or raise `context_tokens`, at a cost in memory. |
 
 ---
 
@@ -268,7 +286,9 @@ uv run lacc run extract_claims paper.md
 ```
 
 Write down how many quotations came back **verified** and how many **not found**. Then run
-the same document against a smaller model and compare.
+the same document against a smaller model and compare - more than once each: `lacc measure
+extract_claims paper.md --runs 4` reports the spread, because one run cannot be compared
+with another.
 
 That number is the only honest answer to whether the larger model was worth the setup, and
 it is specific to your sources rather than to somebody else's benchmark.

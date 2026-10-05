@@ -7,7 +7,8 @@ and about what it can and cannot prove.
 
 ## Where it is
 
-One trail per workspace: `audit.jsonl`, with `audit.anchor` beside it. Each record is one
+One trail per workspace: `audit.jsonl`, with `audit.anchor` beside it and `audit.lock`,
+which writers take turns at so two of them never chain to the same record (ADR-109). Each record is one
 line of JSON, and each carries the digest of the one before it, so a record edited, removed
 from the middle or moved breaks the chain at that point (ADR-023). The anchor remembers how
 long the trail was and how it ended, which is what catches records removed from the end
@@ -15,14 +16,15 @@ long the trail was and how it ended, which is what catches records removed from 
 
 How much a record holds is `audit_level` in your configuration. Under `standard`, what
 happened: the skill, the files, the model, the counts, the digests. Under `full`, also the
-prompt that was sent and the answer that came back - which is what makes it possible to show,
+prompt that was sent and the answer that came back, the question asked and the DOIs sent
+to a registry - which is what makes it possible to show,
 later, exactly what a model was asked and what it said.
 
 ## In the window: Audit
 
 `lacc window -c configs/yours.yaml`, then **Audit** under *Your work*.
 
-- It says **reading** while it walks the chain - one to two seconds for 1,700 records - and then
+- It says **reading** while it walks the chain - one to two seconds for 1,700 records, on 27 September - and then
   whether the chain holds, from when to when, and what the anchor says. These are the same
   sentences `lacc verify` prints.
 - The list beside it is the trail's **runs**, newest first, under the day they happened: the
@@ -32,7 +34,11 @@ later, exactly what a model was asked and what it said.
   registry request says how many DOIs went and whether an address went with them; the DOIs
   themselves are listed only under `audit_level: full`, and the address never. A ranking by
   meaning is a run of its own, `rank_by_meaning`, just before the question it was for - or
-  alone, when the question was prepared and never sent (ADR-108).
+  alone, when the question was prepared and never sent (ADR-108). `bring` is a run too, and
+the one that records a path outside the workspace, with its digest (ADR-111). Unreleased:
+`notes` is a run for the notes and one for each reference's reading (ADR-124), and
+`repeats` a run when it writes its report, with `edits_proposed` under `--propose`
+(ADR-125).
 - How a run ended is what its own records say:
 
   | Shown | Means |

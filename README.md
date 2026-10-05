@@ -65,7 +65,7 @@ uv sync
 uv run lacc profile                  # what this machine can run
 mkdir -p configs                          # LACC looks here; git ignores it
 cp config.example.yaml configs/config.yaml   # set workspace_root, model, context_tokens
-uv run lacc ingest paper.pdf         # PDF or Word into text LACC can read
+uv run lacc ingest paper.pdf         # a PDF or Word file in workspace_root, into text
 uv run lacc run extract_claims paper.md
 
 uv sync --extra gui                  # the window is optional
@@ -121,7 +121,8 @@ confirmation defaulting to no, reads what it was pointed at inside the workspace
 boundary under the `read_files` permission, and records the whole thing in an
 append-only, hash-chained audit log.
 
-- `lacc run summarize_file <path>` and `critique_file` answer about a document.
+- `lacc run summarize_file <path>`, `critique_file` and `assess_source` answer about a
+  document - the last against the standing context your configuration names (ADR-041).
 - `lacc run extract_claims <path>` returns what a source asserts, each claim with the
   document's own words and a page - and **every quotation is checked against the
   source**. What cannot be found is marked as not found rather than presented as fact.
@@ -155,25 +156,30 @@ append-only, hash-chained audit log.
   **your** sources and says, paragraph by paragraph, what your corpus holds up, what it
   contradicts and what it does not cover - with *not covered* stated as not covered rather
   than as wrong.
-- `lacc notes <references> --master <list> --against <corpus>` *(unreleased)* writes a note
-  per reference of a thesis, for an Obsidian vault: where the protocol cites it and what a
-  judge said of each of those sentences, what a model read in it for each part of the thesis,
-  and its verified quotations - each part marked as what it is. Piloted on three references:
-  the judges tried so far do not give verdicts worth reading yet, and each verdict says whose
-  it is.
+- `lacc notes <references> --master <list> --against <corpus> --compact <chapters>
+  --extended <chapters>` *(unreleased)* writes a note per reference of a thesis, for an
+  Obsidian vault, into `notes/`: where the protocol cites it and what a judge said of each
+  of those sentences, what a model read in it for each part of the thesis named in your
+  `context_file`, and its verified quotations - each part marked as what it is. Each
+  reference's file is named by its key in the master list, and the judge's model is
+  `models: {judge: ...}`. Piloted on three references: the judges tried so far do not give
+  verdicts worth reading yet, and each verdict says whose it is.
 - `lacc repeats <files>` *(unreleased)* shows where your text states the same fact twice -
-  sentences in different paragraphs or rows sharing the figures that make a fact, or most of
-  their words - group by group, with file and line. No model and no network, and nothing is
-  called a fault: a table may repeat its prose on purpose. `--propose` asks a model, one
-  group at a time, where the fact should stay and how the rest could read; each proposal is
-  headed as the model's and checked, and your files are never written.
-- `lacc resolve <documents>` asks the registry that assigns DOIs what each reference
+  sentences in different paragraphs or rows that share two specific figures, one figure and
+  a fifth of their words, or half their words - group by group, with file and line. No model
+  and no network, and nothing is called a fault: a table may repeat its prose on purpose.
+  `--propose --into <report>` asks a model, one group at a time, where the fact should stay
+  and how the rest could read; the model is `models: {edit_repetition: ...}`. Each proposal
+  is headed as the model's and checked - what it adds, drops or loses is named - and your
+  files are never written.
+- `lacc resolve <documents> --into <file>` asks the registry that assigns DOIs what each reference
   actually is, instead of asking a model. It is the first destination in this program that
   is not your own machine, and it needs both `network_access` and a `registry_url` written
   in your configuration.
 - `lacc bib <answers> --into refs.bib` writes what the registry answered as
   BibTeX, for biber and pandoc, with no network. `--adding-to` names the `.bib` you already
-  cite from: what it holds is left out and none of its keys is handed out again.
+  cite from, copied into the workspace: what it holds is left out and none of its keys is
+  handed out again.
 - `lacc references <documents>` reports what more than one of your papers cites, and
   whether you hold it; `lacc metadata` prints what each document says about itself - title,
   authors, DOI, date - with no model and no network.
@@ -186,8 +192,8 @@ append-only, hash-chained audit log.
   corpus is from each subject you name, ordered, against a **floor**: one line of the topics
   file has to be a subject deliberately outside your field, and that is what the rest are
   read against. **Nothing is called a gap** - a similarity is an ordering, not an interval -
-  and the quotation that came closest is printed under each topic so the number can be
-  checked rather than believed.
+  and with `--into` the report prints the quotation that came closest under each topic, so
+  the number can be checked rather than believed.
 - `lacc identify <document>` lists the DOIs a document prints and asks the registry what
   each one is, and **chooses none of them**: a document prints the DOIs of what it cites
   too, and no test separated the two. With `--doi` it records the one you established
@@ -204,6 +210,7 @@ append-only, hash-chained audit log.
   the configured engine answers, and `lacc notify test` checks notification settings before
   you rely on them. `lacc outline` lists a document's sections with their pages, and
   `lacc measure` runs a skill several times and reports the spread rather than one number.
+  `lacc --version` says which version is installed.
 - `thinking: false` in the configuration asks a model that reasons before
   answering not to: one sentence took 40 seconds on qwen3.5:9b with its reasoning, and half
   a second without.
@@ -233,7 +240,8 @@ asked what a reference is rather than a model. Naming an
 `embedding_model` lets a question be answered by meaning as well as by shared words -
 measured on a real corpus, a question asked in Spanish against English quotations
 reached eight relevant passages of the first eight, where word matching reached about
-three. It is off unless named, and the word ranking is never removed.
+three. It is off unless named, the word ranking is never removed, and it asks before it
+sends: `Rank by meaning? [y/N]`, where no ranks by words (ADR-106).
 
 By default LACC contacts nothing but a local engine. It reaches another machine only
 when the configuration both permits network access and names the host - so the model

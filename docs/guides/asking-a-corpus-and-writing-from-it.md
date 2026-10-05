@@ -215,7 +215,26 @@ default. The window's *Reviews* section paints the findings over the draft.
 A paragraph can also come back *not judged*: the engine did not answer for it, so nothing
 was concluded - which is not your corpus failing to hold it. Run the review again once the
 engine answers. A draft brought in as `.docx` or PDF is converted first with `lacc ingest`,
-and `review` reads the `.md` that writes (ADR-115).
+and `review` reads the `.md` that writes (ADR-115). Which model judges is a line of your
+configuration, `models: {judge: ...}`, falling back to `model` *(unreleased, ADR-124)*.
+
+### Where your draft says the same thing twice *(unreleased)*
+
+    lacc repeats "drafts/0*.md" --into repeats.md
+
+Sentences in different paragraphs or rows that share two specific figures, one figure and
+a fifth of their words, or half their words, grouped with file and line - no model and no
+network (ADR-125). A table that repeats its prose may be what the text needs: the report
+says where, and you decide. `--propose` asks a model, one group at a time, where the fact
+should stay and how the rest could read, and names what each proposal adds, drops or
+loses.
+
+### A note per reference *(unreleased)*
+
+`lacc notes` writes, for each reference of a thesis, a note an Obsidian vault reads: where
+your protocol cites it, what a judge said of each of those sentences, a model's reading
+for each part of the thesis, and its verified quotations, each marked as what it is
+(ADR-124). The README gives its full usage.
 
 ## Where the corpus is thin
 

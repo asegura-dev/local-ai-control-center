@@ -177,10 +177,13 @@ the model gave page 4 for a sentence on page 1, with the quotation itself correc
 Nothing is removed. An unverified claim stays in the answer and is marked, because the
 point is to show you what the model did rather than tidy it away.
 
-Matching is exact, after collapsing whitespace and folding case. It is deliberately not
-fuzzy: "across four hospitals" for "across three hospitals" is precisely the error that
-must not pass. So it will occasionally reject a quotation you would accept - a changed
-dash, a fixed typo. That errs the right way. A false "not found" costs you a glance; a
+Matching is exact after a few foldings that change no word: whitespace collapsed and case
+folded, typographic dashes and quotes read as plain ones, a word broken by a hyphen at a
+line end rejoined, a line break the model wrote as `\n` read as one (ADR-034, ADR-035,
+ADR-081) - and, unreleased, numbered citation marks such as `[12]` set aside (ADR-123). It is
+deliberately not fuzzy: "across four hospitals" for "across three hospitals" is
+precisely the error that must not pass. So it will occasionally reject a quotation you
+would accept - a fixed typo, a word left out. That errs the right way. A false "not found" costs you a glance; a
 false "verified" is the failure the whole check exists to prevent.
 
 **Know what this proves.** A verified quotation means the words are in the document. It
@@ -229,6 +232,10 @@ uv run lacc run revise_file draft.md
 You approve against a **diff**, not a preview - the revised text does not exist until the
 model answers, so a preview could not show it. Approving writes `draft.revised.md` beside
 the original. What a command writes for you never replaces a file that already existed.
+
+A draft you keep outside the workspace - in a notes vault, say - comes in first: `lacc
+bring <file>` shows its full path, asks, and copies it into `drafts/` with the day in its
+name. Revise the copy (ADR-111).
 
 That protection ends where you take over: once you copy the revision over the original,
 it is an ordinary file you edited.

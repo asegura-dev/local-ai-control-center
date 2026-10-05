@@ -74,7 +74,8 @@ Before committing, the following checks are expected to pass:
 
 In order, these lint the code, verify formatting without changing files, type
 check the package in strict mode, and run the test suite. If formatting fails,
-`.\run.ps1 run ruff format .` applies the changes. The same four run on every push in CI
+`.\run.ps1 run ruff format .` applies the changes. The same four run in CI on every push to `main` and every pull request
+to it
 (`.github/workflows/quality-gate.yml`), on a clean runner where plain `uv` is safe.
 
 Some of the suite is about the code's own shape rather than its behaviour - the layers, the

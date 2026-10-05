@@ -453,15 +453,16 @@ naming the strong machine, an ambient `OLLAMA_HOST=localhost`, and an answer tha
 back from a three-billion-parameter model with nothing saying so.
 
 The notifier is the same rule applied to a smaller thing. It posts to an ntfy server the
-user hosts, named through environment variables the configuration points at - the YAML
-holds the *name* of the variable, never the token, because a token in a configuration file
-is a token in a backup. A third-party messaging service is refused on a ground that is easy
+user hosts, at an address the configuration writes as `server_url` - the YAML holds the
+*name* of the variables for the topic and the token, never their values, because a token
+in a configuration file is a token in a backup (ADR-030, ADR-060). A third-party messaging service is refused on a ground that is easy
 to miss: the body of the message is not the only thing it discloses. That you are working,
 on what, and at what hour is information about the research, whatever the message says.
 
 Two properties of the notifier are worth separating because they are easy to conflate. A
 notification **carries no document content** - which skill ran, how it ended, how long it
-took, and nothing else, not a path and not an error string. And delivery is **best effort**:
+took, counts for a `collect`, and the trail's length and head when it has an anchor
+(ADR-049); never a path and never an error string. And delivery is **best effort**:
 a notifier that cannot be built or cannot reach its server prints and records the failure
 and returns, because a run that already produced an answer is not failed by a message
 about it.
