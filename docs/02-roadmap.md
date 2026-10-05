@@ -76,8 +76,8 @@ What exists, by what it is for:
    - a writer that waits out its turn under load.
 3. **The thesis's references, read for the thesis - begun on 1 October.**
    - The 65 references of the protocol's second version have a workspace of their own. They
-     are converted, and 4,345 of the 4,792 quotations extracted from them were found in their
-     documents.
+     are converted, and their corpus holds 4,447 citable quotations of the 4,844 extracted,
+     each found in its document (ADR-123).
    - A note per reference built on those verified quotations, saying what each gives to each
      part of the thesis: ADR-124, piloted on three references on 1 October. Before the 65, a
      judge worth reading - twenty pairs labelled blind will measure the five tried - and
@@ -473,7 +473,9 @@ similarity path and a mutation test confirming a changed word or digit still fai
 
 **Forty-four are absent in any form tried.** Not stitched from separate sentences, not
 reworded: not there. About one quotation in five, on a real bibliography, with a 14B model.
-That is the number this project should be quoted on, and it is the reason the check exists.
+That was the number this project was quoted on, and it is the reason the check exists.
+Re-taken on 28 September 2026 with that day's checker it is **42 of 237**, about one in six -
+the figure to quote now (chapter 04).
 
 **Eight of 24 documents never entered the window at all.** They were refused for size, which
 is correct, and `collect` said so: each one occupies its own section of the corpus naming the
@@ -584,7 +586,7 @@ near-duplicate threshold is 0.80. The highest-similarity non-identical pair in t
 one that must be kept.
 
 **The lesson for this roadmap is about plans rather than about duplication.** This project
-has a section counting twelve figures it got wrong, and it learned to check numbers. The premise
+has a section counting the figures it got wrong, and it learned to check numbers. The premise
 above was never a number. It was a claim about the world, written in the sentence justifying
 the work, and it was invisible for exactly that reason - nothing in a plan looks like a
 figure. **A plan is where unmeasured claims hide.** The question that catches them is asked
@@ -696,7 +698,7 @@ corpus was complete enough, by distance rather than by clustering (ADR-088).
 ### What this section planned, kept as the plan it was
 
 **Most of what follows has since happened, some of it in another form**, and the figures in
-it are the day it was written. The slices exist - twenty modules in `features/`. The converse
+it are the day it was written. The slices exist, in `features/`. The converse
 rule is a test (ADR-066). `_collected_markdown` and `_assembled` left `cli.py`, which has
 grown anyway. The window arrived as v2.0.0 rather than v2.5.0, and acts in four places.
 Coverage is distance rather than clusters. What has not happened is at the end: discovery,

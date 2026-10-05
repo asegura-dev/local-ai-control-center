@@ -29,7 +29,7 @@ was published and later corrected, both are shown, because the correction is the
 | Enforcing the shape gives 0 quotations against 19; do not use it | The parser refused a truncated document carrying 76 entries. It gives **32 verified against 15**, and the advice was backwards | ADR-056 |
 | **48 of 237 quotations are not in their document** - the figure this project was cited by | **42**. Six were line breaks the model wrote as `\n`, all in one document; the checker has read them as line breaks since ADR-081, and the figure went on being repeated without being re-taken | re-checked 28-sep |
 
-Six of these made the model look worse than it was. The seventh was the correction to that
+The first six of these made the model look worse than it was. The seventh was the correction to that
 pattern, published in the same release that introduced it, and it overshot: it credited a
 model that had invented forty-four quotations. **Knowing you are biased in one direction
 does not make the next figure unbiased.**
@@ -94,8 +94,8 @@ The tenth is the ninth's twin and it cost more, because it had been written into
 premise rather than as a prediction. The plan's next piece was approximate deduplication, on
 the stated grounds that the corpus held near-duplicates between documents. Nobody had looked.
 **It held none** - all 654 quotations, all 26 documents at the time, zero pairs across a
-document boundary; the corpus has since grown to 1,129 citable quotations (ADR-091), and
-this has not been re-run over them - and the entire exact comparison it was to be an
+document boundary; the corpus had grown to 1,129 citable quotations by 23 September (ADR-091),
+and the thesis's to 4,447 by 1 October, and this has not been re-run over either - and the entire exact comparison it was to be an
 approximation of takes 133
 milliseconds. What it does hold is six repeats inside a document, of which equality was
 already catching three. A sentence stated as a fact in a planning document is a figure with no
@@ -374,8 +374,8 @@ against about six. Four runs would be a measurement.
 **about 220 of 1,129 citable passages** - 219 and 226 on two questions on 23 September
 (ADR-091); it was 214 of 777 on 22 September and 218 of 654 when this was first written.
 At a quarter to a third, retrieval decided order and discards more than membership; **at a
-fifth it decides membership too**, which is the direction this paragraph predicted and now
-the state it describes.
+fifth it decides membership too**, which is the direction this paragraph predicted and, on 23
+September, the state it describes.
 
 **Fusion is not measured against either ranking alone.** It is built and tested for mechanism
 and no figure says it wins.
@@ -662,7 +662,7 @@ documents. That is not an argument against predicting. It is an argument for wri
 prediction down where it can embarrass you.
 
 **Ask whether a surprising zero is the world or the instrument.** A rate of exactly none is
-almost always the measuring end. Six of the corrections above are that, and the most recent is
+almost always the measuring end. Six of the corrections above are that, and one of them is
 a zero that was a parser refusing to read what it had been given.
 
 **Ask when it was taken.** A figure in a record is from the day of the record. This project

@@ -66,7 +66,7 @@ first destination in this program that is not the user's own machine (ADR-067).
 `Retriever` is worth noting as the one that paid off twice: it was written with a word
 ranking behind it and the record said an embedding model *"may well do better; nobody here
 has measured that it does, and a port means the measurement can decide rather than the
-fashion"*. Two months later dense retrieval arrived as a second implementation and needed no
+fashion"*. Two days later dense retrieval arrived as a second implementation and needed no
 change to the port at all.
 
 **`adapters` and `system` are separate because a port is not free.** An abstraction earns
@@ -116,8 +116,9 @@ touches a file. Reading before the provider means the contents can reach the pro
 
 A question to a corpus is the exception, and it is an honest one only in part. Its preview
 *is* a ranking of the corpus - which passages would go - so the corpus is read to draw it;
-and with an embedding model, drawing it sends the question to the engine before the
-confirmation. The first is what the preview is; the second is an open gap (ADR-105).
+and with an embedding model, drawing it once sent the question to the engine before the
+confirmation. The first is what the preview is; the second was a gap (ADR-105), closed on
+28 September: drawing it sends nothing, and ranking by meaning asks first (ADR-106).
 The cycle fills the template and sends the result; the filled prompt is the cycle's
 product, not the plan's.
 
@@ -499,8 +500,9 @@ seven, to one - each correction removing another defect here. The paper's senten
 sixteen unquotable to zero.
 
 **And then the correction overshot.** v0.38.0 published "zero fabrications in 237 quotations"
-across a whole bibliography. Re-running the shipped code over the same corpus gives 48 absent
-of 237 - about one in five - of which 44 are not in their document in any form tried. Having
+across a whole bibliography. Re-running the shipped code over the same corpus gave 48 absent
+of 237 - about one in five - of which 44 were not in their document in any form tried;
+re-taken on 28 September with that day's checker, it is 42, about one in six (chapter 04). Having
 found six times that this project blamed the model for its own defects, the seventh
 measurement leant the other way and credited a model that had invented forty-four quotations
 (ADR-042).
@@ -543,8 +545,8 @@ meaning (ADR-050, ADR-061) - and the documents that did not fit enter either in 
 (ADR-045) or as one numbered section taken out of them (ADR-076). Passes turned out to
 help documents that fit as well: six of them gave 59 verified quotations read whole and 352
 read in passes, because a prompt asks once however much it is shown (ADR-089). The limit
-is now the ranking as much as the budget: over 1,129 checked quotations a 32k window admits
-about 220, a fifth (ADR-091).
+is now the ranking as much as the budget: over 1,129 checked quotations, on 23 September, a
+32k window admitted about 220, a fifth (ADR-091).
 
 *Factual metadata.* Asked for a journal, a model supplied one from memory and did not say
 that it had - twelve fabrications in twenty-four, with an explicit instruction not to. It now

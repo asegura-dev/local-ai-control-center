@@ -17,8 +17,8 @@ suite, and for a workspace: every document with its tokens, pages and structure,
 corpus with what is citable in it.
 
 **Nothing it prints is stored.** A number in a file is true for a while and then quietly stops
-being, which is this project's most frequent defect - twelve wrong figures, six of them
-flattering. A figure you can re-take in four seconds never needs to be trusted.
+being, which is this project's most frequent defect - chapter 04 lists the wrong figures, about half of
+them flattering. A figure you can re-take in four seconds never needs to be trusted.
 
 The habit worth forming is smaller than the tool: **before writing a sentence with a number in
 it, take the number.** Twice in one session a count refused half of a plan that was already
@@ -86,7 +86,7 @@ the expectation was written first.
 
 ## 5. Report what went wrong, including your own part
 
-The changelog here says which figures were wrong and which way they leaned. Six of twelve
+The changelog here says which figures were wrong and which way they leaned. About half of them
 flattered the tool. `docs/04-measurements.md` exists for that and is the chapter most worth
 reading.
 

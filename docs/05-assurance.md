@@ -110,8 +110,9 @@ read *held* and were not:
 - **"Nothing outside the workspace is touched"** had stopped being true when the window began
   to write configurations and make workspaces (ADR-093, ADR-094). Those were decided, and shown
   before they happen; the row was what had not followed. Restated above.
-- **"Writing happens in three places only"** - it was twelve, listed in
-  `docs/stack/files-on-disk.md`; thirteen since ADR-109.
+- **"Writing happens in three places only"** - it was more: `docs/stack/files-on-disk.md`,
+  read again from the source on 2-oct, lists twelve commands that write a new file, seven
+  files LACC keeps for itself and two writes outside the workspace.
 
 And one found by the same reading: **preparing a question embedded it** when `embedding_model`
 was set, so the question reached the engine before the preview that asked whether to send it.

@@ -37,52 +37,51 @@ directory by hand succeeds immediately.
 A lock is loud, and you retry. A hollowed-out binary lies, and you debug the wrong thing
 for an hour. That asymmetry is the argument.
 
-## The fix: a directory link
+## The fix: nothing of the environment inside the folder
 
-Keep the environment outside the synchronised tree and leave a link where the tooling
-expects it. Nothing then has to be remembered, and no environment variable has to be set
-in every terminal.
-
-On Windows, from the project directory:
+**Run every `uv` command through `run.ps1`.** It points `uv` at an environment in
+`%USERPROFILE%\.venvs\lacc` by setting `UV_PROJECT_ENVIRONMENT` for that one command, so
+nothing belonging to the environment exists inside the checkout at all:
 
 ```powershell
-New-Item -ItemType Directory -Force -Path "$HOME\.venvs\lacc"
-Remove-Item -Recurse -Force .venv          # only if one is already there
-New-Item -ItemType Junction -Path .venv -Target "$HOME\.venvs\lacc"
-uv sync
+.\run.ps1 sync
+.\run.ps1 run lacc --help
+.\run.ps1 run pytest -q
 ```
 
-A junction needs no administrator rights. On macOS or Linux the equivalent is
-`ln -s ~/.venvs/lacc .venv`.
+Never run `uv` bare from the checkout: `uv sync` then creates a `.venv` inside the
+synchronised folder, and you have two environments. That is how this project once found a
+111 MB `.venv` in its checkout, beside the one `run.ps1` uses (ADR-084).
 
-Verify it took effect:
+On macOS or Linux, set the same variable in the shell you work in, or in a small wrapper
+of your own, before any `uv` command:
 
-```powershell
-Get-Item .venv | Select-Object Name, LinkType, Target
+```sh
+export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/lacc"
 ```
 
-The project directory should now hold a link of a few bytes where a few hundred megabytes
-used to be, and the sync client has nothing left in the environment to dehydrate. Expect
-the occasional locked `dist-info` to survive this: it comes from elsewhere, and the fix is
-to delete the orphaned directory and run the command again.
+Verify it took effect: there should be no `.venv` in the project directory, and
+`.\run.ps1 run python -c "import sys; print(sys.prefix)"` should print a path under
+`.venvs\lacc`. Expect the occasional locked `dist-info` even so: it comes from elsewhere,
+and the fix is to delete the orphaned directory and run the command again.
 
-## Two alternatives, and what they cost
+## What does not work, and what works better
 
-**`UV_PROJECT_ENVIRONMENT`.** Point `uv` at a path outside the sync folder. It works, and
-it is what a wrapper script usually does. The cost is that it has to be set in every
-shell that touches the project: forget once and `uv` silently creates a second
-environment inside the synchronised folder, and you now have two. Setting it globally is
-worse, because every `uv` project on the machine then shares one environment directory.
+**A directory link does not.** A `.venv` junction or symlink pointing outside the folder
+looks like the tidy answer and is not one: synchronisers traverse reparse points, so the
+environment behind the link is still walked and still locked. This guide recommended the
+link until 4 October 2026, while `run.ps1` and ADR-084 already said it was not enough.
 
-**Move the checkout out of the synchronised folder.** This removes the cause rather than
-the symptom, and it is the right answer if you are free to do it. A git repository does
-not belong in a sync folder in the first place: git already keeps the history, the remote
-already is the backup, and the sync client contributes only lock contention and conflicted
-copies. It is also why the checkout has to be left alone while git runs.
+**Moving the checkout out of the synchronised folder works better.** It removes the cause
+rather than the symptom, and it is the right answer if you are free to do it. A git
+repository does not belong in a sync folder in the first place: git already keeps the
+history, the remote already is the backup, and the sync client contributes only lock
+contention and conflicted copies. It is also why the checkout has to be left alone while
+git runs.
 
 ## What this does not protect
 
-The link keeps the environment out of the sync client's way. It does nothing about the
+`run.ps1` keeps the environment out of the sync client's way. It does nothing about the
 rest of the checkout, which is still synchronised - so a `git` operation can still collide
 with the client, and pausing syncing during git work remains sensible until the checkout
 is moved out entirely.

@@ -1,6 +1,6 @@
 # Decision records
 
-Eighty-four records, in the order they were decided. The number is the identity: it is how
+The records, in the order they were decided. The number is the identity: it is how
 they are cited from docstrings and from the chapters, and there are several hundred such
 citations. They are not filed into folders for that reason, and because the records worth
 most cross topics - a record about measurement is usually also about grounding and about

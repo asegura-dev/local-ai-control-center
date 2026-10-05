@@ -28,10 +28,14 @@ shell on Linux or macOS leaves it to LACC (ADR-112).
 
 `collect` runs over each document alone, so one that is too large for the window is refused
 by name with its token count rather than silently half-read. **Read the refusals**, and then
-read those documents in passes - a corpus that does not mention a paper will not mention it
+collect those documents in passes - a corpus that does not mention a paper will not mention it
 when you ask, and nothing in the answer will say why:
 
-    lacc run extract_claims big-guideline.md --in-passes --pages-per-pass 3
+    lacc collect extract_claims big-guideline.md --in-passes --pages-per-pass 3 --into big.md
+    lacc corpus corpus.md big.md --into everything.md
+
+Through `collect`, not `run`: `run` prints what it found and writes nothing, so its
+quotations never reach a corpus. This guide said `run` until 4 October 2026.
 
 **And use passes on documents that fit, when the document is worth it.** Six papers that fit
 the window gave **59 quotations read whole and 352 read in passes** - six times as many, from
@@ -152,7 +156,7 @@ under the question box says what *Prepare* sends - the question alone; quotation
 never embedded get a card that names them, and a button of their own. Every ranking that
 reaches the engine is in the trail, as a `rank_by_meaning` run the Audit section lists.
 
-It matters most across languages and as the corpus grows. At 1,129 citable quotations with a
+It matters most across languages and as the corpus grows. At 1,129 citable quotations - the corpus on 23 September - with a
 32k window the budget admits about 220 of them - a fifth - whatever the ranking says, so
 what gets in at all is now the ranking's decision (ADR-091). At 777 it was a quarter; the
 share falls as you collect more.

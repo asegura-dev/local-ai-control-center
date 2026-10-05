@@ -1,7 +1,7 @@
 # The stack - what LACC is made of, and where each part is used
 
-For somebody who wants to understand the repository without reading its thirty thousand lines
-(about 17,700 of source and 12,200 of tests on 27-sep):
+For somebody who wants to understand the repository without reading all of it (about 17,700
+lines of source and 12,200 of tests on 27-sep, more since):
 what each technology is, why it is here, and where to find it at work. Three pages:
 
 | Page | What it answers |

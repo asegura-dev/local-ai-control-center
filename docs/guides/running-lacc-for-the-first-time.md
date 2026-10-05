@@ -96,8 +96,10 @@ held 2.0 GB at 4,096 tokens and 3.5 GB at 32,768.
 
 ## Choosing a workspace
 
-`workspace_root` is the only directory a command reads from or writes to. Paths that escape
-it - through `..`, a symlink or an absolute path - are refused before anything is opened.
+`workspace_root` is the only directory a command reads from or writes to, with one read
+outside it: `lacc bring` copies the one file you name into `drafts/`, after showing its full
+path and asking. Paths that escape the workspace - through `..`, a symlink or an absolute
+path - are refused before anything is opened.
 The window writes configurations when you ask it to, after showing what would change;
 [every file LACC writes](../stack/files-on-disk.md) is listed.
 

@@ -264,7 +264,8 @@ sudo ntfy token add lacc
 ```
 
 It prints something starting with `tk_`. **Copy it now** - it is shown once. It goes into
-an environment variable later, never into a file.
+`configs/.env` later - a file git ignores, beside your configuration - and never into the
+configuration itself (Part 2.2 of the hub guide).
 
 **6.8** Choose a topic name. A topic is just a label that groups notifications, but treat it
 as a secret: pick something nobody would guess.

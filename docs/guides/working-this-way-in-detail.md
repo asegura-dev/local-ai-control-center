@@ -219,8 +219,8 @@ cost. Not "fix bug".
 
 - **The number first.** "0.3 to 0.5%" before "the structure is cheap".
 - **A table when there is more than one figure.** Prose hides a comparison.
-- **Say which way an error leaned.** Six of twelve wrong figures here flattered the tool, and
-  that sentence is more useful than the twelve.
+- **Say which way an error leaned.** About half the wrong figures here flattered the tool, and
+  that sentence is more useful than the list.
 - **Say what you got wrong, in the same breath.** Two corrections in one session: a figure
   written as ten that was four, and a claim about where a class belonged that was checked only
   when someone tried to act on it.
