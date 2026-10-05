@@ -61,7 +61,8 @@ choice, the trade-off, and the alternative rejected. The one-line-per-file map i
 Beside the book: [ORIENTATION.md](ORIENTATION.md), one page to read first; `guides/`, step by
 step, from a first run to reading what was done; and `stack/`, what LACC is made of and every
 file it writes. There are two ways in - the `lacc` command, and a window (`lacc window`) that
-reads everything the command produces and asks one kind of question.
+reads everything the command produces, asks a corpus, and acts in four places - each only
+when asked, and shown first.
 
 ## Summary
 

@@ -11,8 +11,9 @@ missing from the first table.
 
 ## What a command writes for you - never over anything
 
-Every one of these goes through `write_new_file` (`cycle.py`), which opens with `"x"`:
-exclusive creation, so an existing file is refused rather than replaced, with no gap between
+Every one of these goes through `write_new_file` (`cycle.py`), which opens with `"x"` -
+and `bring`'s copy of a file's bytes opens with `"xb"`, the same thing: exclusive
+creation, so an existing file is refused rather than replaced, with no gap between
 checking and writing (ADR-039). The refusal reads *"... already exists, and LACC writes its
 results only to new files."*
 

@@ -93,7 +93,7 @@ considered.
 
 **What was measured.** The table. Include the counts that *changed the plan* - "counting
 refused half the idea" is the most useful sentence a record can hold, and it has been true
-three times here.
+more than once here.
 
 **Trade-off.** Never empty. If it is hard to write, the decision is not understood yet. Write
 the strongest version of the objection:

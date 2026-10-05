@@ -90,6 +90,8 @@ not to reach for an approximate algorithm to find them.
 
 ## Decisions - ADRs (`docs/adr/`)
 
+The long form, a paragraph per record, is [adr/README.md](adr/README.md); a new record starts from [adr/TEMPLATE.md](adr/TEMPLATE.md).
+
 | ADR | File | The decision |
 |---|---|---|
 | 001 | [foundational-structure](adr/ADR-001-foundational-structure.md) | Core-first dependency direction, the `src/` package layout, flat modules until a split is justified, and the base stack (uv, Pydantic contracts at the boundary, the quality gate of ruff/mypy/pytest). |
@@ -226,7 +228,7 @@ one, rather than all at once.
 | File | What's in it |
 |---|---|
 | [setting-up-the-server-machine](guides/setting-up-the-server-machine.md) | The hub for turning a machine you own into the one LACC talks to: a diagram of the three pieces and what each is for, links to the per-operating-system walkthrough, then the laptop-side configuration, the checks to run in order, and a table of what each symptom usually means. Ends with the measurement that says whether a bigger model was worth the setup. |
-| [running-the-server-day-to-day](guides/running-the-server-day-to-day.md) | Getting your graphics card back without shutting anything down. The engine holds almost no VRAM; the model does, and it unloads itself after five minutes - or immediately, with one request sent from your laptop. Covers `keep_alive`, stopping and starting the engine per operating system, the Windows boot race that leaves Ollama running with nothing listening, and why the context window makes a 14B model measure 13.63 GB rather than 9. |
+| [running-the-server-day-to-day](guides/running-the-server-day-to-day.md) | Getting your graphics card back without shutting anything down. The engine holds almost no VRAM; the model does, and it unloads itself after five minutes - or immediately, with one request sent from your laptop. Covers `keep_alive`, stopping and starting the engine per operating system, the Windows boot race that leaves Ollama running with nothing listening, and why the context window makes a 14B model hold 15.74 GB at a full window rather than 9 - 12.18 GB with the cache at 8 bits. |
 | [server-setup-on-linux](guides/server-setup-on-linux.md) | One continuous path on Ubuntu Server: Tailscale, Ollama bound to the tailnet rather than to every interface, ufw, a model, and ntfy. Numbered steps with the expected output shown, and checkpoints that say to stop rather than continue with a broken layer underneath. |
 | [server-setup-on-windows](guides/server-setup-on-windows.md) | The same path on Windows 10 and 11: the installers, `SetEnvironmentVariable` for the bind address, `Get-NetTCPConnection` to verify it, and ntfy under Docker Desktop with the published port pinned to the tailnet address. Includes the sleep setting that makes a Windows server stop answering. |
 | [running-lacc-for-the-first-time](guides/running-lacc-for-the-first-time.md) | From nothing to a checked answer about your own document: what to install, what `lacc profile` tells you before you pick a model, why `context_tokens` is the setting that bites (unset means the engine's own 4096 and silent truncation), how to choose a workspace that is not inside git or a sync folder, and how to read a verified, not-found or wrong-page mark. Includes using the verification counts to compare models as an experiment rather than an opinion. Also: comparing models with `lacc measure` rather than one run, `thinking: false` for models that reason, what the anchor catches, and where to go next - the window and a corpus. |
@@ -245,3 +247,5 @@ one, rather than all at once.
 | [README.md](../README.md) (repo root) | The public landing page: what LACC is, its design principles, what it is not, the full command list, and the current status. |
 | [docs/README.md](README.md) | The book's table of contents: the numbered chapters, each marked living, how the docs are organised and where the decisions are listed, and the guiding principle. |
 | [CHANGELOG.md](../CHANGELOG.md) (repo root) | Notable changes, newest first. The "what's new since I last looked" skim. |
+| [PRINCIPLES.md](../PRINCIPLES.md) (repo root) | The non-negotiables every change is measured against - architecture, security and philosophy, stated as hard rules - and how they are used. |
+| [VISION.md](../VISION.md) (repo root) | Where the project is heading: a local, private place to write from your own sources; what it looks like when it arrives, the path there, and what it will never become. |

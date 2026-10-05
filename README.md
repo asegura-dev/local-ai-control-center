@@ -219,7 +219,7 @@ Why the checking matters, in one measured number: across the papers of a real bi
 a 14B model produced 237 quotations and **42 of them are not in the document they cite** -
 about one in six, and re-run on 28 September it gave 38 of 216. The check catches them;
 nothing about the fluency of the surrounding prose distinguishes them. It was published as
-48 until the figure was re-taken with today's checker, which reads a line break a model
+48 until the figure was re-taken on 28 September with that day's checker, which reads a line break a model
 writes as `\n`. Newer models invent far less on the same papers - qwen3.5:9b, 43 of 834 -
 and the check matters exactly as much, because the 43 read like the other 791.
 

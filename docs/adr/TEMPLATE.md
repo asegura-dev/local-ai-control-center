@@ -47,7 +47,7 @@ Optional, and the section that makes the difference when it is there.
 
 A table of what was counted before deciding. If the measurement changed the plan, say so -
 "counting refused half the idea" is the most useful sentence a record can contain, and it
-happened twice here.
+has happened more than once here.
 
 If nothing was measured, leave this out rather than inventing a figure. An absent section is
 honest; a decorative one is not.

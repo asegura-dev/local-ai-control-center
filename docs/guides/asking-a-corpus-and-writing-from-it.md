@@ -4,7 +4,8 @@ This guide starts where [running LACC for the first time](running-lacc-for-the-f
 stops. That one gets a run working against one document. This one is about the thing the
 project exists for: turning a folder of papers into paragraphs you can defend.
 
-Everything here was measured on a real bibliography of 24 papers. Where a number appears, it
+The figures here were measured on real bibliographies - most on one of 24 papers, in
+September 2026. Where a number appears, it
 came from a run, and [chapter 4](../04-measurements.md) says which.
 
 ## The shape of the work
@@ -144,7 +145,7 @@ heading, which is why choosing by meaning exists.
     embedding_model: bge-m3     # in your configuration
 
 Off by default: without it nothing changes. With it, the first question against a corpus
-spends about 48 seconds embedding it and writes the vectors to a file beside it; every
+spends about 48 seconds embedding it - measured on 654 quotations - and writes the vectors to a file beside it; every
 question after that is about three seconds. The vectors are a cache - delete the file and it
 rebuilds.
 

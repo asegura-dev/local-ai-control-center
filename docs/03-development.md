@@ -133,7 +133,7 @@ number in a file is true for a while and then quietly stops being, which is this
 most frequent defect. A figure that can be re-taken in seconds never has to be trusted.
 
 The habit is smaller than the tool. **Before writing a sentence with a number in it, take the
-number.** Twice, a count refused half of a plan that was already being written.
+number.** More than once, a count refused half of a plan that was already being written.
 
 [How a change is made here](guides/how-a-change-is-made-here.md) is the whole method in six
 steps, and [`docs/adr/TEMPLATE.md`](adr/TEMPLATE.md) is the record to copy.

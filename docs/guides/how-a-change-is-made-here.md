@@ -21,7 +21,7 @@ being, which is this project's most frequent defect - chapter 04 lists the wrong
 them flattering. A figure you can re-take in four seconds never needs to be trusted.
 
 The habit worth forming is smaller than the tool: **before writing a sentence with a number in
-it, take the number.** Twice in one session a count refused half of a plan that was already
+it, take the number.** More than once, a count refused half of a plan that was already
 being written.
 
 > Deduplication by MinHash was planned over a premise nobody had looked at. Measured: zero

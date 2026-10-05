@@ -16,7 +16,7 @@ left after its module is gone, fails the suite.
 | `adapters/` | One implementation of a port per file: Ollama, Crossref, PDF and Word, ntfy, rankings | `core/`, `ports/` | `test_an_adapter_reaches_only_for_core_and_ports` |
 | `system/` | Machine-facing code that is not behind a port: the audit trail and the profiler | today `core/`, `ports/`, `adapters/` - no test sets a rule | - |
 | `features/` | Pure slices: every decision a view draws, testable without a display | `core/`, `ports/` | `test_a_slice_reaches_only_for_core_and_ports` |
-| `views/` | The window's sections, one module each, and the shapes they are drawn with | `core/`, `ports/`, `features/`, `views/` | `test_a_section_reaches_only_for_what_a_view_may_reach` |
+| `views/` | The window's sections, several to a module, and the shapes they are drawn with | `core/`, `ports/`, `features/`, `views/` | `test_a_section_reaches_only_for_what_a_view_may_reach` |
 | the root | `cycle.py`, the one place a run proceeds; `cli.py` and `window.py`, the two views | anything - they compose | `test_a_view_contains_no_logic` |
 
 Two rules cross the layers. **A view decides nothing**: a function in `cli.py` or `window.py`

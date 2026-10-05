@@ -170,8 +170,9 @@ default:
 
 A model's weights are not all it occupies. The context window LACC asks for is held in
 VRAM too, and it is not small: a 14B model at Q4 is about 9 GB of weights, and a 32,768
-token window adds roughly 6 GB more at 16-bit - which is why the measurement at the top of
-this page reads 13.63 GB rather than 9.
+token window adds roughly 6 GB more at 16-bit - which is why the 14B measured below holds
+15.74 GB at a full window rather than 9, and 12.18 GB with the cache at 8 bits. The 13.63 GB
+at the top of this page is an example of the listing, not a figure to compare.
 
 A model that reasons before answering holds the card for the whole of it: one sentence
 took 40 seconds on qwen3.5:9b with its reasoning and half a second without. `thinking:

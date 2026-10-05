@@ -197,7 +197,8 @@ model quotes it, and this reports **found**, correctly and uselessly. If a run w
 the document contains text shaped like an instruction, open the extracted Markdown and look.
 
 `lacc ingest` now reports text a reader could not have seen - an invisible rendering mode, a
-font too small to read, a position off the page - with the hidden words themselves. A
+font too small to read, a position off the page - with the hidden words themselves, except
+for an invisible rendering mode, which is reported by its page alone. A
 scanned page is entirely an invisible layer and that is normal; a few hidden lines in a
 typeset paper are not. White-on-white text is still not detected.
 
@@ -270,7 +271,7 @@ deliberately, because they contain whatever you were working on.
 
 ## What to do when a run is refused
 
-A refusal is LACC working, and each one names its reason. The four you are most likely to
+A refusal is LACC working, and each one names its reason. The five you are most likely to
 meet:
 
 | Message about | What happened |
@@ -282,7 +283,8 @@ meet:
 | a file being too large | Over `max_input_bytes`, 32 MiB by default. It is a limit about memory, not about the model. |
 
 A refused run exits non-zero. A run you declined exits zero: nothing failed there - you
-were asked and said no, which is the system working.
+were asked and said no, which is the system working. `resolve`, `coverage` and `identify`
+are the exceptions: declined, they exit 1.
 
 ## Next
 
