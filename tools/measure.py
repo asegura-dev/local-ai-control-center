@@ -2,8 +2,8 @@
 
 **Every figure here is taken now.** Nothing is stored, because a number in a file is a number
 that will be true for a while and then quietly stop being - which is the failure this project
-has recorded twelve times, six of them flattering (`docs/04-measurements.md`). A figure you
-can re-take in four seconds never needs to be trusted.
+keeps recording (`docs/04-measurements.md`). A figure you can re-take in four seconds never
+needs to be trusted.
 
 It measures nothing new. It runs the counts that have been done by hand at the point of
 needing them, so that arguing from measurement is the cheap option rather than the diligent

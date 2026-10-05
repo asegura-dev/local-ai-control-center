@@ -61,9 +61,9 @@ class Work(BaseModel):
     fetched_on: str = ""
     """The date this was received, as YYYY-MM-DD.
 
-    Carried because staleness is this project's most frequent defect: twelve wrong figures,
-    several of them true sentences that had aged (ADR-042). A field with a date can be
-    questioned; a field without one reads as current forever.
+    Carried because staleness is this project's most frequent defect: the wrong figures in
+    `docs/04-measurements.md`, several of them true sentences that had aged (ADR-042). A field
+    with a date can be questioned; a field without one reads as current forever.
     """
 
     @property

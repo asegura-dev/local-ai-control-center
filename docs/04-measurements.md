@@ -641,7 +641,7 @@ rule. The difference is large and holds in most documents one by one, and it is 
 
 ## How to read a figure from this project
 
-**Ask what the check could not see.** Six of the twelve wrong figures in the table above were the check
+**Ask what the check could not see.** Six of the wrong figures in the table above were the check
 reporting its own blind spot. The question that found every one of them was not "what is the
 rate" but "what did it reject, and was it right to".
 

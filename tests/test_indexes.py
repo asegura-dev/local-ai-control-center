@@ -1,7 +1,7 @@
 """The indexes of `src/` and `tests/` name every file, and nothing that is gone.
 
 An index somebody has to remember to update is an index that ages, and this project has
-recorded twelve published figures that aged into falsehoods. Structure is kept; requests are
+recorded published figures that aged into falsehoods. Structure is kept; requests are
 negotiated. So the two pages that say where each thing lives are held by the files themselves:
 a module or a test file added without its line fails here, and so does a line left after its
 file was removed.

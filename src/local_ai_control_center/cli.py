@@ -1161,7 +1161,7 @@ def references(
         # "not among yours" rather than "not held". Only the documents whose own DOI could
         # be read are comparable at all, and saying "not held" of a work sitting in the
         # workspace without a DOI in its metadata would be a false negative dressed as a
-        # fact - the shape of error this project has corrected twelve times (ADR-064).
+        # fact - the shape of error this project keeps correcting (ADR-064).
         mark = (
             "[green]you have this[/green]"
             if doi in held
